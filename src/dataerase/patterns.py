@@ -93,23 +93,41 @@ GENERIC = {
 }
 OK_MARKER = "pii-ok"  # put this on a line to say "this one is fake"
 _PLACEHOLDER_DOMAINS = ("example.com", "example.org", "example.net", ".invalid", ".test", ".localhost")
+# Company inboxes, not people. Matched anywhere in the part before the @ ...
+_ROLE_WORDS = ("privacy", "optout", "opt-out", "opt_out", "removal", "gdpr", "ccpa", "dataprotection",
+               "data-protection", "unsubscribe", "compliance", "noreply", "no-reply", "donotreply")
+# ... or as a whole word of it (info@, legal.team@, customer-support@).
+_ROLE_TOKENS = {"info", "help", "support", "contact", "legal", "care", "hello", "service", "remove",
+                "consumer", "requests", "dpo", "team", "sales", "admin"}
+_TOLL_FREE = {"800", "833", "844", "855", "866", "877", "888"}  # business lines, never personal
 
 
 def generic_hits(line: str) -> list[str]:
-    """Labels of personal-looking data in a line (placeholders and `pii-ok` lines are ignored)."""
+    """Labels of personal-looking data in a line.
+
+    Ignored: lines marked `pii-ok`, placeholders (example.com, 555-01xx), company
+    role inboxes (privacy@, support@) and toll-free numbers, so a list of broker
+    contact details can be committed.
+    """
     if OK_MARKER in line:
         return []
     return [
         label
         for label, regex in GENERIC.items()
-        if any(not _is_placeholder(label, m.group()) for m in regex.finditer(line))
+        if any(not _is_not_personal(label, m.group()) for m in regex.finditer(line))
     ]
 
 
-def _is_placeholder(label: str, text: str) -> bool:
+def _is_not_personal(label: str, text: str) -> bool:
     if label == "email address":
         local, _, domain = text.lower().rpartition("@")
-        return local.startswith(("noreply", "no-reply")) or domain.endswith(_PLACEHOLDER_DOMAINS)
+        return (
+            domain.endswith(_PLACEHOLDER_DOMAINS)
+            or any(word in local for word in _ROLE_WORDS)
+            or bool(_ROLE_TOKENS & set(re.split(r"[._+-]", local)))
+        )
     if label == "phone number":
-        return bool(re.search(r"555[\s.-]?01\d\d", text))  # 555-0100..0199 are reserved for fiction
+        digits = re.sub(r"\D", "", text)[-10:]
+        # 555-0100..0199 are reserved for fiction
+        return digits[:3] in _TOLL_FREE or bool(re.search(r"555[\s.-]?01\d\d", text))
     return False

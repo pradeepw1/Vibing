@@ -82,6 +82,14 @@ def test_logging_formatter_redacts_message_args_and_tracebacks(matchers):
         ("fine: (212) 555-0147", []),
         ("fine: build 2024-10-08, id 1234567890", []),
         ("bob.smith@gmail.com  # pii-ok", []),  # pii-ok
+        # company contact details, so the broker list can be committed
+        ('"contact_email": "privacy@spokeo.com"', []),
+        ("optout@acme-data.com, dataprivacy@acme.com, legal.team@acme.com", []),
+        ("customer-support@acme.com, info@acme.com", []),
+        ("call 1-888-555-2671 or (866) 201-4455", []),
+        # ...but people who just happen to have role-ish letters are still caught
+        ("bob.supporter@gmail.com", ["email address"]),  # pii-ok
+        ("(415) 888-2671", ["phone number"]),  # pii-ok
     ],
 )
 def test_generic_hits(line, expected):
