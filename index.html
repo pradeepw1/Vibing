@@ -346,9 +346,6 @@ section {
 @media (min-width: 1000px) {
   .live-grid { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); column-gap: 64px; align-items: start; }
 }
-@media (min-width: 1000px) and (min-height: 900px) {
-  .panel--you { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); }
-}
 .panel { min-width: 0; }
 .panel--you { display: grid; gap: 20px; }
 .k { margin: 0; font: 400 13px/1.4 var(--font-body); color: var(--muted); }
@@ -1140,8 +1137,8 @@ section {
       .reduce((acc, v, i, arr) => (i === 0 ? v : acc + (i === arr.length - 1 ? ' and ' : ', ') + v), '');
     const good = top('good');
     const bad = top('bad');
-    let html = `${join(good.names)} ${good.names.length > 1 ? 'tie for' : 'gets'} the most Good grades (${good.max}\u00a0of\u00a0${ROWS.length})`;
-    if (bad.max > 0) html += `, and ${join(bad.names)} ${bad.names.length > 1 ? 'tie for' : 'gets'} the most Exposed grades (${bad.max}\u00a0of\u00a0${ROWS.length})`;
+    let html = `${join(good.names)} ${good.names.length > 1 ? 'tie for' : 'gets'} the most Good grades (${good.max}&nbsp;of&nbsp;${ROWS.length})`;
+    if (bad.max > 0) html += `, and ${join(bad.names)} ${bad.names.length > 1 ? 'tie for' : 'gets'} the most Exposed grades (${bad.max}&nbsp;of&nbsp;${ROWS.length})`;
     html += '.';
     if (dev === 'android') html += ' Safari isn’t available on Android.';
     const el = $('#answer');
