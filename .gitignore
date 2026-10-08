@@ -1,0 +1,27 @@
+# --- Personal data: never commit any of this ---------------------------------
+*.enc
+profile.json
+profile.yaml
+profile.yml
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.har
+# Anything a run of the tool could produce: logs, saved pages, screenshots
+/data/
+/secrets/
+/exports/
+/logs/
+/screenshots/
+*.log
+
+# --- Python -------------------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
