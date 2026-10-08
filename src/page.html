@@ -1,0 +1,1739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Browsers Share</title>
+<style>
+/*@font-faces@*/
+:root {
+  /* Layout: an inspection sheet. Four browser cards with a graded bar each, then a ledger of
+     everyday browsing moments by browser, then a live readout of the browser you're using. */
+  --bg: #eceef1;
+  --surface: #fbfbfc;
+  --surface-2: #f2f3f6;
+  --ink: #141820;
+  --ink-2: #465061;
+  --muted: #6c7585;
+  --rule: #d9dde4;
+  --accent: #1f4fd1;
+  --accent-wash: #e3e9fb;
+  --good: #0ca30c;
+  --partial: #fab219;
+  --bad: #d03b3b;
+  --good-ink: #0a660a;
+  --partial-ink: #7a5000;
+  --bad-ink: #a42727;
+  --good-wash: #e1f2e1;
+  --partial-wash: #fcefd2;
+  --bad-wash: #f8e0e0;
+  --na-wash: #e9ebef;
+  --shadow: 0 1px 2px rgba(20, 24, 32, 0.06);
+  --font-display: "Plex Condensed", "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Plex Sans", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Plex Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --surface: #161a21;
+    --surface-2: #1d222b;
+    --ink: #edf0f5;
+    --ink-2: #b3bac6;
+    --muted: #8b93a1;
+    --rule: #2a303a;
+    --accent: #85a7ff;
+    --accent-wash: #1a2643;
+    --good-ink: #5fd15f;
+    --partial-ink: #f7c14f;
+    --bad-ink: #f38080;
+    --good-wash: #10291a;
+    --partial-wash: #2e250e;
+    --bad-wash: #361819;
+    --na-wash: #1b1f27;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #161a21;
+  --surface-2: #1d222b;
+  --ink: #edf0f5;
+  --ink-2: #b3bac6;
+  --muted: #8b93a1;
+  --rule: #2a303a;
+  --accent: #85a7ff;
+  --accent-wash: #1a2643;
+  --good-ink: #5fd15f;
+  --partial-ink: #f7c14f;
+  --bad-ink: #f38080;
+  --good-wash: #10291a;
+  --partial-wash: #2e250e;
+  --bad-wash: #361819;
+  --na-wash: #1b1f27;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+}
+[hidden] { display: none !important; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+code, .mono { font-family: var(--font-mono); }
+
+.wrap {
+  max-width: 1232px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: 28px 72px;
+}
+@media (min-width: 720px) { .wrap { padding-inline: 28px; } }
+
+/* Header */
+.top {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (min-width: 900px) { .top { grid-template-columns: minmax(0, 1fr) auto; } }
+.eyebrow {
+  margin: 0 0 12px;
+  font: 400 12px/1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  margin: 0;
+  font: 600 clamp(36px, 5.6vw, 60px)/1.02 var(--font-display);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.lede {
+  margin: 14px 0 0;
+  max-width: 64ch;
+  font-size: 16.5px;
+  color: var(--ink-2);
+}
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+.device-box { display: grid; gap: 8px; justify-items: start; }
+@media (min-width: 900px) { .device-box { justify-items: end; } }
+.device-box .label {
+  font: 400 12px/1.3 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch label {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.switch label:hover { color: var(--ink); background: var(--surface-2); }
+.switch input:checked + label { background: var(--ink); color: var(--surface); }
+.switch input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Section heads */
+section { margin-top: 44px; scroll-margin-top: 16px; }
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px 24px;
+  margin-bottom: 16px;
+}
+h2 {
+  margin: 0;
+  font: 600 clamp(26px, 3.2vw, 32px)/1.1 var(--font-display);
+  text-wrap: balance;
+}
+.section-head p { margin: 6px 0 0; max-width: 70ch; color: var(--ink-2); }
+
+/* Legend + status chips */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.legend li { display: inline-flex; align-items: center; gap: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font: 600 12px/1.3 var(--font-body);
+  white-space: nowrap;
+}
+.chip svg { width: 12px; height: 12px; flex: none; }
+.chip--good { background: var(--good-wash); color: var(--good-ink); }
+.chip--partial { background: var(--partial-wash); color: var(--partial-ink); }
+.chip--bad { background: var(--bad-wash); color: var(--bad-ink); }
+.chip--na { background: var(--na-wash); color: var(--muted); }
+.chip--neutral { background: var(--surface-2); color: var(--ink-2); }
+
+/* Summary cards */
+.cards {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 18px;
+}
+@media (min-width: 600px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1060px) { .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px 18px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card.is-you { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.card h3 { margin: 0; font: 600 26px/1.05 var(--font-display); }
+.you-badge {
+  font: 600 11px/1.2 var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.card-meta { margin: -6px 0 0; font: 12.5px/1.45 var(--font-mono); color: var(--muted); }
+.bar { display: flex; gap: 2px; height: 26px; }
+.seg {
+  flex: var(--n) 1 0%;
+  min-width: 24px;
+  display: grid;
+  place-items: center;
+  font: 600 12.5px/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.seg:first-child { border-radius: 4px 0 0 4px; }
+.seg:last-child { border-radius: 0 4px 4px 0; }
+.seg:only-child { border-radius: 4px; }
+.seg--good { background: var(--good); color: #08200a; }
+.seg--partial { background: var(--partial); color: #2b1d00; }
+.seg--bad { background: var(--bad); color: #ffffff; }
+.bar--na {
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, var(--na-wash) 0 6px, transparent 6px 12px);
+  border: 1px dashed var(--rule);
+}
+.score { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-2); }
+.score span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.score svg { width: 12px; height: 12px; }
+.score .s-good { color: var(--good-ink); }
+.score .s-partial { color: var(--partial-ink); }
+.score .s-bad { color: var(--bad-ink); }
+.take { margin: 0; font-size: 14.5px; line-height: 1.5; }
+.money { margin: auto 0 0; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); }
+.money b { display: block; margin-bottom: 2px; font: 400 11px/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+/* Tooltip */
+.tip {
+  position: fixed;
+  z-index: 50;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--ink);
+  color: var(--surface);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.tip ul { margin: 6px 0 0; padding-left: 16px; }
+
+/* Ledger */
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  appearance: none;
+  padding: 9px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 14px/1.2 var(--font-body);
+  cursor: pointer;
+}
+.btn:hover { background: var(--surface-2); }
+.btn--primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn--primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn[disabled] { opacity: 0.6; cursor: progress; }
+.linkbtn {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 600 13px/1.3 var(--font-body);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mx {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: clip;
+}
+.mx-head, .mx-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.1fr) repeat(4, minmax(0, 1fr));
+}
+.mx-head {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 3;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.mx-head > div { padding: 12px 14px; min-width: 0; }
+.mx-head > div + div { border-left: 1px solid var(--rule); }
+.mx-head .hb { font: 600 17px/1.15 var(--font-display); }
+.mx-head .hb small {
+  display: block;
+  margin-top: 2px;
+  font: 600 10.5px/1.2 var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.mx-head .hl { font: 400 11.5px/1.3 var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); align-self: end; }
+.mx-group {
+  padding: 22px 16px 10px;
+  border-top: 1px solid var(--rule);
+  background: var(--surface-2);
+}
+.mx-head + .mx-group { border-top: 0; }
+.mx-group h3 { margin: 0; font: 600 20px/1.15 var(--font-display); }
+.mx-group p { margin: 3px 0 0; font-size: 13.5px; color: var(--ink-2); max-width: 80ch; }
+.mx-row { border-top: 1px solid var(--rule); }
+.mx-label { padding: 16px; min-width: 0; }
+.mx-label h4 { margin: 0; font: 600 15.5px/1.3 var(--font-body); text-wrap: balance; }
+.mx-label p { margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
+.mx-cell { padding: 16px 14px; border-left: 1px solid var(--rule); min-width: 0; }
+.mx-cell.is-you { background: var(--accent-wash); }
+.cell-b { display: none; margin-bottom: 6px; font: 600 15px/1.2 var(--font-display); }
+.short { margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
+.more { margin-top: 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.more p { margin: 0; }
+.fix {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font: 12.5px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.mx-cell.is-you .fix { background: var(--surface); }
+.fix b {
+  display: block;
+  margin-bottom: 2px;
+  font: 600 10.5px/1.3 var(--font-body);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mx-src {
+  grid-column: 1 / -1;
+  padding: 10px 16px 14px;
+  border-top: 1px dashed var(--rule);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mx-src ul { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 4px 0 0; padding: 0; list-style: none; }
+@media (max-width: 899px) {
+  .mx-head { display: none; }
+  .mx-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mx-label { grid-column: 1 / -1; padding-bottom: 6px; }
+  .mx-cell { border-left: 0; border-top: 1px solid var(--rule); }
+  .mx-cell:nth-child(odd) { border-left: 1px solid var(--rule); }
+  .cell-b { display: block; }
+}
+@media (max-width: 540px) {
+  .mx-row { grid-template-columns: minmax(0, 1fr); }
+  .mx-cell:nth-child(odd) { border-left: 0; }
+}
+
+/* Live test */
+.live-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) { .live-grid { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); align-items: start; } }
+.panel {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+@media (min-width: 980px) { .panel--you { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); } }
+.panel--you { display: grid; gap: 16px; }
+.k {
+  margin: 0;
+  font: 400 11.5px/1.3 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.you-name { margin: 4px 0 0; font: 600 36px/1.05 var(--font-display); }
+.you-sub { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); }
+.pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); }
+.pick select {
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 14px var(--font-body);
+}
+.fp-code { margin: 4px 0 0; font: 400 clamp(22px, 3vw, 28px)/1.15 var(--font-mono); letter-spacing: 0.03em; overflow-wrap: anywhere; }
+.note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.note--warn { background: var(--partial-wash); color: var(--ink); }
+.steps { margin: 0; padding-left: 20px; font-size: 13.5px; color: var(--ink-2); display: grid; gap: 4px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.status { min-height: 1.4em; margin: 0; font-size: 13px; color: var(--ink-2); }
+#copy-fallback {
+  width: 100%;
+  min-height: 140px;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 12px/1.45 var(--font-mono);
+}
+.facts { display: grid; gap: 22px; }
+.fact-group h3 {
+  margin: 0 0 4px;
+  font: 600 12px/1.3 var(--font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.fact {
+  display: grid;
+  grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
+  gap: 3px 18px;
+  padding: 11px 0;
+  border-top: 1px solid var(--rule);
+}
+.fact-k { font-weight: 600; font-size: 14px; }
+.fact-v { font: 13.5px/1.5 var(--font-mono); overflow-wrap: anywhere; min-width: 0; }
+.fact-v .chip { margin-right: 8px; vertical-align: 1px; }
+.fact-why { grid-column: 2; font-size: 13px; color: var(--ink-2); }
+@media (max-width: 560px) {
+  .fact { grid-template-columns: minmax(0, 1fr); }
+  .fact-why { grid-column: 1; }
+}
+
+/* Footer notes */
+.notes-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.notes-grid h3 { margin: 0 0 8px; font: 600 20px/1.15 var(--font-display); }
+.notes-grid ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; }
+.src-h { margin: 0 0 12px; font: 600 20px/1.15 var(--font-display); }
+.src-list { columns: 1; column-gap: 28px; font-size: 13.5px; }
+@media (min-width: 900px) { .src-list { columns: 2; } }
+.src-list h4 { margin: 0 0 4px; font: 600 14px/1.3 var(--font-body); break-after: avoid; }
+.src-list ul { margin: 0 0 14px; padding-left: 18px; break-inside: avoid; }
+.src-list li { margin-bottom: 3px; }
+.src-panel { margin-top: 16px; }
+.foot { margin-top: 36px; font-size: 12.5px; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .switch label, .linkbtn { transition: background-color 0.15s ease, color 0.15s ease; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <p class="eyebrow">Default settings · checked 8 October 2026</p>
+      <h1>What your browser gives away</h1>
+      <p class="lede">You open a browser, search for something, read a few pages, click a link a friend sent. Here’s what Chrome, Safari, DuckDuckGo and Brave send out while you do that, and who ends up with it.</p>
+      <ul class="jump">
+        <li><a href="#summary">Scores</a></li>
+        <li><a href="#ledger">Side by side</a></li>
+        <li><a href="#live">Test your browser</a></li>
+        <li><a href="#notes">Good to know &amp; sources</a></li>
+      </ul>
+    </div>
+    <div class="device-box">
+      <span class="label" id="device-label">Show me</span>
+      <div class="switch" role="radiogroup" aria-labelledby="device-label">
+        <input type="radio" name="device" id="dev-desktop" value="desktop" checked><label for="dev-desktop">Computer</label>
+        <input type="radio" name="device" id="dev-iphone" value="iphone"><label for="dev-iphone">iPhone</label>
+        <input type="radio" name="device" id="dev-android" value="android"><label for="dev-android">Android</label>
+      </div>
+    </div>
+  </header>
+
+  <section id="summary" aria-labelledby="summary-title">
+    <div class="section-head">
+      <div>
+        <h2 id="summary-title">How each browser scores</h2>
+        <p id="summary-sub">Each browser checked on 11 things, with the settings it comes with.</p>
+      </div>
+      <ul class="legend" aria-label="What the grades mean">
+        <li><span class="chip chip--good" data-icon="good">Good</span>Blocked, or nothing tied to you</li>
+        <li><span class="chip chip--partial" data-icon="partial">Partial</span>Some gets out, or partly blocked</li>
+        <li><span class="chip chip--bad" data-icon="bad">Exposed</span>Sent or open by default</li>
+      </ul>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section id="ledger" aria-labelledby="ledger-title">
+    <div class="section-head">
+      <div>
+        <h2 id="ledger-title">Side by side</h2>
+        <p>Each row is a normal moment in a browsing session. Open the details to see what exactly goes out and how to change it.</p>
+      </div>
+      <div class="tools">
+        <button type="button" class="btn" id="toggle-all" aria-pressed="false">Show all details</button>
+      </div>
+    </div>
+    <div class="mx" id="mx"></div>
+  </section>
+
+  <section id="live" aria-labelledby="live-title">
+    <div class="section-head">
+      <div>
+        <h2 id="live-title">Test the browser you’re using</h2>
+        <p>Everything below is read by this page the same way any website could read it, without asking you. Nothing leaves your device unless you press one of the two test buttons.</p>
+      </div>
+    </div>
+    <div class="live-grid">
+      <aside class="panel panel--you" aria-label="Your browser">
+        <div>
+          <p class="k">You seem to be using</p>
+          <p class="you-name" id="you-name">Checking…</p>
+          <p class="you-sub" id="you-sub"></p>
+        </div>
+        <p class="note" id="you-note" hidden></p>
+        <label class="pick" for="you-pick">Not right? Pick it:
+          <select id="you-pick">
+            <option value="">Choose…</option>
+            <option value="chrome">Chrome</option>
+            <option value="safari">Safari</option>
+            <option value="ddg">DuckDuckGo</option>
+            <option value="brave">Brave</option>
+            <option value="other">Something else</option>
+          </select>
+        </label>
+        <div>
+          <p class="k">Fingerprint code for this browser</p>
+          <p class="fp-code" id="fp-code">····-····-····</p>
+          <p class="you-sub" id="fp-count"></p>
+        </div>
+        <ol class="steps">
+          <li>Write down the code. Clear your cookies, or come back tomorrow, and look again.</li>
+          <li>If the code stays the same, any site could use these details to recognize you, even with no cookies.</li>
+          <li>In Brave, this code changes for every site and each time you restart the browser.</li>
+        </ol>
+        <div class="btns">
+          <button type="button" class="btn btn--primary" id="btn-trackers">Test tracker blocking</button>
+          <button type="button" class="btn" id="btn-ip">Show my IP address</button>
+          <button type="button" class="btn" id="btn-copy">Copy results</button>
+        </div>
+        <p class="status" id="live-status" role="status" aria-live="polite"></p>
+        <p class="note note--warn" id="file-note" hidden>You opened this as a file on your device. Some browsers switch off their tracker blocking for local files, so the tracker test may say “Loaded” even in Brave or DuckDuckGo. Open it from a web address for a fair test.</p>
+        <textarea id="copy-fallback" readonly hidden aria-label="Results to copy"></textarea>
+      </aside>
+      <div class="panel">
+        <div class="facts" id="facts"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="notes" aria-labelledby="notes-title">
+    <div class="section-head">
+      <div>
+        <h2 id="notes-title">Good to know</h2>
+      </div>
+    </div>
+    <div class="notes-grid">
+      <div class="panel">
+        <h3>What no browser hides</h3>
+        <ul>
+          <li><strong>Logging in.</strong> Once you sign in to a site, it knows it’s you, whatever browser you use.</li>
+          <li><strong>Your internet provider</strong> can usually see which websites you connect to (not the pages inside them), unless you use a VPN or iCloud Private Relay.</li>
+          <li><strong>Private and Incognito windows</strong> only stop history being saved on your device. Sites, trackers and your internet provider can still see you.</li>
+          <li><strong>Your search engine</strong> matters as much as your browser. Safari and Chrome both send your searches to Google unless you change it.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>How the grades work</h3>
+        <ul>
+          <li>Every grade is about what happens <strong>with the settings the browser comes with</strong>. Most of the “Exposed” items can be changed; the details say how.</li>
+          <li><strong>Good</strong> means it’s blocked, it’s off until you turn it on, or nothing tied to you leaves. <strong>Partial</strong> means some data goes out but it’s limited or anonymous, or protection only covers part of the problem. <strong>Exposed</strong> means it’s sent or left open by default.</li>
+          <li>What companies say they do is taken from their own pages; we can’t audit their servers. Where a fact comes only from user reports, the details say so.</li>
+          <li>Versions: Chrome and Brave current releases, Safari 27 (September 2026), DuckDuckGo current apps.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="panel src-panel">
+      <h3 class="src-h">Sources</h3>
+      <div class="src-list" id="src-list"></div>
+    </div>
+    <p class="foot">Built as a single file with no outside requests, ads or trackers. Fonts: IBM Plex, under the SIL Open Font License.</p>
+  </section>
+
+</div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Data ----------
+
+  const BROWSERS = [
+    {
+      id: 'chrome', name: 'Chrome', maker: 'Google',
+      engine: { desktop: 'Blink (Chromium)', iphone: 'WebKit (Apple requires it)', android: 'Blink (Chromium)' },
+      money: 'Advertising. Most of Google’s money comes from ads.',
+      take: {
+        desktop: 'Sends the most to its maker and blocks the least. Sites and trackers get a clear view of you.',
+        iphone: 'Apple’s engine blocks cross-site cookies here, but your typing and usage still go to Google and trackers still run.',
+        android: 'Sends the most to its maker and blocks the least. On Android you’re usually signed in to Google already.'
+      }
+    },
+    {
+      id: 'safari', name: 'Safari', maker: 'Apple',
+      engine: { desktop: 'WebKit (Mac only)', iphone: 'WebKit', android: null },
+      money: 'Selling devices and services. Google also pays Apple billions a year to be Safari’s default search engine.',
+      take: {
+        desktop: 'Sends little to Apple and blocks cross-site cookies, but most tracking code still runs and your typing goes to Google.',
+        iphone: 'Sends little to Apple and blocks cross-site cookies, but most tracking code still runs and your typing goes to Google.',
+        android: 'Safari only runs on Apple devices.'
+      }
+    },
+    {
+      id: 'ddg', name: 'DuckDuckGo', maker: 'DuckDuckGo',
+      engine: { desktop: 'WebKit on Mac, WebView2 on Windows', iphone: 'WebKit (Apple requires it)', android: 'Android System WebView' },
+      money: 'Ads on its search results, picked from what you searched rather than a profile, plus a paid subscription.',
+      take: {
+        desktop: 'Blocks most trackers, strips tracking tags and deals with cookie banners. Sends only rounded, anonymous counts home.',
+        iphone: 'Blocks most trackers, strips tracking tags and deals with cookie banners. Sends only rounded, anonymous counts home.',
+        android: 'Blocks most trackers, strips tracking tags and deals with cookie banners. Sends only rounded, anonymous counts home.'
+      }
+    },
+    {
+      id: 'brave', name: 'Brave', maker: 'Brave Software',
+      engine: { desktop: 'Blink (Chromium)', iphone: 'WebKit (Apple requires it)', android: 'Blink (Chromium)' },
+      money: 'Optional private ads, sponsored new-tab images, search ads, and paid extras like Brave VPN.',
+      take: {
+        desktop: 'The most protection out of the box, including scrambled fingerprints. Sends anonymous stats home unless you switch them off.',
+        iphone: 'Strong blocking, but fingerprint protection is weaker on iPhone because of Apple’s engine rules.',
+        android: 'The most protection out of the box, including scrambled fingerprints. Sends anonymous stats home unless you switch them off.'
+      }
+    }
+  ];
+
+  const GROUPS = {
+    maker: {
+      title: 'What the browser company gets',
+      sub: 'Data that goes to Google, Apple, DuckDuckGo or Brave themselves.'
+    },
+    sites: {
+      title: 'What websites and trackers get',
+      sub: 'What the sites you visit, and the ad and tracking companies built into them, can collect through the browser.'
+    }
+  };
+
+  const ROWS = [
+    {
+      id: 'background', group: 'maker',
+      title: 'While the browser is just open',
+      sub: 'Usage stats and crash reports',
+      src: ['g-usage', 'd-atb', 'd-privacy', 'b-p3a', 'b-policy', 'b-ping'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'On by default. Sends how you use Chrome, your system details and settings, tagged with a random ID for your device.',
+          more: 'Crash reports can include the sites you had open and what was in memory at the time. If you’re signed in with sync on, the age and gender on your Google Account may be added.',
+          fix: 'Settings → You and Google → Sync and Google services → turn off “Help improve Chrome’s features and performance”.',
+          iphone: { fix: 'Chrome settings → Google services → turn off “Help improve Chrome’s features and performance”.' },
+          android: { fix: 'Chrome settings → Google services → turn off “Help improve Chrome’s features and performance”.' }
+        },
+        safari: {
+          s: 'good',
+          short: 'Apple asks when you set up the device. If you said no, nothing is sent.',
+          more: 'If you said yes, crash and usage reports go to Apple without your name or Apple Account attached.',
+          fix: 'System Settings → Privacy & Security → Analytics & Improvements.',
+          iphone: { fix: 'Settings → Privacy & Security → Analytics & Improvements.' }
+        },
+        ddg: {
+          s: 'partial',
+          short: 'Sends anonymous, rounded counts, like “about 5 searches this week”. No unique ID, per DuckDuckGo.',
+          more: 'It also adds a test-group code (the “atb” value you may see in search links) so it can compare versions of a feature. DuckDuckGo says it doesn’t store IP addresses or anything that could rebuild your history.',
+          fix: 'We couldn’t find a switch for these counts.'
+        },
+        brave: {
+          s: 'partial',
+          short: 'On by default: anonymous product stats (P3A) and a daily “still in use” ping. No unique ID, per Brave.',
+          more: 'P3A uses a method called STAR, so Brave can only read an answer once many people send the same one. Crash reports are your choice. Some users found the daily ping kept going after they switched it off; Brave said it fixed that in version 1.84.',
+          fix: 'brave://settings/privacy → Data collection → turn off product analytics (P3A) and the daily usage ping.',
+          iphone: { fix: 'Brave settings → Brave Shields & Privacy → turn off product analytics (P3A).' },
+          android: { fix: 'Brave settings → Privacy and security → turn off product analytics (P3A) and the daily usage ping.' }
+        }
+      }
+    },
+    {
+      id: 'typing', group: 'maker',
+      title: 'When you type in the address bar',
+      sub: 'Search suggestions as you type',
+      src: ['g-url', 'a-search', 'd-privacy', 'b-search'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Each letter you type goes to Google, along with your IP address and Google cookies, so it can suggest searches.',
+          more: 'Chrome tries to hold back things that look like passwords or local file names. With “Make searches and browsing better” on, it also sends the address of the page you’re on. If you’re signed in, Google can link all this to your account.',
+          fix: 'Settings → You and Google → Sync and Google services → turn off search suggestions (“Improve search suggestions” or “Autocomplete searches and URLs”) and “Make searches and browsing better”. Or switch search engine.',
+          iphone: { fix: 'Chrome settings → Google services → turn off search suggestions and “Make searches and browsing better”.' },
+          android: { fix: 'Chrome settings → Google services → turn off search suggestions and “Make searches and browsing better”.' }
+        },
+        safari: {
+          s: 'partial',
+          short: 'Goes to Google, Safari’s default search engine. With Safari Suggestions on, Apple gets it too, tied to a random ID that changes every 15 minutes.',
+          more: 'Apple may also get your location (if Location Services is on) and general topics you’re interested in. Apple says none of this is linked to your Apple Account.',
+          fix: 'Safari → Settings → Search → untick search engine suggestions and Safari Suggestions, or pick DuckDuckGo as the search engine.',
+          iphone: { fix: 'Settings → Apps → Safari → turn off Search Engine Suggestions and Safari Suggestions, or set Search Engine to DuckDuckGo.' }
+        },
+        ddg: {
+          s: 'good',
+          short: 'Goes to DuckDuckGo, which says it doesn’t save your searches or your IP address.',
+          more: 'Some results come from Microsoft Bing, but DuckDuckGo sends the search on its own, not tied to you. Search ads are picked from your search words, not a profile.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Goes to Brave Search, the default for new users in the US, UK, Canada, Germany, France and more. Brave says it doesn’t build profiles.',
+          more: 'Brave Search runs its own web index. In some countries the default may be a different engine, so it’s worth checking.',
+          fix: 'brave://settings/search → check which engine is set.',
+          iphone: { fix: 'Brave settings → Search engines → check which engine is set.' },
+          android: { fix: 'Brave settings → Search engines → check which engine is set.' }
+        }
+      }
+    },
+    {
+      id: 'sync', group: 'maker',
+      title: 'When you sync between devices',
+      sub: 'History, bookmarks, passwords, open tabs',
+      src: ['a-icloud', 'd-privacy', 'b-policy'],
+      cells: {
+        chrome: {
+          s: 'partial',
+          short: 'Only if you sign in. Then history, bookmarks, passwords and open tabs are saved to your Google Account, and Google can read most of it.',
+          more: 'Passwords are encrypted. The rest is readable by Google unless you set a sync passphrase. Your Chrome history can also feed your Google “Web & App Activity”, which shapes search results and ads.',
+          fix: 'Settings → You and Google → Sync and Google services → Encryption options → set a passphrase. Or don’t sign in.',
+          iphone: { fix: 'Chrome settings → your name → choose what gets saved, or sign out of Chrome.' },
+          android: {
+            short: 'Android phones are signed in to Google, and Chrome offers one-tap sign-in the first time you open it. After that, history and bookmarks can be saved to your Google Account.',
+            fix: 'Chrome settings → your name → choose what gets saved, or sign out of Chrome.'
+          }
+        },
+        safari: {
+          s: 'good',
+          short: 'Syncs through iCloud. History and open tabs are end-to-end encrypted, so Apple can’t read them.',
+          more: 'Bookmarks are only end-to-end encrypted if you turn on Advanced Data Protection. Otherwise Apple holds the key.',
+          fix: 'To lock bookmarks too: System Settings → your name → iCloud → Advanced Data Protection.',
+          iphone: { fix: 'To lock bookmarks too: Settings → your name → iCloud → Advanced Data Protection.' }
+        },
+        ddg: {
+          s: 'good',
+          short: 'Sync & Backup stays off until you turn it on, and it’s end-to-end encrypted. No account needed.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Brave Sync stays off until you set it up. Your data is encrypted on your device first, and no account is needed.',
+          fix: 'Nothing to change.'
+        }
+      }
+    },
+    {
+      id: 'ai', group: 'maker',
+      title: 'When you use the built-in AI',
+      sub: 'Assistants that read the page for you',
+      src: ['g-gemini', 'a-privacy', 'd-ai', 'b-policy'],
+      cells: {
+        chrome: {
+          s: 'partial',
+          short: 'Gemini in Chrome reads the tab you’re on, plus any tabs you share with it, when you use it.',
+          more: 'Your chats can be kept, read by human reviewers and used to improve Google’s AI, depending on your Gemini activity setting. It can also use your rough location.',
+          fix: 'Turn off “Keep Activity” (once called Gemini Apps Activity) in your Google Account, or don’t use Gemini in Chrome.'
+        },
+        safari: {
+          s: 'good',
+          short: 'Apple Intelligence features, like page summaries, run on your device or on Apple’s Private Cloud Compute, which Apple says doesn’t keep your data.',
+          more: 'They only work on newer devices, and only when you use them.',
+          fix: 'Nothing to change.'
+        },
+        ddg: {
+          s: 'good',
+          short: 'Duck.ai is optional. DuckDuckGo removes your IP address before chats reach the AI company, and chats aren’t used for training.',
+          more: 'The AI companies have to delete what they receive within 30 days. Your chat history stays on your device unless you turn on encrypted sync.',
+          fix: 'You can hide the AI features in settings if you don’t want them.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Leo only sends what you ask, when you ask. Brave says it doesn’t keep your chats or your IP address.',
+          fix: 'Nothing to change. You can hide Leo in settings.'
+        }
+      }
+    },
+    {
+      id: 'cookies', group: 'sites',
+      title: 'Cookies that follow you between sites',
+      sub: 'Third-party cookies',
+      src: ['g-sandbox', 'a-itp', 'ios-xsite', 'd-web', 'b-policy'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Allowed. Google scrapped its plan to phase them out. They’re only blocked in Incognito windows.',
+          more: 'These cookies let ad companies recognize you as you move between any sites that carry their code.',
+          fix: 'Settings → Privacy and security → Third-party cookies → Block third-party cookies.',
+          iphone: {
+            s: 'good',
+            short: 'Blocked. Apple’s engine blocks them for every iPhone browser, Chrome included.',
+            more: 'This comes from iOS, not from Chrome. It shows up as “Allow Cross-Website Tracking” in the iPhone settings for Chrome, which is off by default.',
+            fix: 'Keep Settings → Apps → Chrome → Allow Cross-Website Tracking switched off.'
+          },
+          android: { fix: 'Chrome settings → Site settings → Third-party cookies → Block third-party cookies.' }
+        },
+        safari: {
+          s: 'good',
+          short: 'Blocked by default. Safari’s Intelligent Tracking Prevention also limits cookies made by tracking code to 7 days.',
+          fix: 'Keep “Prevent cross-site tracking” turned on.'
+        },
+        ddg: {
+          s: 'good',
+          short: 'Third-party cookies from known trackers are blocked.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Blocked by default. Each site gets its own separate cookie jar.',
+          fix: 'Nothing to change.'
+        }
+      }
+    },
+    {
+      id: 'trackers', group: 'sites',
+      title: 'Tracking code on the pages you read',
+      sub: 'Ad and analytics scripts',
+      src: ['g-mv2', 'a-webkit26', 'a-afp', 'd-web'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Everything loads. Chrome has no tracker blocker, and since 2025 it no longer runs the older kind of add-on that full blockers like uBlock Origin needed.',
+          more: 'Chrome does block ads on sites with very intrusive ads, but that isn’t aimed at tracking.',
+          fix: 'Add a blocker made for Chrome’s current add-on system, such as uBlock Origin Lite.',
+          iphone: {
+            short: 'Most tracking code loads. Apple’s engine limits what it can store, but Chrome adds no blocking of its own.',
+            fix: 'Chrome on iPhone can’t use blocker add-ons.'
+          },
+          android: { fix: 'Chrome on Android can’t use blocker add-ons.' }
+        },
+        safari: {
+          s: 'partial',
+          short: 'Most tracking code still loads. Known trackers can’t keep long-lasting cookies and don’t see your IP address.',
+          more: 'Since Safari 26, known fingerprinting scripts also can’t save long-lived cookies or read link tags. The stronger “Advanced Tracking and Fingerprinting Protection” blocks known tracker domains, but out of the box it only runs in Private Browsing.',
+          fix: 'Safari → Settings → Advanced → “Use advanced tracking and fingerprinting protection” → in all browsing.',
+          iphone: { fix: 'Settings → Apps → Safari → Advanced → Advanced Tracking and Fingerprinting Protection → All Browsing.' }
+        },
+        ddg: {
+          s: 'good',
+          short: 'Blocks most third-party trackers before they load, including Google’s and Facebook’s.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Brave Shields block trackers and most ads by default.',
+          fix: 'Nothing to change.'
+        }
+      }
+    },
+    {
+      id: 'fingerprint', group: 'sites',
+      title: 'Your device’s “fingerprint”',
+      sub: 'Screen, fonts, graphics chip and more, combined into an ID',
+      src: ['g-script', 'a-webkit26', 'a-pb2', 'd-web', 'b-fp', 'b-ios'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'No protection in normal windows. Sites can combine your screen, fonts, graphics chip and more into a fairly stable ID.',
+          more: 'Google has started blocking some known fingerprinting scripts, but only in Incognito.',
+          fix: 'Not much you can change in Chrome itself.'
+        },
+        safari: {
+          s: 'partial',
+          short: 'Since Safari 26, known fingerprinting scripts get fixed or slightly scrambled values for things like screen size, canvas and audio.',
+          more: 'Scripts that aren’t on Apple’s list still see real values in normal windows. Private Browsing scrambles these for every script.',
+          fix: 'Use Private Browsing, or turn Advanced Tracking and Fingerprinting Protection on for all browsing.'
+        },
+        ddg: {
+          s: 'partial',
+          short: 'Hides or changes some of the device details that fingerprinting scripts read.',
+          more: 'DuckDuckGo calls this Fingerprinting Protection. Run the live test below to see what still shows.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Gives each site a slightly different, random version of your device details, so sites can’t match you across the web.',
+          more: 'The random values change for every site and each time you restart Brave.',
+          fix: 'Nothing to change.',
+          iphone: {
+            s: 'partial',
+            short: 'Weaker on iPhone. Apple’s engine rules limit what Brave can change, and some graphics details stay the same.',
+            more: 'Brave added randomizing on iPhone in 2022, but its newer graphics protections are for computers and Android only.'
+          }
+        }
+      }
+    },
+    {
+      id: 'ip', group: 'sites',
+      title: 'Your IP address',
+      sub: 'Gives away your rough location and internet provider',
+      src: ['g-sandbox', 'a-hideip', 'd-privacy', 'b-policy'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Every site, and every tracker on it, sees your IP address. Google cancelled its planned IP Protection feature in 2025.',
+          fix: 'Use a VPN.'
+        },
+        safari: {
+          s: 'partial',
+          short: 'Hidden from known trackers by default. The websites themselves still see it unless you pay for iCloud+ Private Relay.',
+          fix: 'For full hiding, turn on iCloud Private Relay (needs iCloud+).'
+        },
+        ddg: {
+          s: 'partial',
+          short: 'Websites see it. Blocked trackers never get it, because they never load.',
+          more: 'A VPN comes with DuckDuckGo’s paid subscription.',
+          fix: 'Use a VPN for full hiding.'
+        },
+        brave: {
+          s: 'partial',
+          short: 'Websites see it. Blocked trackers never get it, because they never load.',
+          more: 'On computers, “New private window with Tor” hides it. Brave VPN costs extra.',
+          fix: 'Use a Tor window or a VPN.',
+          iphone: { more: 'Brave VPN costs extra.', fix: 'Use a VPN.' },
+          android: { more: 'Brave VPN costs extra.', fix: 'Use a VPN.' }
+        }
+      }
+    },
+    {
+      id: 'links', group: 'sites',
+      title: 'Tracking tags in links you click',
+      sub: 'Bits like ?fbclid= or ?gclid= stuck on the end of links',
+      src: ['a-webkit26', 'd-web', 'b-debounce'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Kept. The site you land on reads the tag and can tie your visit to the ad or post you came from.',
+          fix: 'Nothing built in.'
+        },
+        safari: {
+          s: 'partial',
+          short: 'Removed in Private Browsing and in links opened from Mail and Messages. Kept in normal windows.',
+          more: 'Since Safari 26, known fingerprinting scripts can’t read them in any window.',
+          fix: 'Turn Advanced Tracking and Fingerprinting Protection on for all browsing.'
+        },
+        ddg: {
+          s: 'good',
+          short: 'Removed. DuckDuckGo strips known tracking tags from links you click.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Removed for known tags. Brave also skips known tracking redirects and goes straight to the real page.',
+          fix: 'Nothing to change.'
+        }
+      }
+    },
+    {
+      id: 'banners', group: 'sites',
+      title: 'Cookie banners',
+      sub: 'The “Accept all” pop-ups on almost every site',
+      src: ['d-web', 'b-cookie'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'You deal with each one yourself. Tapping “Accept all” lets the site share your data with its partners.',
+          fix: 'Look for “Reject all” or “Necessary only”.'
+        },
+        safari: {
+          s: 'bad',
+          short: 'You deal with each one yourself. Tapping “Accept all” lets the site share your data with its partners.',
+          fix: 'Look for “Reject all” or “Necessary only”.'
+        },
+        ddg: {
+          s: 'good',
+          short: 'Picks the most private option for you and hides the banner, where it can.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Hides most cookie banners by default, so you never tap “Accept all” by accident.',
+          fix: 'Nothing to change.'
+        }
+      }
+    },
+    {
+      id: 'gpc', group: 'sites',
+      title: 'A “don’t sell my data” signal',
+      sub: 'Global Privacy Control',
+      src: ['mdn-gpc', 'a-webkit27', 'd-web', 'b-gpc'],
+      cells: {
+        chrome: {
+          s: 'bad',
+          short: 'Not sent, unless you add an extension that sends it.',
+          more: 'This signal tells sites not to sell or share your data. In some US states, like California, sites have to respect it.',
+          fix: 'Add an extension that sends it, such as Privacy Badger.',
+          iphone: { fix: 'Chrome on iPhone can’t add extensions.' },
+          android: { fix: 'Chrome on Android can’t add extensions.' }
+        },
+        safari: {
+          s: 'bad',
+          short: 'Not sent. Safari doesn’t send this signal out of the box.',
+          more: 'Safari 27 lets other apps built on Apple’s engine send it, but Safari itself still doesn’t by default.',
+          fix: 'No setting for it yet.'
+        },
+        ddg: {
+          s: 'good',
+          short: 'Sent to every site by default.',
+          fix: 'Nothing to change.'
+        },
+        brave: {
+          s: 'good',
+          short: 'Sent to every site by default.',
+          fix: 'Nothing to change.'
+        }
+      }
+    }
+  ];
+
+  const SOURCES = {
+    'g-usage': ['Google', 'How Chrome keeps your usage statistics and crash reports private', 'https://support.google.com/chrome/answer/14746339'],
+    'g-url': ['Google', 'How Chrome keeps your URL and search data private', 'https://support.google.com/chrome/answer/13730681'],
+    'g-sandbox': ['Google', 'Update on plans for Privacy Sandbox technologies (Oct 2025)', 'https://privacysandbox.google.com/blog/update-on-plans-for-privacy-sandbox-technologies'],
+    'g-script': ['Google', 'Script blocking in Incognito', 'https://privacysandbox.google.com/protections/script-blocking'],
+    'g-mv2': ['Google', '9to5Google: Chrome disables uBlock Origin', 'https://9to5google.com/2024/10/15/google-chrome-disables-ublock-origin/'],
+    'g-gemini': ['Google', 'University of Michigan IT: Gemini in Chrome', 'https://teamdynamix.umich.edu/TDClient/30/Portal/KB/Article/14329/Google-Gemini-in-Chrome-Browser-Feature'],
+    'a-search': ['Apple', 'Safari Search & Privacy', 'https://support.apple.com/en-in/HT210698'],
+    'a-icloud': ['Apple', 'iCloud data security overview', 'https://support.apple.com/en-us/102651'],
+    'a-privacy': ['Apple', 'Privacy features', 'https://www.apple.com/privacy/features/'],
+    'a-itp': ['Apple', 'WebKit: Tracking Prevention', 'https://webkit.org/tracking-prevention/'],
+    'a-webkit26': ['Apple', 'WebKit: Features in Safari 26.0', 'https://webkit.org/blog/17333/webkit-features-in-safari-26-0/'],
+    'a-webkit27': ['Apple', 'WebKit: Features for Safari 27.0', 'https://webkit.org/blog/18325/webkit-features-for-safari-27-0/'],
+    'a-pb2': ['Apple', 'WebKit: Private Browsing 2.0', 'https://webkit.org/blog/15697/private-browsing-2-0/'],
+    'a-afp': ['Apple', 'Lapcat Software: Safari 26 fingerprinting protection explained', 'https://lapcatsoftware.com/articles/2025/9/4.html'],
+    'a-hideip': ['Apple', 'iMore: Hide your IP address in Safari', 'https://www.imore.com/how-hide-your-ip-address-safari-iphone-and-ipad'],
+    'ios-xsite': ['Apple', 'BrowserStack: Cross-site tracking on iOS', 'https://www.browserstack.com/docs/automate/selenium/ios-cross-site-tracking'],
+    'd-privacy': ['DuckDuckGo', 'Privacy Policy', 'https://duckduckgo.com/privacy'],
+    'd-atb': ['DuckDuckGo', 'Anonymous A/B testing and usage counts', 'https://duckduckgo.com/duckduckgo-help-pages/privacy/atb'],
+    'd-web': ['DuckDuckGo', 'Web tracking protections', 'https://duckduckgo.com/duckduckgo-help-pages/web-browsing-privacy'],
+    'd-ai': ['DuckDuckGo', 'Duck.ai privacy', 'https://duckduckgo.com/duckduckgo-help-pages/duckai/ai-chat-privacy'],
+    'b-policy': ['Brave', 'Browser privacy policy', 'https://brave.com/privacy/browser/'],
+    'b-p3a': ['Brave', 'Privacy-preserving product analytics (P3A)', 'https://brave.com/privacy-preserving-product-analytics-p3a/'],
+    'b-ping': ['Brave', 'Community report: daily usage ping after switching it off', 'https://community.brave.app/t/daily-usage-ping-to-brave-being-sent-regardless-of-off-setting/644973'],
+    'b-search': ['Brave', 'WeLiveSecurity: Brave makes its own search the default', 'https://www.welivesecurity.com/2021/10/20/brave-browser-replaces-google-own-search-engine/'],
+    'b-cookie': ['Brave', 'Blocking cookie consent banners', 'https://brave.com/privacy-updates/21-blocking-cookie-notices/'],
+    'b-fp': ['Brave', 'Simplifying fingerprinting protections', 'https://brave.com/privacy-updates/28-sunsetting-strict-fingerprinting-mode/'],
+    'b-ios': ['Brave', 'Privacy improvements for iPhone', 'https://brave.com/privacy-updates/20-grab-bag-ios/'],
+    'b-debounce': ['Brave', 'Debouncing tracking redirects', 'https://brave.com/privacy-updates/11-debouncing/'],
+    'b-gpc': ['Brave', 'Global Privacy Control', 'https://brave.com/global-privacy-control/'],
+    'mdn-gpc': ['Web standards', 'MDN: navigator.globalPrivacyControl', 'https://developer.mozilla.org/en-US/docs/Web/API/Navigator/globalPrivacyControl']
+  };
+
+  const STATUS = {
+    good: { label: 'Good', word: 'good' },
+    partial: { label: 'Partial', word: 'partial' },
+    bad: { label: 'Exposed', word: 'exposed' },
+    na: { label: 'Not available', word: 'n/a' }
+  };
+
+  const ICON = {
+    good: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.4 2.3 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    partial: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 1.7a4.3 4.3 0 0 1 0 8.6z" fill="currentColor"/></svg>',
+    bad: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    na: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>'
+  };
+
+  const DEVICE_NAMES = { desktop: 'computer', iphone: 'iPhone', android: 'Android' };
+
+  // ---------- Helpers ----------
+
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+  };
+  const chip = (s) => `<span class="chip chip--${s}">${ICON[s]}${STATUS[s].label}</span>`;
+
+  function cellFor(row, bId, dev) {
+    if (bId === 'safari' && dev === 'android') {
+      return { s: 'na', short: 'Safari isn’t available on Android.' };
+    }
+    const base = row.cells[bId];
+    const o = base[dev] || {};
+    return {
+      s: o.s || base.s,
+      short: o.short || base.short,
+      more: 'more' in o ? o.more : base.more,
+      fix: o.fix || base.fix
+    };
+  }
+
+  function tally(bId, dev) {
+    const t = { good: [], partial: [], bad: [], na: [] };
+    for (const r of ROWS) t[cellFor(r, bId, dev).s].push(r.title);
+    return t;
+  }
+
+  // ---------- State ----------
+
+  const state = {
+    device: 'desktop',
+    you: null,
+    open: new Set(),
+    allOpen: false
+  };
+
+  // ---------- Summary cards ----------
+
+  function renderCards() {
+    const dev = state.device;
+    $('#summary-sub').textContent = `Each browser checked on ${ROWS.length} things, using the settings it comes with on ${dev === 'desktop' ? 'a computer' : 'an ' + DEVICE_NAMES[dev]}.`;
+    $('#cards').innerHTML = BROWSERS.map((b) => {
+      const t = tally(b.id, dev);
+      const isNa = t.na.length === ROWS.length;
+      const you = state.you === b.id;
+      const total = ROWS.length;
+      let bar;
+      if (isNa) {
+        bar = `<div class="bar bar--na" role="img" aria-label="${esc(b.name)} is not available on Android"></div>`;
+      } else {
+        const segs = ['good', 'partial', 'bad'].filter((s) => t[s].length).map((s) =>
+          `<span class="seg seg--${s}" style="--n:${t[s].length}" tabindex="0" data-b="${b.id}" data-s="${s}" aria-label="${esc(b.name)}: ${t[s].length} ${STATUS[s].word} out of ${total}">${t[s].length}</span>`
+        ).join('');
+        bar = `<div class="bar" role="group" aria-label="${esc(b.name)}: ${t.good.length} good, ${t.partial.length} partial, ${t.bad.length} exposed, out of ${total}">${segs}</div>`;
+      }
+      const score = isNa ? '<p class="score">Not on Android</p>' :
+        `<p class="score">
+          <span class="s-good">${ICON.good}${t.good.length} good</span>
+          <span class="s-partial">${ICON.partial}${t.partial.length} partial</span>
+          <span class="s-bad">${ICON.bad}${t.bad.length} exposed</span>
+        </p>`;
+      const engine = b.engine[dev];
+      return `<article class="card${you ? ' is-you' : ''}" data-b="${b.id}">
+        <div class="card-head"><h3>${esc(b.name)}</h3>${you ? '<span class="you-badge">You’re using this</span>' : ''}</div>
+        <p class="card-meta">by ${esc(b.maker)}${engine ? ' · ' + esc(engine) : ''}</p>
+        ${bar}
+        ${score}
+        <p class="take">${esc(b.take[dev])}</p>
+        <p class="money"><b>Makes money from</b>${esc(b.money)}</p>
+      </article>`;
+    }).join('');
+  }
+
+  // Tooltip for bar segments
+  const tip = $('#tip');
+  function showTip(seg) {
+    const b = BROWSERS.find((x) => x.id === seg.dataset.b);
+    const s = seg.dataset.s;
+    const t = tally(b.id, state.device);
+    tip.innerHTML = `<strong>${esc(b.name)}</strong> · ${STATUS[s].label}: ${t[s].length} of ${ROWS.length}<ul>${t[s].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    tip.hidden = false;
+    const r = seg.getBoundingClientRect();
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    let left = r.left + r.width / 2 - tw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    let top = r.top - th - 8;
+    if (top < 8) top = r.bottom + 8;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  }
+  function hideTip() { tip.hidden = true; }
+  const cards = $('#cards');
+  cards.addEventListener('pointerover', (e) => { const seg = e.target.closest('.seg'); if (seg) showTip(seg); });
+  cards.addEventListener('pointerout', (e) => { if (e.target.closest('.seg')) hideTip(); });
+  cards.addEventListener('focusin', (e) => { const seg = e.target.closest('.seg'); if (seg) showTip(seg); });
+  cards.addEventListener('focusout', hideTip);
+  window.addEventListener('scroll', hideTip, { passive: true });
+
+  // ---------- Side-by-side ledger ----------
+
+  function renderLedger() {
+    const dev = state.device;
+    const head = `<div class="mx-head" aria-hidden="true">
+      <div class="hl">Moment</div>
+      ${BROWSERS.map((b) => `<div class="hb">${esc(b.name)}${state.you === b.id ? '<small>You’re using this</small>' : ''}</div>`).join('')}
+    </div>`;
+    let html = head;
+    let lastGroup = null;
+    for (const r of ROWS) {
+      if (r.group !== lastGroup) {
+        lastGroup = r.group;
+        html += `<div class="mx-group"><h3>${esc(GROUPS[r.group].title)}</h3><p>${esc(GROUPS[r.group].sub)}</p></div>`;
+      }
+      const open = state.allOpen || state.open.has(r.id);
+      const cells = BROWSERS.map((b) => {
+        const c = cellFor(r, b.id, dev);
+        const you = state.you === b.id ? ' is-you' : '';
+        let extra = '';
+        if (c.s !== 'na') {
+          extra = `<div class="more"${open ? '' : ' hidden'}>
+            ${c.more ? `<p>${esc(c.more)}</p>` : ''}
+            ${c.fix ? `<div class="fix"><b>Change it</b>${esc(c.fix)}</div>` : ''}
+          </div>`;
+        }
+        return `<div class="mx-cell${you}" data-b="${b.id}">
+          <span class="cell-b">${esc(b.name)}</span>
+          ${chip(c.s)}
+          <p class="short">${esc(c.short)}</p>
+          ${extra}
+        </div>`;
+      }).join('');
+      const srcs = `<div class="mx-src"${open ? '' : ' hidden'}>Sources<ul>${r.src.map((k) => {
+        const s = SOURCES[k];
+        return `<li><a href="${esc(s[2])}" target="_blank" rel="noopener noreferrer">${esc(s[1])}</a></li>`;
+      }).join('')}</ul></div>`;
+      html += `<div class="mx-row" data-row="${r.id}">
+        <div class="mx-label">
+          <h4>${esc(r.title)}</h4>
+          <p>${esc(r.sub)}</p>
+          <button type="button" class="linkbtn" data-toggle="${r.id}" aria-expanded="${open}">${open ? 'Hide details' : 'Show details'}</button>
+        </div>
+        ${cells}
+        ${srcs}
+      </div>`;
+    }
+    $('#mx').innerHTML = html;
+  }
+
+  $('#mx').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-toggle]');
+    if (!btn) return;
+    const id = btn.dataset.toggle;
+    const row = btn.closest('.mx-row');
+    const isOpen = btn.getAttribute('aria-expanded') === 'true';
+    if (isOpen) state.open.delete(id); else state.open.add(id);
+    if (isOpen && state.allOpen) {
+      // Leaving "all open" mode: keep every other row open.
+      state.allOpen = false;
+      ROWS.forEach((r) => { if (r.id !== id) state.open.add(r.id); });
+      syncToggleAll();
+    }
+    row.querySelectorAll('.more, .mx-src').forEach((el) => { el.hidden = isOpen; });
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    btn.textContent = isOpen ? 'Show details' : 'Hide details';
+  });
+
+  function syncToggleAll() {
+    const btn = $('#toggle-all');
+    btn.setAttribute('aria-pressed', String(state.allOpen));
+    btn.textContent = state.allOpen ? 'Hide all details' : 'Show all details';
+  }
+  $('#toggle-all').addEventListener('click', () => {
+    state.allOpen = !state.allOpen;
+    state.open.clear();
+    syncToggleAll();
+    renderLedger();
+  });
+
+  // ---------- Sources list ----------
+
+  function renderSources() {
+    const by = {};
+    for (const k of Object.keys(SOURCES)) {
+      const [who, title, url] = SOURCES[k];
+      (by[who] = by[who] || []).push(`<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a></li>`);
+    }
+    const order = ['Google', 'Apple', 'DuckDuckGo', 'Brave', 'Web standards'];
+    const label = { Google: 'Chrome', Apple: 'Safari', DuckDuckGo: 'DuckDuckGo', Brave: 'Brave', 'Web standards': 'Web standards' };
+    $('#src-list').innerHTML = order.filter((w) => by[w]).map((w) => `<h4>${esc(label[w])}</h4><ul>${by[w].join('')}</ul>`).join('');
+  }
+
+  // ---------- Device switch ----------
+
+  function setDevice(dev, save) {
+    state.device = dev;
+    const input = document.getElementById(`dev-${dev}`);
+    if (input) input.checked = true;
+    if (save) store.set('wbs-device', dev);
+    renderCards();
+    renderLedger();
+  }
+  document.querySelectorAll('input[name="device"]').forEach((el) => {
+    el.addEventListener('change', () => { if (el.checked) setDevice(el.value, true); });
+  });
+
+  // ---------- Live test ----------
+
+  const LIVE_GROUPS = [
+    ['where', 'Where you are, roughly'],
+    ['device', 'Your device'],
+    ['browser', 'Your browser'],
+    ['fp', 'Fingerprint tests'],
+    ['signals', 'Privacy signals']
+  ];
+  const facts = new Map();
+  function setFact(id, group, label, value, why, tone) {
+    facts.set(id, { id, group, label, value, why, tone: tone || null });
+  }
+  function renderFacts() {
+    $('#facts').innerHTML = LIVE_GROUPS.map(([g, title]) => {
+      const rows = [...facts.values()].filter((f) => f.group === g);
+      if (!rows.length) return '';
+      return `<div class="fact-group"><h3>${esc(title)}</h3>${rows.map((f) => `
+        <div class="fact">
+          <div class="fact-k">${esc(f.label)}</div>
+          <div class="fact-v">${f.tone ? chip(f.tone) : ''}${esc(f.value)}</div>
+          ${f.why ? `<div class="fact-why">${esc(f.why)}</div>` : ''}
+        </div>`).join('')}</div>`;
+    }).join('');
+  }
+
+  function hash(str) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+  }
+  const groupCode = (h) => `${h.slice(0, 4)}-${h.slice(4, 8)}-${h.slice(8, 12)}`;
+
+  function systemName() {
+    const ua = navigator.userAgent;
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/Android/.test(ua)) { const m = ua.match(/Android\s([\d.]+)/); return 'Android' + (m ? ' ' + m[1] : ''); }
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/CrOS/.test(ua)) return 'ChromeOS';
+    if (/Mac OS X|Macintosh/.test(ua)) return 'Mac';
+    if (/Linux/.test(ua)) return 'Linux';
+    return 'Unknown';
+  }
+
+  function detectDevice() {
+    const ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iphone';
+    if (/Android/.test(ua)) return 'android';
+    return 'desktop';
+  }
+
+  async function detectBrowser() {
+    const ua = navigator.userAgent;
+    const brands = ((navigator.userAgentData && navigator.userAgentData.brands) || []).map((b) => b.brand);
+    try {
+      if (navigator.brave && typeof navigator.brave.isBrave === 'function' && await navigator.brave.isBrave()) return { id: 'brave', sure: true };
+    } catch (e) { /* not Brave */ }
+    if (/DuckDuckGo\/|\bDdg\//.test(ua) || brands.some((b) => /duckduckgo/i.test(b))) return { id: 'ddg', sure: true };
+    if (brands.includes('Brave')) return { id: 'brave', sure: true };
+    if (/CriOS\//.test(ua)) return { id: 'chrome', sure: true };
+    if (/Edg\/|EdgA\/|EdgiOS\/|OPR\/|Firefox\/|FxiOS\/|SamsungBrowser\/|Vivaldi|YaBrowser/.test(ua)) return { id: 'other', sure: true };
+    if (brands.includes('Google Chrome')) return { id: 'chrome', sure: true };
+    if (/Chrome\//.test(ua)) return { id: 'chrome', sure: false };
+    if (/Safari\//.test(ua) && /Version\//.test(ua)) return { id: 'safari', sure: false };
+    return { id: 'other', sure: false };
+  }
+
+  const NAME_FOR = { chrome: 'Chrome', safari: 'Safari', ddg: 'DuckDuckGo', brave: 'Brave', other: 'Another browser' };
+
+  function applyYou(id, how) {
+    state.you = ['chrome', 'safari', 'ddg', 'brave'].includes(id) ? id : null;
+    $('#you-name').textContent = NAME_FOR[id] || 'Another browser';
+    $('#you-pick').value = id || '';
+    const dev = detectDevice();
+    const sub = how === 'picked' ? `You picked this, on ${systemName()}.` : `Detected on ${systemName()}.`;
+    $('#you-sub').textContent = sub;
+    const note = $('#you-note');
+    let msg = '';
+    if (how === 'guess-safari') {
+      msg = 'DuckDuckGo and Brave on Apple devices can look exactly like Safari to websites. If you’re using one of them, pick it below.';
+    } else if (how === 'guess-chrome') {
+      msg = 'Some browsers built on Chrome’s engine look the same as Chrome to websites. If this isn’t Chrome, pick it below.';
+    } else if (id === 'other') {
+      msg = 'This page compares Chrome, Safari, DuckDuckGo and Brave. The live test below still works for any browser.';
+    }
+    note.textContent = msg;
+    note.hidden = !msg;
+    if (state.you && !store.get('wbs-device')) setDevice(dev, false);
+    else { renderCards(); renderLedger(); }
+  }
+
+  $('#you-pick').addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    store.set('wbs-you', v);
+    applyYou(v, 'picked');
+  });
+
+  function canvasTest() {
+    try {
+      const c = document.createElement('canvas');
+      c.width = 260; c.height = 64;
+      const x = c.getContext('2d');
+      x.textBaseline = 'top';
+      x.font = '16px Arial, sans-serif';
+      x.fillStyle = '#f60';
+      x.fillRect(110, 6, 90, 30);
+      x.fillStyle = '#069';
+      x.fillText('Browser check \u{1F603} 1.0', 4, 10);
+      x.fillStyle = 'rgba(102, 204, 0, 0.7)';
+      x.fillText('Browser check \u{1F603} 1.0', 6, 14);
+      x.beginPath();
+      x.arc(222, 32, 20, 0, Math.PI * 2);
+      x.fill();
+      const a = c.toDataURL();
+      const b = c.toDataURL();
+      return { code: groupCode(hash(a)), changes: a !== b };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function audioTest() {
+    return new Promise((resolve) => {
+      try {
+        const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        if (!AC) { resolve(null); return; }
+        const ctx = new AC(1, 5000, 44100);
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(10000, 0);
+        const comp = ctx.createDynamicsCompressor();
+        [['threshold', -50], ['knee', 40], ['ratio', 12], ['attack', 0], ['release', 0.25]].forEach(([k, v]) => {
+          if (comp[k] && comp[k].setValueAtTime) comp[k].setValueAtTime(v, 0);
+        });
+        osc.connect(comp);
+        comp.connect(ctx.destination);
+        osc.start(0);
+        const timer = setTimeout(() => resolve(null), 2500);
+        const done = (buf) => {
+          clearTimeout(timer);
+          try {
+            const d = buf.getChannelData(0);
+            let sum = 0;
+            for (let i = 4500; i < 5000; i++) sum += Math.abs(d[i]);
+            resolve(groupCode(hash(sum.toString())));
+          } catch (e) { resolve(null); }
+        };
+        ctx.oncomplete = (ev) => done(ev.renderedBuffer);
+        const p = ctx.startRendering();
+        if (p && typeof p.then === 'function') p.then(done).catch(() => { clearTimeout(timer); resolve(null); });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  function gpuInfo() {
+    try {
+      const c = document.createElement('canvas');
+      const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      if (!gl) return null;
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      return renderer ? String(renderer) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const FONT_LIST = ['Arial', 'Arial Black', 'Arial Narrow', 'Calibri', 'Cambria', 'Candara', 'Century Gothic', 'Comic Sans MS', 'Consolas', 'Constantia', 'Corbel', 'Courier New', 'Franklin Gothic Medium', 'Garamond', 'Georgia', 'Impact', 'Lucida Console', 'Lucida Sans Unicode', 'Palatino Linotype', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana', 'American Typewriter', 'Avenir', 'Avenir Next', 'Baskerville', 'Didot', 'Futura', 'Geneva', 'Gill Sans', 'Helvetica Neue', 'Hiragino Sans', 'Menlo', 'Monaco', 'Optima', 'PingFang SC', 'Roboto', 'Noto Sans', 'Ubuntu', 'DejaVu Sans', 'Liberation Sans', 'Cantarell', 'Fira Sans', 'Open Sans', 'Lato', 'Source Sans Pro', 'Microsoft YaHei', 'MS Gothic', 'Meiryo', 'Malgun Gothic', 'SimSun', 'Nirmala UI', 'Mangal'];
+
+  function detectFonts() {
+    try {
+      const c = document.createElement('canvas');
+      const x = c.getContext('2d');
+      const sample = 'mmmmmmmmmmwwwwwwlli10OQ@#';
+      const bases = ['monospace', 'serif', 'sans-serif'];
+      const baseWidth = {};
+      bases.forEach((b) => { x.font = `72px ${b}`; baseWidth[b] = x.measureText(sample).width; });
+      return FONT_LIST.filter((f) => bases.some((b) => {
+        x.font = `72px "${f}", ${b}`;
+        return x.measureText(sample).width !== baseWidth[b];
+      }));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function tzOffset() {
+    const m = -new Date().getTimezoneOffset();
+    const sign = m >= 0 ? '+' : '-';
+    const a = Math.abs(m);
+    return `UTC${sign}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
+  }
+
+  async function runLive() {
+    const nav = navigator;
+    const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown'; } catch (e) { return 'Unknown'; } })();
+    setFact('tz', 'where', 'Time zone', `${tz} (${tzOffset()})`, 'Narrows down which part of the world you’re in.');
+    setFact('langs', 'where', 'Languages', (nav.languages && nav.languages.length ? nav.languages.join(', ') : nav.language) || 'Unknown', 'Hints at where you live and which languages you read.');
+    setFact('ip', 'where', 'Public IP address', 'Press “Show my IP address” to look it up', 'Shows your rough location and internet provider. Every site you visit gets this.');
+
+    setFact('system', 'device', 'System', systemName(), 'Narrows down which kind of device you use.');
+    setFact('screen', 'device', 'Screen', `${screen.width} × ${screen.height}, pixel ratio ${Math.round((window.devicePixelRatio || 1) * 100) / 100}, ${screen.colorDepth}-bit colour`, 'Screen size and sharpness are common fingerprint clues.');
+    setFact('window', 'device', 'Window size', `${window.innerWidth} × ${window.innerHeight}`, 'Changes as you resize, but still helps tell people apart in the moment.');
+    setFact('cores', 'device', 'Processor cores', nav.hardwareConcurrency ? String(nav.hardwareConcurrency) : 'Hidden', 'More or fewer cores than usual makes you stand out.');
+    setFact('memory', 'device', 'Memory', nav.deviceMemory ? `${nav.deviceMemory} GB (rounded)` : 'Not shared', 'Only browsers built on Chrome’s engine share this.');
+    setFact('touch', 'device', 'Touch points', String(nav.maxTouchPoints || 0), 'Tells a phone or tablet apart from a computer.');
+    const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setFact('prefs', 'device', 'Display settings', `${dark ? 'Dark' : 'Light'} mode${calm ? ', reduced motion' : ''}`, 'Small settings like these add a little more to your fingerprint.');
+    setFact('gpu', 'device', 'Graphics chip', 'Checking…', 'The name of your graphics chip is one of the most identifying details.');
+
+    setFact('ua', 'browser', 'User agent', nav.userAgent, 'Sent with every page you load. Names your browser, its version and your system.');
+    setFact('hints', 'browser', 'Extra details on request', 'Checking…', 'Browsers built on Chrome’s engine can hand over your exact version and device model when a site asks.');
+    setFact('fonts', 'browser', 'Installed fonts found', 'Checking…', 'Your set of fonts can be close to unique, especially if you’ve installed your own.');
+    setFact('cookies', 'browser', 'Cookies', nav.cookieEnabled ? 'Allowed for this page' : 'Blocked', 'Most sites need first-party cookies to keep you signed in.');
+
+    setFact('canvas', 'fp', 'Canvas drawing', 'Checking…', 'Every device draws the same text and shapes a tiny bit differently. Sites turn that into a code.');
+    setFact('audio', 'fp', 'Audio processing', 'Checking…', 'The same trick, using sound that’s never played out loud.');
+
+    const gpc = nav.globalPrivacyControl;
+    setFact('gpc', 'signals', 'Global Privacy Control', gpc === true ? 'Sending “don’t sell my data”' : 'Not sending', 'Tells sites not to sell or share your data. Some US states make sites respect it.', gpc === true ? 'good' : 'bad');
+    const dnt = nav.doNotTrack || window.doNotTrack;
+    setFact('dnt', 'signals', 'Do Not Track', dnt === '1' ? 'On' : 'Off', 'An older signal that most sites ignore.', null);
+    setFact('trackers', 'signals', 'Tracker blocking', 'Press “Test tracker blocking” to check', 'Tries to reach Google Analytics and the Facebook pixel, two of the most common trackers.');
+    renderFacts();
+
+    if (location.protocol === 'file:') $('#file-note').hidden = false;
+
+    // Slower checks
+    const gpu = gpuInfo();
+    setFact('gpu', 'device', 'Graphics chip', gpu || 'Hidden', 'The name of your graphics chip is one of the most identifying details.');
+
+    let hints = 'Not offered by this browser';
+    if (nav.userAgentData && typeof nav.userAgentData.getHighEntropyValues === 'function') {
+      try {
+        const h = await nav.userAgentData.getHighEntropyValues(['platformVersion', 'architecture', 'model', 'fullVersionList']);
+        const parts = [];
+        if (h.platform) parts.push(`${h.platform}${h.platformVersion ? ' ' + h.platformVersion : ''}`);
+        if (h.architecture) parts.push(h.architecture);
+        if (h.model) parts.push(`model ${h.model}`);
+        if (h.fullVersionList) {
+          const main = h.fullVersionList.find((v) => !/not.?a.?brand/i.test(v.brand) && v.brand !== 'Chromium') || h.fullVersionList[0];
+          if (main) parts.push(`${main.brand} ${main.version}`);
+        }
+        hints = parts.length ? parts.join(' · ') : 'Offered, but empty';
+      } catch (e) { hints = 'Offered, but refused here'; }
+    }
+    setFact('hints', 'browser', 'Extra details on request', hints, 'Browsers built on Chrome’s engine can hand over your exact version and device model when a site asks.');
+
+    const fonts = detectFonts();
+    setFact('fonts', 'browser', 'Installed fonts found', fonts ? `${fonts.length} of ${FONT_LIST.length} checked${fonts.length ? ': ' + fonts.join(', ') : ''}` : 'Hidden', 'Your set of fonts can be close to unique, especially if you’ve installed your own.');
+
+    const cv = canvasTest();
+    setFact('canvas', 'fp', 'Canvas drawing', cv ? `${cv.code}${cv.changes ? ' (changes every time: your browser adds noise)' : ''}` : 'Blocked', 'Every device draws the same text and shapes a tiny bit differently. Sites turn that into a code.', cv && cv.changes ? 'good' : null);
+    renderFacts();
+
+    const au = await audioTest();
+    setFact('audio', 'fp', 'Audio processing', au || 'Blocked or not supported', 'The same trick, using sound that’s never played out loud.');
+    renderFacts();
+
+    const parts = [nav.userAgent, (nav.languages || []).join(','), tz, screen.width, screen.height, screen.colorDepth, window.devicePixelRatio, nav.hardwareConcurrency, nav.deviceMemory, nav.maxTouchPoints, gpu, hints, (fonts || []).join(','), cv && cv.code, au];
+    $('#fp-code').textContent = groupCode(hash(parts.map((p) => String(p)).join('|')));
+    const readable = [...facts.values()].filter((f) => !['ip', 'trackers', 'gpc', 'dnt'].includes(f.id)).length;
+    $('#fp-count').textContent = `This page read ${readable} details about your device and browser without asking.`;
+  }
+
+  // Outside requests: only when a button is pressed.
+  const cspBlocked = new Set();
+  document.addEventListener('securitypolicyviolation', (e) => {
+    try { cspBlocked.add(new URL(e.blockedURI).host); } catch (err) { cspBlocked.add(String(e.blockedURI)); }
+  });
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function probe(url) {
+    const host = new URL(url).host;
+    try {
+      await fetch(url, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' });
+      return 'loaded';
+    } catch (e) {
+      await wait(200);
+      return cspBlocked.has(host) ? 'host' : 'blocked';
+    }
+  }
+
+  const status = $('#live-status');
+
+  $('#btn-trackers').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    status.textContent = 'Contacting google-analytics.com and connect.facebook.net once, without cookies…';
+    const [ga, fb] = await Promise.all([
+      probe('https://www.google-analytics.com/analytics.js'),
+      probe('https://connect.facebook.net/en_US/fbevents.js')
+    ]);
+    const results = [ga, fb];
+    let value, tone;
+    if (results.includes('host')) {
+      value = 'Can’t test here: the site hosting this copy blocks all outside requests. Open the GitHub version to run it.';
+      tone = null;
+    } else if (results.every((r) => r === 'blocked')) {
+      value = 'Both trackers blocked';
+      tone = 'good';
+    } else if (results.every((r) => r === 'loaded')) {
+      value = 'Both trackers loaded';
+      tone = 'bad';
+    } else {
+      value = `Google Analytics ${ga === 'loaded' ? 'loaded' : 'blocked'}, Facebook pixel ${fb === 'loaded' ? 'loaded' : 'blocked'}`;
+      tone = 'partial';
+    }
+    setFact('trackers', 'signals', 'Tracker blocking', value, 'Tried to reach Google Analytics and the Facebook pixel, two of the most common trackers. “Blocked” can also mean your network or a blocker app stopped it.', tone);
+    renderFacts();
+    status.textContent = 'Tracker test done.';
+    btn.disabled = false;
+  });
+
+  $('#btn-ip').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    status.textContent = 'Asking api.ipify.org, a free IP lookup service…';
+    let value;
+    try {
+      const res = await fetch('https://api.ipify.org?format=json', { credentials: 'omit', cache: 'no-store' });
+      const data = await res.json();
+      value = data && data.ip ? data.ip : 'No answer';
+    } catch (err) {
+      await wait(200);
+      value = cspBlocked.has('api.ipify.org')
+        ? 'Can’t look it up here: the site hosting this copy blocks outside requests. Every normal website still sees it.'
+        : 'Couldn’t reach the lookup service. Your browser, network or a blocker may have stopped it.';
+    }
+    setFact('ip', 'where', 'Public IP address', value, 'Shows your rough location and internet provider. Every site you visit gets this.');
+    renderFacts();
+    status.textContent = 'IP lookup done.';
+    btn.disabled = false;
+  });
+
+  $('#btn-copy').addEventListener('click', () => {
+    const lines = [
+      'What Browsers Share: live test',
+      `Browser: ${$('#you-name').textContent}`,
+      `Fingerprint code: ${$('#fp-code').textContent}`,
+      `Date: ${new Date().toISOString().slice(0, 10)}`,
+      ''
+    ];
+    for (const [g, title] of LIVE_GROUPS) {
+      const rows = [...facts.values()].filter((f) => f.group === g);
+      if (!rows.length) continue;
+      lines.push(title.toUpperCase());
+      rows.forEach((f) => lines.push(`${f.label}: ${f.value}`));
+      lines.push('');
+    }
+    const text = lines.join('\n');
+    const fallback = () => {
+      const ta = $('#copy-fallback');
+      ta.value = text;
+      ta.hidden = false;
+      ta.focus();
+      ta.select();
+      status.textContent = 'Copying isn’t allowed here. The results are selected below, so copy them by hand.';
+    };
+    try {
+      navigator.clipboard.writeText(text).then(() => { status.textContent = 'Copied. Paste it somewhere to compare with another browser.'; }, fallback);
+    } catch (err) {
+      fallback();
+    }
+  });
+
+  // Put the status icons into the legend chips.
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.insertAdjacentHTML('afterbegin', ICON[el.dataset.icon]); });
+
+  // ---------- Boot ----------
+
+  const savedDevice = store.get('wbs-device');
+  if (savedDevice && DEVICE_NAMES[savedDevice]) state.device = savedDevice;
+  setDevice(state.device, false);
+  renderSources();
+
+  const savedYou = store.get('wbs-you');
+  detectBrowser().then((d) => {
+    if (savedYou) { applyYou(savedYou, 'picked'); return; }
+    let how = 'detected';
+    if (!d.sure && d.id === 'safari') how = 'guess-safari';
+    if (!d.sure && d.id === 'chrome') how = 'guess-chrome';
+    applyYou(d.id, how);
+  });
+  runLive();
+})();
+</script>
+</body>
+</html>
