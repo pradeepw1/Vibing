@@ -20,7 +20,6 @@ OUT = ROOT / "index.html"
 MARKER = "/*@font-faces@*/"
 
 FONTS = [
-    ("Plex Condensed", 600, "ibm-plex-sans-condensed-latin-600-normal.woff2"),
     ("Plex Sans", 400, "ibm-plex-sans-latin-400-normal.woff2"),
     ("Plex Sans", 600, "ibm-plex-sans-latin-600-normal.woff2"),
     ("Plex Mono", 400, "ibm-plex-mono-latin-400-normal.woff2"),
