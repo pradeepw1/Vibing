@@ -122,12 +122,12 @@ section {
 /* Status mark: icon + word, colour on the text only */
 .chip {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 5px;
   font: 600 var(--fs-small)/1.3 var(--font-body);
   white-space: nowrap;
 }
-.chip svg { width: 11px; height: 11px; flex: none; }
+.chip svg { width: 11px; height: 11px; flex: none; align-self: center; }
 .chip--good { color: var(--good-ink); }
 .chip--partial { color: var(--partial-ink); }
 .chip--bad { color: var(--bad-ink); }
@@ -160,7 +160,7 @@ section {
   cursor: pointer;
 }
 .btn:hover { background: var(--rule); }
-.btn[disabled] { opacity: 0.6; cursor: progress; }
+.btn[aria-disabled="true"] { opacity: 0.6; cursor: progress; }
 
 /* Header */
 .eyebrow { margin: 0 0 14px; font: 400 13px/1.4 var(--font-body); color: var(--muted); }
@@ -173,30 +173,36 @@ section {
 .device-box { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; margin: 6px 0 2px; }
 .device-box .label { font: 400 13px/1.4 var(--font-body); color: var(--muted); }
 .switch { display: inline-flex; gap: 20px; }
-.switch input { position: absolute; opacity: 0; pointer-events: none; }
 .switch label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  border-bottom: 2px solid transparent;
   font: 400 15px/1.2 var(--font-body);
   color: var(--ink-2);
   cursor: pointer;
   user-select: none;
 }
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switch span { padding-block: 6px 4px; border-bottom: 2px solid transparent; }
 .switch label:hover { color: var(--ink); }
-.switch input:checked + label { color: var(--ink); border-bottom-color: var(--ink); }
-.switch input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:checked + span { color: var(--ink); border-bottom-color: var(--ink); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (forced-colors: active) {
+  .switch span { border-bottom-color: Canvas; }
+  .switch input:checked + span { border-bottom-color: CanvasText; }
+}
 .answer { margin: 10px 0 0; max-width: 60ch; font-size: var(--fs-answer); line-height: 1.5; }
 .answer b { font-weight: 600; }
 .sub { margin: 4px 0 0; max-width: 62ch; font-size: 14px; color: var(--ink-2); }
-@media (min-width: 720px) {
-  .summary-head { grid-template-columns: minmax(0, 1fr) auto; column-gap: 32px; }
-  .summary-head h2 { grid-column: 1; grid-row: 1; }
-  .answer { grid-column: 1; grid-row: 2; }
-  .sub { grid-column: 1; grid-row: 3; }
-  .device-box { grid-column: 2; grid-row: 1 / span 3; align-self: start; margin: -10px 0 0; }
-}
 
 .summary-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px var(--gap-col); }
 #cards { display: contents; }
@@ -263,6 +269,7 @@ section {
 
 /* Side by side */
 .mx-head, .mx-row { display: grid; grid-template-columns: var(--cols); column-gap: var(--gap-col); }
+.mx-head { align-items: baseline; }
 .mx-head {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
@@ -272,7 +279,7 @@ section {
   border-bottom: 1px solid var(--rule-strong);
 }
 .mx-head > div { min-width: 0; }
-.mx-head .hl { align-self: end; font: 400 13px/1.3 var(--font-body); color: var(--muted); }
+.mx-head .hl { font: 400 13px/1.3 var(--font-body); color: var(--muted); }
 .mx-head .hb { padding-top: 6px; border-top: 2px solid transparent; font: 600 15px/1.3 var(--font-body); }
 .mx-head .hb.is-you { border-top-color: var(--accent); }
 .mx-head .hb small { display: block; font: 400 12.5px/1.3 var(--font-body); color: var(--accent); }
@@ -300,9 +307,9 @@ section {
 .fix b { font-weight: 600; }
 .mx-src { grid-column: 2 / -1; padding-top: 14px; font-size: 13px; line-height: 1.5; color: var(--muted); }
 .mx-src ul, .mx-src li { display: inline; margin: 0; padding: 0; }
-.mx-src li + li::before { content: " · "; }
 .mx-src a { color: var(--ink-2); }
 #toggle-all { font-size: 14px; }
+@media (min-width: 1000px) { html { scroll-padding-top: 80px; } }
 @media (max-width: 999px) {
   .mx-head { display: none; }
   .mx-row { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
@@ -336,6 +343,8 @@ section {
 .live-grid { display: grid; gap: 48px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1000px) {
   .live-grid { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); column-gap: 64px; align-items: start; }
+}
+@media (min-width: 1000px) and (min-height: 900px) {
   .panel--you { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); }
 }
 .panel { min-width: 0; }
@@ -380,7 +389,7 @@ section {
 }
 .fact-k { font: 400 14px/1.45 var(--font-body); }
 .fact-v { font: 400 13px/1.5 var(--font-mono); overflow-wrap: anywhere; min-width: 0; }
-.fact-v .chip { margin-right: 8px; vertical-align: -1px; }
+.fact-v .chip { margin-right: 8px; }
 .fact-why { grid-column: 2; font-size: 13px; color: var(--muted); }
 @media (max-width: 560px) {
   .fact { grid-template-columns: minmax(0, 1fr); }
@@ -437,15 +446,16 @@ section {
     </ul>
   </header>
 
+  <main>
   <section id="summary" aria-labelledby="summary-title">
     <div class="summary-head">
       <h2 id="summary-title">How each browser scores</h2>
       <div class="device-box">
         <span class="label" id="device-label">Show for</span>
         <div class="switch" role="radiogroup" aria-labelledby="device-label">
-          <input type="radio" name="device" id="dev-desktop" value="desktop" checked><label for="dev-desktop">Computer</label>
-          <input type="radio" name="device" id="dev-iphone" value="iphone"><label for="dev-iphone">iPhone</label>
-          <input type="radio" name="device" id="dev-android" value="android"><label for="dev-android">Android</label>
+          <label><input type="radio" name="device" id="dev-desktop" value="desktop" checked><span>Computer</span></label>
+          <label><input type="radio" name="device" id="dev-iphone" value="iphone"><span>iPhone</span></label>
+          <label><input type="radio" name="device" id="dev-android" value="android"><span>Android</span></label>
         </div>
       </div>
       <p class="answer" id="answer" aria-live="polite"></p>
@@ -467,7 +477,7 @@ section {
         <h2 id="ledger-title">Side by side</h2>
         <p>Each row is a normal moment in a browsing session. Open the details to see what exactly goes out and how to change it.</p>
       </div>
-      <button type="button" class="linkbtn" id="toggle-all" aria-pressed="false">Show all details</button>
+      <button type="button" class="linkbtn" id="toggle-all">Show all details</button>
     </div>
     <div class="mx" id="mx"></div>
   </section>
@@ -480,7 +490,7 @@ section {
       </div>
     </div>
     <div class="live-grid">
-      <aside class="panel panel--you" aria-label="Your browser">
+      <div class="panel panel--you">
         <div>
           <p class="k">You seem to be using</p>
           <p class="you-name" id="you-name">Checking…</p>
@@ -507,15 +517,15 @@ section {
           <li>If the code stays the same, any site could use these details to recognize you, even with no cookies.</li>
           <li>In Brave, this code changes for every site and each time you restart the browser.</li>
         </ol>
+        <p class="note note--warn" id="file-note" data-icon="partial" hidden>You opened this as a file on your device. Some browsers switch off their tracker blocking for local files, so the tracker test may say “Loaded” even in Brave or DuckDuckGo. Open it from a web address for a fair test.</p>
         <div class="btns">
           <button type="button" class="btn" id="btn-trackers">Test tracker blocking</button>
           <button type="button" class="btn" id="btn-ip">Show my IP address</button>
           <button type="button" class="linkbtn" id="btn-copy">Copy results</button>
         </div>
         <p class="status" id="live-status" role="status" aria-live="polite"></p>
-        <p class="note note--warn" id="file-note" data-icon="partial" hidden>You opened this as a file on your device. Some browsers switch off their tracker blocking for local files, so the tracker test may say “Loaded” even in Brave or DuckDuckGo. Open it from a web address for a fair test.</p>
         <textarea id="copy-fallback" readonly hidden aria-label="Results to copy"></textarea>
-      </aside>
+      </div>
       <div class="panel">
         <div class="facts" id="facts"></div>
       </div>
@@ -549,11 +559,12 @@ section {
       </div>
     </div>
     <details class="src" id="sources">
-      <summary>All sources (<span id="src-count">30</span>)</summary>
+      <summary><span>All sources (<span id="src-count">30</span>)</span></summary>
       <div class="src-list" id="src-list"></div>
     </details>
     <p class="foot">Built as a single file with no outside requests, ads or trackers. Fonts: IBM Plex, under the SIL Open Font License.</p>
   </section>
+  </main>
 
 </div>
 
@@ -1078,7 +1089,8 @@ section {
     device: 'desktop',
     you: null,
     open: new Set(),
-    allOpen: false
+    allOpen: false,
+    deviceChosen: false
   };
 
   // ---------- Summary ----------
@@ -1126,11 +1138,12 @@ section {
       .reduce((acc, v, i, arr) => (i === 0 ? v : acc + (i === arr.length - 1 ? ' and ' : ', ') + v), '');
     const good = top('good');
     const bad = top('bad');
-    let html = `${join(good.names)} ${good.names.length > 1 ? 'tie for' : 'gets'} the most Good grades (${good.max} of ${ROWS.length})`;
-    if (bad.max > 0) html += `, and ${join(bad.names)} ${bad.names.length > 1 ? 'tie for' : 'gets'} the most Exposed grades (${bad.max} of ${ROWS.length})`;
+    let html = `${join(good.names)} ${good.names.length > 1 ? 'tie for' : 'gets'} the most Good grades (${good.max}\u00a0of\u00a0${ROWS.length})`;
+    if (bad.max > 0) html += `, and ${join(bad.names)} ${bad.names.length > 1 ? 'tie for' : 'gets'} the most Exposed grades (${bad.max}\u00a0of\u00a0${ROWS.length})`;
     html += '.';
     if (dev === 'android') html += ' Safari isn’t available on Android.';
-    $('#answer').innerHTML = html;
+    const el = $('#answer');
+    if (el.innerHTML !== html) el.innerHTML = html;
   }
 
   // ---------- Side-by-side ledger ----------
@@ -1166,15 +1179,15 @@ section {
           ${extra}
         </div>`;
       }).join('');
-      const links = r.src.map((k) => {
+      const links = r.src.map((k, i) => {
         const src = SOURCES[k];
-        return `<li><a href="${esc(src[2])}" target="_blank" rel="noopener noreferrer">${esc(src[1])}</a></li>`;
+        return `<li>${i ? '<span aria-hidden="true"> · </span>' : ''}<a href="${esc(src[2])}" target="_blank" rel="noopener noreferrer">${esc(src[1])}</a></li>`;
       }).join('');
       html += `<div class="mx-row" data-row="${r.id}">
         <div class="mx-label">
-          <h4>${esc(r.title)}</h4>
+          <h4 id="row-${r.id}">${esc(r.title)}</h4>
           <p>${esc(r.sub)}</p>
-          <button type="button" class="linkbtn" data-toggle="${r.id}" aria-expanded="${open}">${open ? 'Hide details' : 'Show details'}</button>
+          <button type="button" class="linkbtn" data-toggle="${r.id}" aria-expanded="${open}" aria-describedby="row-${r.id}">${open ? 'Hide details' : 'Show details'}</button>
         </div>
         ${cells}
         <div class="mx-src"${open ? '' : ' hidden'}><span>Sources:</span> <ul>${links}</ul></div>
@@ -1203,7 +1216,6 @@ section {
 
   function syncToggleAll() {
     const btn = $('#toggle-all');
-    btn.setAttribute('aria-pressed', String(state.allOpen));
     btn.textContent = state.allOpen ? 'Hide all details' : 'Show all details';
   }
   $('#toggle-all').addEventListener('click', () => {
@@ -1233,7 +1245,10 @@ section {
     state.device = dev;
     const input = document.getElementById(`dev-${dev}`);
     if (input) input.checked = true;
-    if (save) store.set('wbs-device', dev);
+    if (save) {
+      state.deviceChosen = true;
+      store.set('wbs-device', dev);
+    }
     renderCards();
     renderLedger();
   }
@@ -1335,7 +1350,7 @@ section {
     }
     note.textContent = msg;
     note.hidden = !msg;
-    if (state.you && !store.get('wbs-device')) setDevice(dev, false);
+    if (!state.deviceChosen && !store.get('wbs-device') && state.device !== dev) setDevice(dev, false);
     else { renderCards(); renderLedger(); }
   }
 
@@ -1539,7 +1554,8 @@ section {
 
   $('#btn-trackers').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
-    btn.disabled = true;
+    if (btn.getAttribute('aria-disabled') === 'true') return;
+    btn.setAttribute('aria-disabled', 'true');
     status.textContent = 'Contacting google-analytics.com and connect.facebook.net once, without cookies…';
     const [ga, fb] = await Promise.all([
       probe('https://www.google-analytics.com/analytics.js'),
@@ -1563,12 +1579,13 @@ section {
     setFact('trackers', 'signals', 'Tracker blocking', value, 'Tried to reach Google Analytics and the Facebook pixel, two of the most common trackers. “Blocked” can also mean your network or a blocker app stopped it.', tone);
     renderFacts();
     status.textContent = `Tracker test: ${value}${/\.$/.test(value) ? '' : '.'}`;
-    btn.disabled = false;
+    btn.removeAttribute('aria-disabled');
   });
 
   $('#btn-ip').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
-    btn.disabled = true;
+    if (btn.getAttribute('aria-disabled') === 'true') return;
+    btn.setAttribute('aria-disabled', 'true');
     status.textContent = 'Asking api.ipify.org, a free IP lookup service…';
     let value;
     let ok = false;
@@ -1586,7 +1603,7 @@ section {
     setFact('ip', 'where', 'Public IP address', value, 'Shows your rough location and internet provider. Every site you visit gets this.');
     renderFacts();
     status.textContent = ok ? `Your IP address: ${value}` : value;
-    btn.disabled = false;
+    btn.removeAttribute('aria-disabled');
   });
 
   $('#btn-copy').addEventListener('click', () => {
@@ -1626,15 +1643,13 @@ section {
   // Printing opens every detail and the source list, then puts them back.
   let printSnap = null;
   window.addEventListener('beforeprint', () => {
-    printSnap = { all: state.allOpen, src: $('#sources').open };
-    state.allOpen = true;
-    renderLedger();
+    printSnap = { src: $('#sources').open };
+    document.querySelectorAll('#mx [hidden]').forEach((el) => { el.hidden = false; el.dataset.printHidden = ''; });
     $('#sources').open = true;
   });
   window.addEventListener('afterprint', () => {
     if (!printSnap) return;
-    state.allOpen = printSnap.all;
-    renderLedger();
+    document.querySelectorAll('#mx [data-print-hidden]').forEach((el) => { el.hidden = true; delete el.dataset.printHidden; });
     $('#sources').open = printSnap.src;
     printSnap = null;
   });
