@@ -1,13 +1,14 @@
-"""Command line entry point: init, show, leak-check."""
+"""Command line entry point: init, show, leak-check, brokers."""
 from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from datetime import date
 from pathlib import Path
 
-from . import leakcheck, vault
+from . import brokers, leakcheck, vault
 from .patterns import build_matchers
 from .profile import Profile
 from .redact import configure_logging
@@ -20,12 +21,16 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         return args.run(args)
-    except vault.VaultError as e:
+    except (vault.VaultError, brokers.BrokerListError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
     except (KeyboardInterrupt, EOFError):
         print("\ncancelled", file=sys.stderr)
         return 130
+    except BrokenPipeError:
+        # Output was piped into something like `head` that stopped reading. Not an error.
+        sys.stdout = open(os.devnull, "w")
+        return 0
     except Exception as e:
         # Deliberately no message and no traceback: either could contain your details.
         print(f"error: unexpected {type(e).__name__} (details hidden to protect your data)", file=sys.stderr)
@@ -50,6 +55,12 @@ def _parser() -> argparse.ArgumentParser:
     leak.add_argument("--path", type=Path, help="profile location")
     leak.add_argument("--no-history", action="store_true", help="only scan current files")
     leak.set_defaults(run=_leak_check)
+
+    brk = sub.add_parser("brokers", help="list the data brokers and how to get off each one")
+    brk.add_argument("id", nargs="?", help="show everything about one broker")
+    brk.add_argument("--category", choices=brokers.CATEGORIES)
+    brk.add_argument("--region", help="only ones you can use from here, e.g. US or US-CA")
+    brk.set_defaults(run=_brokers)
     return parser
 
 
@@ -100,6 +111,65 @@ def _leak_check(args: argparse.Namespace) -> int:
         print(f"... and {len(findings) - MAX_SHOWN} more")
     print(f"\n{len(findings)} place(s) contain your details. Values are not shown on purpose.")
     return 1
+
+
+def _brokers(args: argparse.Namespace) -> int:
+    # No passphrase needed: the broker list holds no personal data.
+    catalog = brokers.load()
+    if args.id:
+        broker = catalog.get(args.id)
+        if broker is None:
+            retired = next((r for r in catalog.retired if r.id == args.id), None)
+            reason = f" It was retired: {retired.notes}" if retired else ""
+            print(f"No broker with id {args.id!r}.{reason} Run `dataerase brokers` to see them all.", file=sys.stderr)
+            return 1
+        _print_broker(broker)
+        return 0
+
+    shown = [
+        b for b in catalog.brokers
+        if (not args.category or b.category == args.category)
+        and (not args.region or any(args.region == r or args.region.startswith(r + "-") for r in b.regions))
+    ]
+    width = max((len(b.id) for b in shown), default=2)
+    print(f"{'id':<{width}}  {'category':<13} {'how':<17} {'asks for':<44} {'days':>4}  confidence")
+    for b in shown:
+        asks = ", ".join(b.requires) or "-"
+        if len(asks) > 44:
+            asks = asks[:41] + "..."
+        days = str(b.processing_days) if b.processing_days is not None else "?"
+        flag = "  !" if b.red_flags else ""
+        print(f"{b.id:<{width}}  {b.category:<13} {b.method:<17} {asks:<44} {days:>4}  {b.confidence}{flag}")
+
+    print(f"\n{len(shown)} brokers. "
+          f"{sum(b.needs_listing_url for b in shown)} need you to find your own listing first.")
+    if flagged := [b.id for b in shown if b.red_flags]:
+        print(f"! Want ID, SSN or payment, which this tool never gives: {', '.join(flagged)}")
+    if unsure := [b.id for b in shown if b.confidence == "unsure"]:
+        print(f"Couldn't confirm these are still working: {', '.join(unsure)}")
+    print("Details for one: dataerase brokers <id>")
+    return 0
+
+
+def _print_broker(b: brokers.Broker) -> None:
+    rows = [
+        ("name", b.name), ("website", b.website), ("category", b.category), ("owner", b.owner or "-"),
+        ("also removes", ", ".join(b.covers) or "-"), ("opt out at", b.opt_out_url or "-"),
+        ("method", b.method), ("email to", b.contact_email or "-"),
+        ("find listing first", "yes" if b.needs_listing_url else "no"),
+        ("asks for", ", ".join(b.requires) or "-"), ("they check you by", ", ".join(b.verification) or "-"),
+        ("takes (days)", b.processing_days if b.processing_days is not None else "unknown"),
+        ("regions", ", ".join(b.regions)), ("look-up URL", b.search_url or "-"),
+        ("confidence", f"{b.confidence} (checked {b.checked})"),
+    ]
+    for label, value in rows:
+        print(f"  {label:<20} {value}")
+    if b.red_flags:
+        print(f"  {'WARNING':<20} asks for {', '.join(b.red_flags)}. The tool won't send this; decide by hand.")
+    if b.notes:
+        print(f"  {'notes':<20} {b.notes}")
+    for src in b.sources:
+        print(f"  {'source':<20} {src}")
 
 
 def _print_masked(profile: Profile) -> None:

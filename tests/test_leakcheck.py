@@ -111,6 +111,20 @@ def test_staged_blocks_sensitive_file_names(repo):
     assert {f.where for f in leakcheck.scan_staged(repo)} == {"profile.enc", ".env", "profile.json", "export.har"}
 
 
+def test_allowlist_accepts_only_exact_values(repo):
+    (repo / ".leakcheck-allow").write_text("# business lines\nPress@Acme-Data.com  # their press office\n(415) 201-4455\n")  # pii-ok
+    stage(repo, "a.txt", "press@acme-data.com\ncall 415.201.4455\n")  # pii-ok
+    assert leakcheck.scan_staged(repo) == []
+    stage(repo, "b.txt", "bob.smith@gmail.com\n(415) 201-4456\n")  # pii-ok
+    assert {f.where for f in leakcheck.scan_staged(repo)} == {"b.txt:1", "b.txt:2"}
+
+
+def test_allowlist_file_passes_its_own_check(repo):
+    (repo / ".leakcheck-allow").write_text("press@acme-data.com\n")  # pii-ok
+    git(repo, "add", ".leakcheck-allow")
+    assert leakcheck.scan_staged(repo) == []
+
+
 def test_line_with_form_feed_is_not_hidden(repo):
     stage(repo, "a.txt", "ok\x0cbob.smith@gmail.com\n")  # pii-ok
     assert len(leakcheck.scan_staged(repo)) == 1

@@ -102,20 +102,31 @@ _ROLE_TOKENS = {"info", "help", "support", "contact", "legal", "care", "hello", 
 _TOLL_FREE = {"800", "833", "844", "855", "866", "877", "888"}  # business lines, never personal
 
 
-def generic_hits(line: str) -> list[str]:
+def generic_hits(line: str, allowed: frozenset[str] = frozenset()) -> list[str]:
     """Labels of personal-looking data in a line.
 
     Ignored: lines marked `pii-ok`, placeholders (example.com, 555-01xx), company
-    role inboxes (privacy@, support@) and toll-free numbers, so a list of broker
-    contact details can be committed.
+    role inboxes (privacy@, support@), toll-free numbers, and exact values in
+    `allowed` (see allow_key), so a list of broker contact details can be committed.
     """
     if OK_MARKER in line:
         return []
     return [
         label
         for label, regex in GENERIC.items()
-        if any(not _is_not_personal(label, m.group()) for m in regex.finditer(line))
+        if any(
+            not _is_not_personal(label, m.group()) and allow_key(m.group()) not in allowed
+            for m in regex.finditer(line)
+        )
     ]
+
+
+def allow_key(value: str) -> str:
+    """How a value is compared with the allow-list: emails ignore case, numbers ignore formatting."""
+    value = value.strip()
+    if "@" in value:
+        return value.lower()
+    return re.sub(r"\D", "", value)[-10:]
 
 
 def _is_not_personal(label: str, text: str) -> bool:

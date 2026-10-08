@@ -1,0 +1,15 @@
+# Public company and government contact details that the commit check should
+# accept. These come from the broker list (src/dataerase/data/brokers.json).
+#
+# Only ever add a business or government address here. Never a person's own
+# email or phone number: anything listed here can be committed freely.
+
+Register@donotcall.gov
+membersupport@mylife.com
+expungement@spokeo.com
+datenschutz@acxiom.com
+consumercare@liveramp.com
+TWNFreeze@equifax.com
+(614) 665-0450
+dfr.ndp.licensing@dcbs.oregon.gov
+503-947-7300

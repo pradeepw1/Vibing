@@ -17,9 +17,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
-from .patterns import Matcher, generic_hits
+from .patterns import Matcher, allow_key, generic_hits
 
 MAX_FILE_BYTES = 5_000_000
+# Exact company/government contact details the commit check should accept.
+ALLOW_FILE = ".leakcheck-allow"
 COMMIT_MARK = "@@@COMMIT:"
 # Files that should never be committed, whatever is inside them.
 BLOCKED_NAME = re.compile(
@@ -100,11 +102,21 @@ def scan_staged(root: Path) -> list[Finding]:
         if BLOCKED_NAME.search(base) and not ALLOWED_NAME.match(base):
             findings.append(Finding(name, "file type that should never be committed"))
 
+    allowed = load_allowlist(root)
     diff = _git(root, "diff", "--cached", "-U0", "--no-color", "--diff-filter=ACMR")
     for _, path, lineno, text in _added_lines(diff):
-        for label in generic_hits(text):
+        for label in generic_hits(text, allowed):
             findings.append(Finding(f"{path}:{lineno}", f"looks like a {label}"))
     return findings
+
+
+def load_allowlist(root: Path) -> frozenset[str]:
+    """Values from .leakcheck-allow: one per line, # for comments."""
+    path = root / ALLOW_FILE
+    if not path.exists():
+        return frozenset()
+    lines = (line.split("#")[0].strip() for line in path.read_text("utf-8").splitlines())
+    return frozenset(allow_key(line) for line in lines if line)
 
 
 # --- helpers ------------------------------------------------------------------
