@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -63,7 +65,7 @@ def test_shipped_list_is_safe_to_commit():
     # The pre-commit hook must accept every line: company contact details only.
     allowed = leakcheck.load_allowlist(Path(__file__).resolve().parent.parent)
     text = brokers.resources.files("dataerase").joinpath("data/brokers.json").read_text("utf-8")
-    flagged = [(n, generic_hits(line, allowed)) for n, line in enumerate(text.split("\n"), 1)]
+    flagged = [(n, generic_hits(line, allowed, company_contacts=True)) for n, line in enumerate(text.split("\n"), 1)]
     assert [f for f in flagged if f[1]] == []
 
 
@@ -129,6 +131,11 @@ def test_opt_out_may_live_on_your_listing_page(tmp_path):
         ({"id": "Acme Corp"}, "slug"),
         ({"name": "  "}, "can't be empty"),
         ({"surprise": 1}, "unknown keys"),
+        ({"covers": ["https://sister.example.com/optout"]}, "bare hostnames"),
+        ({"covers": ["sister"]}, "bare hostnames"),
+        ({"regions": []}, "regions"),
+        ({"regions": ["us"]}, "regions"),
+        ({"regions": ["United States"]}, "regions"),
     ],
 )
 def test_bad_entries_are_rejected(tmp_path, overrides, message):
@@ -203,6 +210,23 @@ def test_cli_filters_by_region(capsys, shipped):
     # California residents can use everything a US resident can, plus state-only tools.
     count = lambda out: int(out.split(" brokers.")[0].split("\n")[-1])
     assert count(california) > count(us_only)
+
+
+def test_cli_region_ignores_case(capsys):
+    main(["brokers", "--region", "us-ca"])
+    lower = capsys.readouterr().out
+    main(["brokers", "--region", "US-CA"])
+    assert lower == capsys.readouterr().out
+
+
+def test_cli_output_piped_into_head_exits_cleanly():
+    src = str(Path(__file__).resolve().parent.parent / "src")
+    proc = subprocess.Popen([sys.executable, "-m", "dataerase", "brokers"], env={"PYTHONPATH": src},
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc.stdout.readline()
+    proc.stdout.close()  # like `| head -1`
+    _, err = proc.communicate()
+    assert proc.returncode == 0 and err == b""
 
 
 def test_cli_shows_one_broker(capsys, shipped):

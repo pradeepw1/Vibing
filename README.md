@@ -16,7 +16,7 @@ Sending the requests comes next.
 | Where it could leak | What stops it |
 |---|---|
 | **Disk** | Your details are stored encrypted (AES-256-GCM, key from your passphrase via scrypt). The file is `0600` in a `0700` folder. The passphrase is never saved. |
-| **Git** | The tool won't store the profile inside any git repo. `.gitignore` blocks profile, `.env`, key, log and screenshot files. A pre-commit hook blocks anything that looks like an email, phone number or SSN. |
+| **Git** | The tool won't store the profile inside any git repo. `.gitignore` blocks profile, `.env`, key, log and screenshot files. A pre-commit hook blocks anything that looks like an email, phone number or SSN. The only exceptions are exact business contacts listed in `.leakcheck-allow`, plus company inboxes and toll-free numbers inside the broker list file. |
 | **Screen and logs** | Values are masked when shown (`j***@e***`). `Profile` can't be printed. Logs and error output are scrubbed of your real values. Crash dumps are turned off. |
 | **Proof** | `dataerase leak-check` searches the files **and the full git history** for your exact values, including the commit author name and email. It reports where, never what. |
 
@@ -95,7 +95,7 @@ No passphrase needed. The list holds only public company details
 **How sure each entry is:**
 
 - `checked-live` (66): we loaded the broker's own page on the date shown.
-- `recent-guides` (32): the page blocks bots, so this comes from 2025-2026 removal guides that agree.
+- `recent-guides` (32): the page blocks bots, so this comes from 2025-2026 removal guides. Where they disagree, the notes say so.
 - `unsure` (9): couldn't confirm the site still works. The list command names these.
 
 **Flags (`!`).** A few brokers want something this tool will never hand over:
@@ -105,28 +105,36 @@ No passphrase needed. The list holds only public company details
 
 You decide those by hand.
 
-**Each broker sends only what it asks for.** `asks for` lists exactly what the opt-out
-form needs, and the next step uses it to send nothing more. Where a form takes either
-date of birth or street address, the list picks the address.
+**Each broker gets only what it asks for.** `asks for` lists what the opt-out form is
+known to need, and the next step uses it to send nothing more:
+- Where a form takes either date of birth or street address, the list picks the address.
+- MyLife only needs your birth year, so that's all it gets.
+- A few two-step forms haven't had their second page documented (SmartBackgroundChecks,
+  FastBackgroundCheck, FamilyTreeNow). They may ask for more, and you decide by hand.
 
 **Things to know:**
 
 - Sister sites aren't always covered by one request. FastPeopleSearch's owner runs ten
-  sites, and each needs its own request. An entry's "also removes" lists only sites
-  a request is known to cover.
+  sites, and each needs its own request. Nine have entries here. An entry's "also removes"
+  lists only sites a request is known to cover.
 - About 15 smaller sites (PrivateRecords, PeopleSearch123 and others on the same
   platform) now require your full date of birth. Skip them if you'd rather not give it.
 - Ancestry and TruePeopleSearch.net need an account (TruePeopleSearch.net needs a Google
   sign-in). PeopleConnect (Intelius, TruthFinder, Instant Checkmate) needs your date of
   birth, and you must keep your account there or the removal is undone.
 - Brokers re-list people. Expect to repeat this every few months.
-- `retired` in the file lists 9 sites that shut down or changed hands (Radaris, PeekYou,
+- `retired` in the file lists 12 sites that shut down or changed hands (Radaris, PeekYou,
   ClustrMaps and others) and why. That way nobody adds them back by mistake.
 - `references` lists the state broker registries (California, Vermont, Texas, Oregon) and
   public opt-out lists, for finding brokers that aren't covered yet.
 
-**Not on the list yet:** Bumper.com, PrivateEye.com, Truecaller, LiveIntent, and about 25
-Radaris-network sites whose owners couldn't be identified.
+**Not on the list yet:**
+- Phonebooks.com, the tenth FastPeopleSearch sister site.
+- Bumper.com, PrivateEye.com, Truecaller and LiveIntent.
+- About 25 Radaris-network sites whose owners couldn't be identified.
+- ReversePhone.com and FreePhoneTracer.com: their links point to BeenVerified's and
+  NumberGuru's forms, but it's not confirmed that those requests remove them, so check
+  them afterwards.
 
 **Keeping it fresh.** Opt-out pages move often. Every entry has a `checked` date and its
 sources. Re-check anything older than a few months before relying on it.

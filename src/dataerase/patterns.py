@@ -93,21 +93,29 @@ GENERIC = {
 }
 OK_MARKER = "pii-ok"  # put this on a line to say "this one is fake"
 _PLACEHOLDER_DOMAINS = ("example.com", "example.org", "example.net", ".invalid", ".test", ".localhost")
-# Company inboxes, not people. Matched anywhere in the part before the @ ...
+# Company inboxes, not people. These two lists are only trusted in the broker
+# list file (company_contacts=True): anywhere else a personal address, like a
+# +optout alias at Gmail or hello@ at your own domain, must still be caught.
+# Matched anywhere in the part before the @ (and before any +tag) ...
 _ROLE_WORDS = ("privacy", "optout", "opt-out", "opt_out", "removal", "gdpr", "ccpa", "dataprotection",
                "data-protection", "unsubscribe", "compliance", "noreply", "no-reply", "donotreply")
 # ... or as a whole word of it (info@, legal.team@, customer-support@).
 _ROLE_TOKENS = {"info", "help", "support", "contact", "legal", "care", "hello", "service", "remove",
                 "consumer", "requests", "dpo", "team", "sales", "admin"}
 _TOLL_FREE = {"800", "833", "844", "855", "866", "877", "888"}  # business lines, never personal
+# Personal mailbox providers: never a company inbox, whatever the address says.
+_WEBMAIL = {"gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com", "live.com", "msn.com",
+            "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "mail.com",
+            "yandex.com", "zoho.com", "fastmail.com", "hey.com", "tutanota.com"}
 
 
-def generic_hits(line: str, allowed: frozenset[str] = frozenset()) -> list[str]:
+def generic_hits(line: str, allowed: frozenset[str] = frozenset(), company_contacts: bool = False) -> list[str]:
     """Labels of personal-looking data in a line.
 
-    Ignored: lines marked `pii-ok`, placeholders (example.com, 555-01xx), company
-    role inboxes (privacy@, support@), toll-free numbers, and exact values in
-    `allowed` (see allow_key), so a list of broker contact details can be committed.
+    Always ignored: lines marked `pii-ok`, placeholders (example.com, 555-01xx)
+    and exact values in `allowed` (see allow_key).
+    With company_contacts=True (only for the broker list file), company role
+    inboxes (a broker's privacy@ address) and toll-free numbers are ignored too.
     """
     if OK_MARKER in line:
         return []
@@ -115,7 +123,7 @@ def generic_hits(line: str, allowed: frozenset[str] = frozenset()) -> list[str]:
         label
         for label, regex in GENERIC.items()
         if any(
-            not _is_not_personal(label, m.group()) and allow_key(m.group()) not in allowed
+            not _is_not_personal(label, m.group(), company_contacts) and allow_key(m.group()) not in allowed
             for m in regex.finditer(line)
         )
     ]
@@ -129,16 +137,17 @@ def allow_key(value: str) -> str:
     return re.sub(r"\D", "", value)[-10:]
 
 
-def _is_not_personal(label: str, text: str) -> bool:
+def _is_not_personal(label: str, text: str, company_contacts: bool = False) -> bool:
     if label == "email address":
         local, _, domain = text.lower().rpartition("@")
-        return (
-            domain.endswith(_PLACEHOLDER_DOMAINS)
-            or any(word in local for word in _ROLE_WORDS)
-            or bool(_ROLE_TOKENS & set(re.split(r"[._+-]", local)))
-        )
+        if domain.endswith(_PLACEHOLDER_DOMAINS) or local.startswith(("noreply", "no-reply")):
+            return True
+        if not company_contacts or domain in _WEBMAIL:
+            return False
+        base = local.split("+")[0]  # jane+optout@ is Jane, not an opt-out team
+        return any(word in base for word in _ROLE_WORDS) or bool(_ROLE_TOKENS & set(re.split(r"[._-]", base)))
     if label == "phone number":
-        digits = re.sub(r"\D", "", text)[-10:]
-        # 555-0100..0199 are reserved for fiction
-        return digits[:3] in _TOLL_FREE or bool(re.search(r"555[\s.-]?01\d\d", text))
+        if re.search(r"555[\s.-]?01\d\d", text):  # 555-0100..0199 are reserved for fiction
+            return True
+        return company_contacts and re.sub(r"\D", "", text)[-10:][:3] in _TOLL_FREE
     return False

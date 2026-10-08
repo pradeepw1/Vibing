@@ -11,6 +11,7 @@ Besides the brokers, the file keeps two short lists:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date
 from importlib import resources
@@ -28,8 +29,8 @@ CONFIDENCE = ("checked-live", "recent-guides", "unsure")
 
 # What a broker can ask for. These map onto profile fields, except listing_url
 # (found per site) and signature (you do that yourself).
-FIELDS = ("full_name", "email", "phone", "street_address", "city_state", "zip", "birth_date", "age",
-          "listing_url", "signature", "id_document", "ssn", "payment")
+FIELDS = ("full_name", "email", "phone", "street_address", "city_state", "zip", "birth_date", "birth_year",
+          "age", "listing_url", "signature", "id_document", "ssn", "payment")
 # The tool never sends or does these automatically. A broker that wants them
 # is flagged so you can decide by hand (often you can skip it, or black out
 # everything but your name and address).
@@ -209,6 +210,12 @@ def _parse(entry: object, index: int) -> Broker:
         raise BrokerListError(f"{where}: needs_listing_url and requires['listing_url'] disagree")
     if not broker.sources:
         raise BrokerListError(f"{where}: needs at least one source")
+    # Bare hostnames only, so the duplicate check below compares like with like.
+    if bad := [c for c in broker.covers if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", c)]:
+        raise BrokerListError(f"{where}: covers must be bare hostnames like example.com, got {bad}")
+    # A typo here would silently hide the broker from `--region`.
+    if not broker.regions or not all(re.fullmatch(r"[A-Z]{2}(-[A-Z]{2})?", r) for r in broker.regions):
+        raise BrokerListError(f"{where}: regions must be codes like US, US-CA or EU")
     return broker
 
 

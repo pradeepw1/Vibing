@@ -111,6 +111,15 @@ def test_staged_blocks_sensitive_file_names(repo):
     assert {f.where for f in leakcheck.scan_staged(repo)} == {"profile.enc", ".env", "profile.json", "export.har"}
 
 
+def test_company_inboxes_only_pass_in_the_broker_file(repo):
+    broker_file = repo / leakcheck.BROKER_FILE
+    broker_file.parent.mkdir(parents=True)
+    broker_file.write_text('{"contact_email": "privacy@acme-data.com", "phone": "1-888-555-2671"}\n')  # pii-ok
+    git(repo, "add", leakcheck.BROKER_FILE)
+    stage(repo, "notes.md", "privacy@acme-data.com\n1-888-555-2671\n")  # pii-ok
+    assert {f.where for f in leakcheck.scan_staged(repo)} == {"notes.md:1", "notes.md:2"}
+
+
 def test_allowlist_accepts_only_exact_values(repo):
     (repo / ".leakcheck-allow").write_text("# business lines\nPress@Acme-Data.com  # their press office\n(415) 201-4455\n")  # pii-ok
     stage(repo, "a.txt", "press@acme-data.com\ncall 415.201.4455\n")  # pii-ok

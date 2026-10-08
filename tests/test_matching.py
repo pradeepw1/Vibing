@@ -82,15 +82,52 @@ def test_logging_formatter_redacts_message_args_and_tracebacks(matchers):
         ("fine: (212) 555-0147", []),
         ("fine: build 2024-10-08, id 1234567890", []),
         ("bob.smith@gmail.com  # pii-ok", []),  # pii-ok
-        # company contact details, so the broker list can be committed
-        ('"contact_email": "privacy@spokeo.com"', []),
-        ("optout@acme-data.com, dataprivacy@acme.com, legal.team@acme.com", []),
-        ("customer-support@acme.com, info@acme.com", []),
-        ("call 1-888-555-2671 or (866) 201-4455", []),
-        # ...but people who just happen to have role-ish letters are still caught
-        ("bob.supporter@gmail.com", ["email address"]),  # pii-ok
-        ("(415) 888-2671", ["phone number"]),  # pii-ok
+        # Outside the broker file, company-looking contacts are checked like any other.
+        ("privacy@spokeo.com", ["email address"]),  # pii-ok
+        ("call 1-888-555-2671", ["phone number"]),  # pii-ok
     ],
 )
 def test_generic_hits(line, expected):
     assert generic_hits(line) == expected
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '"contact_email": "privacy@spokeo.com"',  # pii-ok
+        "optout@acme-data.com, dataprivacy@acme.com, legal.team@acme.com",  # pii-ok
+        "customer-support@acme.com, info@acme.com, support+optout@usphonebook.com",  # pii-ok
+        "call 1-888-555-2671 or (866) 201-4455",  # pii-ok
+    ],
+)
+def test_company_contacts_pass_in_the_broker_file(line):
+    assert generic_hits(line, company_contacts=True) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # Personal addresses that only look like role inboxes: caught even in the broker file.
+        "jane.doe+optout@gmail.com",  # pii-ok
+        "jane+privacy@fastmail.com",  # pii-ok
+        "jane.care@gmail.com",  # pii-ok
+        "contact.jane@yahoo.com",  # pii-ok
+        "bob.supporter@outlook.com",  # pii-ok
+        "jdoe+unsubscribe@acme-data.com",  # pii-ok
+        "(415) 888-2671",  # pii-ok
+    ],
+)
+def test_personal_contacts_are_caught_even_in_the_broker_file(line):
+    assert generic_hits(line, company_contacts=True) != []
+    assert generic_hits(line) != []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "hello@janedoe.net",  # pii-ok
+        "+91 888-123-4567",  # pii-ok
+    ],
+)
+def test_role_and_toll_free_rules_stay_out_of_other_files(line):
+    assert generic_hits(line) != []

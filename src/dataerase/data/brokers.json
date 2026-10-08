@@ -379,7 +379,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "Checked live 2026-10-08: /app/optout/search and /optout both 301-redirect to /svc/optout/search/. That page is Cloudflare-blocked to bots, so the fields come from guides. Flow (DeleteMe updated 2026-09-15 and verified Aug 2026; Clearnym Aug 2026): search by name and state, 'Proceed to Opt Out', enter email, hCaptcha, then click 'Verify Opt-Out' in the email; a second email confirms. CONFLICT: redact.dev (May 2026) reached a 'Do Not Sell' identity form marking age, street address, city, state and ZIP as required. Send those only if the live form demands them. BeenVerified's privacy policy (updated 09/09/2026, checked live) says you may also email privacy@beenverified.com, use its online request form, or phone or mail to opt out Public information. ccpa@beenverified.com is guide-reported. ReversePhone.com's footer 'Do Not Sell or Share' link points to this BeenVerified opt-out (checked live). ReversePhone is therefore listed in covers, by inference. NumberGuru's footer link also points here, but NumberGuru has its own path too; file both. Other LTVCO brands (PeopleLooker, PeopleSmart, NeighborWho, Ownerly) each run their own opt-out and privacy@ address, so file them separately. Typical 24-72h. Re-listing after moves is reported. ReversePhone.com is a BeenVerified, LLC site, but it's not confirmed that this request removes it; check it afterwards.",
+      "notes": "Checked live 2026-10-08: /app/optout/search and /optout both 301-redirect to /svc/optout/search/. That page is Cloudflare-blocked to bots, so the fields come from guides. Flow (DeleteMe updated 2026-09-15 and verified Aug 2026; Clearnym Aug 2026): search by name and state, 'Proceed to Opt Out', enter email, hCaptcha, then click 'Verify Opt-Out' in the email; a second email confirms. CONFLICT: redact.dev (May 2026) reached a 'Do Not Sell' identity form marking age, street address, city, state and ZIP as required. Send those only if the live form demands them. BeenVerified's privacy policy (updated 09/09/2026, checked live) says you may also email privacy@beenverified.com, use its online request form, or phone or mail to opt out Public information. ccpa@beenverified.com is guide-reported. ReversePhone.com's footer 'Do Not Sell or Share' link points to this BeenVerified opt-out (checked live). NumberGuru's footer link also points here, but NumberGuru has its own path too; file both. Other LTVCO brands (PeopleLooker, PeopleSmart, NeighborWho, Ownerly) each run their own opt-out and privacy@ address, so file them separately. Typical 24-72h. Re-listing after moves is reported. ReversePhone.com is a BeenVerified, LLC site, but it's not confirmed that this request removes it; check it afterwards.",
       "sources": [
         "https://www.beenverified.com/app/optout/search",
         "https://www.beenverified.com/faq/privacy/",
@@ -682,7 +682,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. COVERED by the MTA network request (see fastpeoplesearch). Redact (2026-08-05) cites the operator's filing that the record-level opt-out 'travels across all ten sites', which matches the 2026 CA registry text. Form 1 (DeleteMe, updated 2026-09-22, 'as of May 2026'): subject or agent, name, email, agreement box and reCAPTCHA. The emailed 'Click here to fill out the form' link opens Form 2, an almost identical form with fields matching the listing. Its fields aren't itemized; MTA siblings ask for city, state, ZIP and street or DOB. Removal takes '3 days or less'. DeleteMe says it rejects opt-outs from states without a comprehensive privacy law. The site returns a Cloudflare 403 to automated fetch.",
+      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. Form 1 (DeleteMe, updated 2026-09-22, 'as of May 2026'): subject or agent, name, email, agreement box and reCAPTCHA. The emailed 'Click here to fill out the form' link opens Form 2, an almost identical form with fields matching the listing. Its fields aren't itemized; MTA siblings ask for city, state, ZIP and street or DOB. Removal takes '3 days or less'. DeleteMe says it rejects opt-outs from states without a comprehensive privacy law. The site returns a Cloudflare 403 to automated fetch.",
       "sources": [
         "https://joindeleteme.com/opt-out-guides/fastbackgroundcheck-opt-out-guide/",
         "https://redact.dev/data-brokers/fastbackgroundcheck-com/remove",
@@ -718,7 +718,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. Checked live 2026-10-08: the page loaded as 'Do Not Sell/Right to Opt-out'. Step 1: 'I am' (subject or authorized agent), First Name*, Middle Name (optional), Last Name*, Email address*, authorization checkbox, and a Cloudflare Turnstile captcha. The emailed link must be used within 24h. Step 2 (redact.dev, May 2026): name, city, state and ZIP required, plus EITHER date of birth OR street address. Prefer street address over DOB for minimisation. Phone and email are also shown; leave phone blank unless forced. 'Please allow 3 days.' The page footer links a partner API (EnformionGO). USPhoneBook and PeopleSearchNow share the operator but are not confirmed covered; file separately. The Big-Ass list marks it high-risk. search_url left null: /search?name=... returns 404, and /name/... pages are bot-blocked, so no pattern could be confirmed.",
+      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. Checked live 2026-10-08: the page loaded as 'Do Not Sell/Right to Opt-out'. Step 1: 'I am' (subject or authorized agent), First Name*, Middle Name (optional), Last Name*, Email address*, authorization checkbox, and a Cloudflare Turnstile captcha. The emailed link must be used within 24h. Step 2 (redact.dev, May 2026): name, city, state and ZIP required, plus EITHER date of birth OR street address. Prefer street address over DOB for minimisation. Phone and email are also shown; leave phone blank unless forced. 'Please allow 3 days.' The page footer links a partner API (EnformionGO). USPhoneBook and PeopleSearchNow share the operator but are not confirmed covered; file separately. The Big-Ass list marks it high-risk. search_url left null: /search?name=... returns 404, and /name/... pages are bot-blocked, so no pattern could be confirmed. Eligibility: MTA's Do-Not-Sell notice applies to residents of states with comprehensive privacy laws, and public-record suppression is applied 'as a courtesy'; DeleteMe says FPS often rejects other states. Escalation contact (CA registry): privacy@mtalley.zendesk.com.",
       "sources": [
         "https://www.fastpeoplesearch.com/optout",
         "https://redact.dev/data-brokers/fastpeoplesearch-com/remove",
@@ -1052,7 +1052,7 @@
         "email",
         "city_state",
         "zip",
-        "birth_date"
+        "birth_year"
       ],
       "verification": [
         "captcha",
@@ -1164,7 +1164,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "Checked live 2026-10-08. numberguru.com/optout and /app/optout/search 301 to numberguru.com/svc/optout/search/, which is bot-blocked. NumberGuru's own homepage footer link 'Do Not Sell My Personal Information' points to https://www.beenverified.com/app/optout/search, so the BeenVerified request may also cover NumberGuru. Coverage is unconfirmed; file both. Per redact.dev (Aug 2026) the form searches by first name, last name and state (no phone field), then email plus hCaptcha, 'Verify Opt-Out' in the email, and a second confirmation email. About 24h. FreePhoneTracer.com states on its homepage that it 'is powered by NumberGuru.com' (checked live), so it is listed in covers. The live privacy policy gives privacy@numberguru.com. Spam labels and caller comments on a number need a separate support request. FreePhoneTracer.com says it is 'powered by NumberGuru.com', but it's not confirmed that this request removes it; check it afterwards.",
+      "notes": "Checked live 2026-10-08. numberguru.com/optout and /app/optout/search 301 to numberguru.com/svc/optout/search/, which is bot-blocked. NumberGuru's own homepage footer link 'Do Not Sell My Personal Information' points to https://www.beenverified.com/app/optout/search, so the BeenVerified request may also cover NumberGuru. Coverage is unconfirmed; file both. Per redact.dev (Aug 2026) the form searches by first name, last name and state (no phone field), then email plus hCaptcha, 'Verify Opt-Out' in the email, and a second confirmation email. About 24h. FreePhoneTracer.com states on its homepage that it 'is powered by NumberGuru.com' (checked live). The live privacy policy gives privacy@numberguru.com. Spam labels and caller comments on a number need a separate support request. FreePhoneTracer.com says it is 'powered by NumberGuru.com', but it's not confirmed that this request removes it; check it afterwards.",
       "sources": [
         "https://www.numberguru.com/",
         "https://www.numberguru.com/privacy-policy/",
@@ -1222,7 +1222,6 @@
       "requires": [
         "full_name",
         "email",
-        "street_address",
         "city_state"
       ],
       "verification": [
@@ -1307,7 +1306,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "The Suppression Center (a JS app) is live as of 2026-10-08; I read its app bundle. Login: enter email, agree to the terms, then click the verification email link ('Free - Start Here'). Identity: 'You must include your date of birth and name to see any results. You must additionally include and verify at least one phone number or email address to find a verified match.' A record counts as verified only if it contains an email or phone you verified by code. If your email isn't on the record, you will also need a phone number that is on it, so the tool may need phone too. Then, under 'Control Report Visibility', set the record to 'Suppressed' and Save. Scope: 'only applies to the Public Data generated in response to a name search on the people search sites in the PeopleConnect family'. It does not cover Classmates, phone/address/email reverse lookups, or sex-offender lists. GOTCHA: do NOT delete your user data in the Privacy Center. The app says suppressions are deleted with it and you 'must maintain your user information on file with the Suppression Center'. Unverifiable records: the app offers mailto privacy@peopleconnect.us; use privacy@intelius.com for Intelius sites (Redact). Addresses.com's footer says its data is 'provided solely by Intelius, LLC' and its removal links go to the Intelius privacy center and then here (Redact, 2026-09-10); the 2026 CA registry lists addresses.com and zabasearch.com as Intelius domains. Addresses.com itself returned a 403 here, so recheck it afterwards. Judges and other protected persons have a separate email route. Merge with any PeopleConnect/Intelius/TruthFinder entry from another group.",
+      "notes": "The Suppression Center (a JS app) is live as of 2026-10-08; I read its app bundle. Login: enter email, agree to the terms, then click the verification email link ('Free - Start Here'). Identity: 'You must include your date of birth and name to see any results. You must additionally include and verify at least one phone number or email address to find a verified match.' A record counts as verified only if it contains an email or phone you verified by code. If your email isn't on the record, you will also need a phone number that is on it, so the tool may need phone too. Then, under 'Control Report Visibility', set the record to 'Suppressed' and Save. Scope: 'only applies to the Public Data generated in response to a name search on the people search sites in the PeopleConnect family'. It does not cover Classmates, phone/address/email reverse lookups, or sex-offender lists. GOTCHA: do NOT delete your user data in the Privacy Center. The app says suppressions are deleted with it and you 'must maintain your user information on file with the Suppression Center'. Unverifiable records: the app offers mailto privacy@peopleconnect.us; use privacy@intelius.com for Intelius sites (Redact). Addresses.com's footer says its data is 'provided solely by Intelius, LLC' and its removal links go to the Intelius privacy center and then here (Redact, 2026-09-10); the 2026 CA registry lists addresses.com and zabasearch.com as Intelius domains. Addresses.com itself returned a 403 here, so recheck it afterwards. Judges and other protected persons have a separate email route. Merge with any PeopleConnect/Intelius/TruthFinder entry from another group. The server rejects some addresses with 'Task specific emails are not allowed', so use a normal mailbox, not an alias or disposable one. The birth date can't be changed once saved, so check it before saving. ZabaSearch isn't among PeopleConnect's named examples; search it again a week after suppressing.",
       "sources": [
         "https://suppression.peopleconnect.us/",
         "https://suppression.peopleconnect.us/app.82072afbd46ca6dfc5e3.js",
@@ -1344,28 +1343,10 @@
       ],
       "processing_days": 3,
       "regions": [
-        "US-CA",
-        "US-CO",
-        "US-CT",
-        "US-DE",
-        "US-IN",
-        "US-IA",
-        "US-KY",
-        "US-MD",
-        "US-MN",
-        "US-MT",
-        "US-NE",
-        "US-NH",
-        "US-NJ",
-        "US-OR",
-        "US-RI",
-        "US-TN",
-        "US-TX",
-        "US-UT",
-        "US-VA"
+        "US"
       ],
       "search_url": null,
-      "notes": "STATE-RESTRICTED. redact.dev (updated 2026-09-24) quotes the rejection email: requests are refused when the person 'lives in a state that does not have a comprehensive consumer privacy law that applies to our data'. RecordingLaw (Aug 2026) says the do-not-sell notice covers residents of comprehensive-privacy-law states. Residents elsewhere can try, but expect rejection. The regions list holds the 19 states redact lists. The site served me a Cloudflare 'security challenge' on 2026-10-08. Flow: (1) short form at /opt-out (name plus email). (2) Email from support@peoplefinders.com, 'Complete your peoplefinders.com Privacy Request'; the link expires in 24h. (3) Record Suppression Form: First Name, Last Name and Street Address required (plus city, state and ZIP as part of the address). Middle name, phone and DOB are optional; omit them. The form states removal 'within 3 days'. Phone route: (877) 551-9688 (do-not-sell notice per RecordingLaw). DeleteMe still describes an older /manage flow; treat it as stale. PrivateEye and PublicRecordsNow (both loaded live) are referral fronts that route to partner sites and have no removal form. redact.dev rechecked this in Sept 2026. Other Confi-Chek-linked sites need their own requests. PrivateEye.com has its own removal flow (privateeye.com/removal), so it is not covered by this request.",
+      "notes": "STATE-RESTRICTED. redact.dev (updated 2026-09-24) quotes the rejection email: requests are refused when the person 'lives in a state that does not have a comprehensive consumer privacy law that applies to our data'. RecordingLaw (Aug 2026) says the do-not-sell notice covers residents of comprehensive-privacy-law states. Residents elsewhere can try, but expect rejection. redact lists these states: CA, CO, CT, DE, IN, IA, KY, MD, MN, MT, NE, NH, NJ, OR, RI, TN, TX, UT, VA. The site served me a Cloudflare 'security challenge' on 2026-10-08. Flow: (1) short form at /opt-out (name plus email). (2) Email from support@peoplefinders.com, 'Complete your peoplefinders.com Privacy Request'; the link expires in 24h. (3) Record Suppression Form: First Name, Last Name and Street Address required (plus city, state and ZIP as part of the address). Middle name, phone and DOB are optional; omit them. The form states removal 'within 3 days'. Phone route: (877) 551-9688 (do-not-sell notice per RecordingLaw). DeleteMe still describes an older /manage flow; treat it as stale.  PublicRecordsNow (loaded live) is a referral front with no removal form of its own (redact.dev rechecked this in Sept 2026). PrivateEye looked the same when loaded, but BADBOOL (2026-09-27) gives it its own removal flow (privateeye.com/removal), so it is not counted as covered here. Other Confi-Chek-linked sites need their own requests.",
       "sources": [
         "https://www.peoplefinders.com/opt-out",
         "https://redact.dev/data-brokers/peoplefinders-com/remove",
@@ -1619,7 +1600,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "ASKS FOR AN ID DOCUMENT. Redact walked the flow on 2026-08-07 and rechecked it live on 2026-09-09. The footer link /remove-my-info leads to /optout ('Remove Your Personal Information From Our Search Results'). Search by first name, last name, city and state, enter an email, and click 'Confirm Opt-out' in the email from noreply@peoplewhiz.com. Then click 'That's Me' on your row; each separate listing needs its own submission. The confirmation email says a valid ID must be faxed or mailed before processing starts, but gives no fax number or address; ask support@peoplewhiz.com or (833) 276-9449. Redact advises redacting everything except name, photo and DOB, and never sending an SSN or full licence number. Takes up to 5 business days (page) or 7 (email), then 24-48h for the index. No payment is asked. Sister site PeopleWhizr (peoplewhizr.com) is a separate corporation with its own index and needs its own request; its removal search errored on 2026-09-09. The 2026 CA registry contact (cyrus@...) is an individual's mailbox, so it is not used. peoplewhiz.com returned a 403 here.",
+      "notes": "ASKS FOR AN ID DOCUMENT. Redact walked the flow on 2026-08-07 and rechecked it live on 2026-09-09. The footer link /remove-my-info leads to /optout ('Remove Your Personal Information From Our Search Results'). Search by first name, last name, city and state, enter an email, and click 'Confirm Opt-out' in the email from noreply@peoplewhiz.com. Then click 'That's Me' on your row; each separate listing needs its own submission. The confirmation email says a valid ID must be faxed or mailed before processing starts, but gives no fax number or address; ask support@peoplewhiz.com or (833) 276-9449. Redact advises redacting everything except name, photo and DOB, and never sending an SSN or full licence number. Takes up to 5 business days (page) or 7 (email), then 24-48h for the index. No payment is asked. Sister site PeopleWhizr (peoplewhizr.com) is a separate corporation with its own index and needs its own request; its removal search errored on 2026-09-09. The 2026 CA registry contact is a named employee's mailbox, so it is not used. peoplewhiz.com returned a 403 here.",
       "sources": [
         "https://redact.dev/data-brokers/peoplewhiz-com/remove",
         "https://cppa.ca.gov/data_broker_registry/registry.csv"
@@ -2000,7 +1981,6 @@
       "requires": [
         "full_name",
         "email",
-        "phone",
         "street_address",
         "city_state"
       ],
@@ -2013,7 +1993,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. COVERED by the MTA network request (see fastpeoplesearch). MTA's 2026 registry filing says a request on any MTA site applies across all ten. Use this form only if a listing persists here after the primary request. Flow (Redact, May 2026): Form 1 asks for first, middle (optional) and last name, email, a consent box and CAPTCHA. The single-use link from support@searchpeoplefree.com expires in 24h. Form 2 asks for phone and date of birth (neither marked required), street address, city and state (all three required), plus Cloudflare Turnstile. No ZIP field is documented. Removal takes 3 days or less. Phone fallback: (800) 958-6869. Not to be confused with searchpeoplefree.net. Same residency caveat as the other MTA sites. The site returns a Cloudflare 403 to automated fetch.",
+      "notes": "Same company as FastPeopleSearch and its sister sites. Its 2026 California filing says a do-not-sell request on one site applies to all of them, but listing removal is per site, so file here too, then re-check the sisters a few days later. Flow (Redact, May 2026): Form 1 asks for first, middle (optional) and last name, email, a consent box and CAPTCHA. The single-use link from support@searchpeoplefree.com expires in 24h. Form 2 asks for phone and date of birth (neither marked required), street address, city and state (all three required), plus Cloudflare Turnstile. No ZIP field is documented. Removal takes 3 days or less. Phone fallback: (800) 958-6869. Not to be confused with searchpeoplefree.net. Same residency caveat as the other MTA sites. The site returns a Cloudflare 403 to automated fetch.",
       "sources": [
         "https://redact.dev/data-brokers/searchpeoplefree-com/remove",
         "https://cppa.ca.gov/data_broker_registry/registry.csv",
@@ -2516,7 +2496,7 @@
         "US"
       ],
       "search_url": null,
-      "notes": "403 on 2026-10-08 for /opt-out and /privacy-rights/. Flow per redact.dev (walked through 2026-08-11, updated 2026-10-05): enter an email and accept the ToS, click the emailed link, enter DATE OF BIRTH (cannot be changed once saved), then full legal name (first/middle/last). It then searches name plus DOB; select your record. The opt-out hides the listing, it does not delete the record. A human check was added before the 2026-10-05 recheck. BADBOOL instead says name, city and state plus several captchas, so the fields are disputed and city/state may also be asked. CheckPeople's live opt-out page (same software, Slatkis-managed) starts with the same email-then-link step, which supports redact's account. A separate opt-out from CheckPeople. Fallback compliance@unmask.com (CA registry) with name, the listing's city and state, and its URL; CA residents can also use DROP.",
+      "notes": "403 on 2026-10-08 for /opt-out and /privacy-rights/. Flow per redact.dev (walked through 2026-08-11, updated 2026-10-05): enter an email and accept the ToS, click the emailed link, enter DATE OF BIRTH (cannot be changed once saved), then full legal name (first/middle/last). It then searches name plus DOB; select your record. The opt-out hides the listing, it does not delete the record. A human check was added before the 2026-10-05 recheck. BADBOOL instead says name, city and state plus several captchas, so the fields are disputed and city/state may also be asked. CheckPeople's live opt-out page (same software and operator) starts with the same email-then-link step, which supports redact's account. A separate opt-out from CheckPeople. Fallback compliance@unmask.com (CA registry) with name, the listing's city and state, and its URL; CA residents can also use DROP.",
       "sources": [
         "https://redact.dev/data-brokers/unmask-com/remove",
         "https://checkpeople.com/opt-out",
@@ -3810,63 +3790,84 @@
       "id": "advanced-people-search",
       "name": "Advanced People Search",
       "url": "https://www.advanced-people-search.com",
-      "notes": "Marked removed: the domain only redirects to PublicRecordsNow, a PeopleFinders referral front end with no records of its own. The PeopleFinders opt-out covers it.",
+      "notes": "NO LONGER SERVES LISTINGS. On 2026-10-08 the domain 301-redirects to publicrecordsnow.com, and /opt-out and name paths return 404. Redact (2026-08-25) says PublicRecordsNow is 'a front end for PeopleFinders' that holds no records and passes searches to PeopleFinders with a partner ID; its page links to the tracking domain trkpf.com. DeleteMe (2026-09-14) still calls APS a PeopleFinders subsidiary and says to opt out at peoplefinders.com/opt-out: listing URL plus email, captcha, then the email link (about 48h). Handle this under the PeopleFinders entry in another group. Why retired: Marked removed: the domain only redirects to PublicRecordsNow, a PeopleFinders referral front end with no records of its own. The PeopleFinders opt-out covers it.",
       "checked": "2026-10-08"
     },
     {
       "id": "clustrmaps",
       "name": "ClustrMaps",
       "url": "https://clustrmaps.com",
-      "notes": "Marked defunct: DNS points to localhost, and Redact confirms the site has been off since May 2026. opt_out_url set to null; the last-known route is in notes.",
+      "notes": "SWITCHED OFF. On 2026-10-08 clustrmaps.com resolves to 127.0.0.1 on both Google and Cloudflare DNS. Redact (2026-09-25) says it was last seen working on 2026-05-18, was dead when checked on 2026-09-25, and its domain is registered until 2027-06-17, so it could return. Operator unknown: its terms credited ClustrMaps Ltd., a UK company dissolved in 2016. Before the shutdown, finishing an opt-out led to a OneRep affiliate link. Last-known route was /bl/opt-out (email, CAPTCHA, name/city/state search, tick items, Apply). 'Switched off' doesn't mean deleted; for stale Google results use Google's Refresh Outdated Content tool. Recheck before sending anything. Why retired: Marked defunct: DNS points to localhost, and Redact confirms the site has been off since May 2026. opt_out_url set to null; the last-known route is in notes.",
+      "checked": "2026-10-08"
+    },
+    {
+      "id": "homemetry",
+      "name": "Homemetry",
+      "url": "https://homemetry.com",
+      "notes": "Domain parked when checked.",
       "checked": "2026-10-08"
     },
     {
       "id": "neighbor-report",
       "name": "Neighbor.Report",
       "url": "https://neighbor.report",
-      "notes": "Marked defunct: DNS has been broken since at least 2026-08-25 (Offlist) and still was on 2026-10-08. There is no working opt-out to send to; recheck periodically.",
+      "notes": "UNREACHABLE for at least 6 weeks. On 2026-10-08 both Google and Cloudflare DNS return SERVFAIL: 'No Reachable Authority', and the delegated name servers REFUSED the query. Offlist found the same DNS failure on 2026-08-25. DeleteMe (dated 2026-09-14) still describes the old flow: search by address, copy the profile URL, footer 'Opt Out/Report a Violation' form (name, email, profile URL, address, reason, CAPTCHA), Remove, Apply, about 24h. Its date stamp does not show a live check. Recheck later; the site may return. Why retired: Marked defunct: DNS has been broken since at least 2026-08-25 (Offlist) and still was on 2026-10-08. There is no working opt-out to send to; recheck periodically.",
+      "checked": "2026-10-08"
+    },
+    {
+      "id": "officialusa",
+      "name": "OfficialUSA",
+      "url": "https://www.officialusa.com",
+      "notes": "Its name servers refuse queries, like neighbor.report's. Re-check from a normal network before relying on this; the research sandbox's DNS failed for some live domains.",
       "checked": "2026-10-08"
     },
     {
       "id": "oracle-advertising",
       "name": "Oracle Advertising / Oracle Data Cloud (BlueKai, Datalogix) - DEFUNCT",
       "url": "https://www.oracle.com",
-      "notes": "Defunct broker (shut down Sept 30, 2024). Confirmed live that the advertising privacy policy now redirects to an end-of-life page. Set opt_out_url to null and requires to empty, and moved the general Oracle inquiry form into notes.",
+      "notes": "DEFUNCT. Oracle shut its advertising business (Oracle Data Cloud, BlueKai, Datalogix, Grapeshot, Moat) on Sept 30, 2024. The old Oracle Advertising Privacy Policy URL (oracle.com/legal/privacy/advertising-privacy-policy.html) now redirects to the Data Services Contracts page, which carries an 'Oracle Advertising End-of-Life FAQs' document. There is no active ad-data opt-out to send. If the owner still wants a deletion request for archived records, Oracle's general route is the Privacy Inquiries form at https://www.oracle.com/legal/data-privacy-inquiry-form/, linked from oracle.com/legal/privacy/rights/. That is a general Oracle form, not a broker opt-out, so the tool should not automate it. An Aug 2026 guide suggests privacy_ww@oracle.com; that address was not seen on Oracle's pages. Data Oracle sold before 2024 stays with the buyers. Why retired: Defunct broker (shut down Sept 30, 2024). Confirmed live that the advertising privacy policy now redirects to an end-of-life page. Set opt_out_url to null and requires to empty, and moved the general Oracle inquiry form into notes.",
       "checked": "2026-10-08"
     },
     {
       "id": "peekyou",
       "name": "PeekYou (DEFUNCT - domain controlled by Atlas Data Privacy)",
       "url": "https://www.peekyou.com",
-      "notes": "Defunct: the domain is now controlled by Atlas after a settlement, confirmed live.",
+      "notes": "Re-checked live 2026-10-08. Both peekyou.com and the old opt-out URL (/about/contact/optout/) show 'Domain Update': the domain is now controlled by Atlas Data Privacy Corporation after a settlement with PeekYou LLC (NJ Superior Court, Essex, ESX-L-003299-25, filed 2025-04-30). No people search or opt-out form remains. Guides from early 2026 that still describe the old form are stale. Tool action: skip, and re-check periodically in case the brand reappears on another domain. Why retired: Defunct: the domain is now controlled by Atlas after a settlement, confirmed live.",
       "checked": "2026-10-08"
     },
     {
       "id": "persopo",
       "name": "Persopo",
       "url": "https://persopo.com",
-      "notes": "Marked removed. Persopo says it no longer stores records, and its search form goes to a TruthFinder affiliate link, so no Persopo listing exists to submit. Its data is covered by the PeopleConnect suppression for TruthFinder.",
+      "notes": "NOT A DATA HOLDER ANY MORE. Read live on 2026-10-08. The homepage says 'Persopo no longer stores or keeps any records', and the opt-out page says 'Persopo does not store, hold, or give access to records anymore'. The site's JS sends the search form to a TruthFinder affiliate tracking URL, so Persopo has no listing of its own to copy. That makes its email opt-out (copy the listing text to support@persopo.com, or mail it to Opt Out Dept., 848 N. Rainbow Blvd., Suite 20, Las Vegas, NV 89107; 10-20 business days) impossible to follow. Records shown come from TruthFinder, so use the PeopleConnect Suppression Center (peopleconnect entry). The old opt-out page is still up and support@persopo.com (Cloudflare-obfuscated) still works as a fallback if a Persopo-branded listing ever reappears. The privacy policy also lists (800) 481-9168. Why retired: Marked removed. Persopo says it no longer stores records, and its search form goes to a TruthFinder affiliate link, so no Persopo listing exists to submit. Its data is covered by the PeopleConnect suppression for TruthFinder.",
       "checked": "2026-10-08"
     },
     {
       "id": "publicdatausa",
       "name": "PublicDataUSA",
       "url": "https://www.publicdatausa.com",
-      "notes": "Marked defunct: DNS is broken, and Redact confirms the site has been off since June 2026 with no opt-out route.",
+      "notes": "SWITCHED OFF. On 2026-10-08 publicdatausa.com and www return SERVFAIL on Google and Cloudflare DNS; its Cloudflare name servers are no longer authoritative. Redact (2026-09-25) says it was last seen working on 2026-06-01, has no opt-out route, and the domain is registered until 2030-05-22, so it could reappear. Last-known flow (Optery, 2025-10-28): search by name and state, then 'Remove My Information' at the bottom of the results (name, results URL, email, CAPTCHA). Optery lists support@usa-official.com as a contact (unverified), and Redact says USA Official is switched off too. Why retired: Marked defunct: DNS is broken, and Redact confirms the site has been off since June 2026 with no opt-out route.",
       "checked": "2026-10-08"
     },
     {
       "id": "radaris",
       "name": "Radaris (DEFUNCT - domain transferred by court order)",
       "url": "https://radaris.com",
-      "notes": "Defunct: the domain was seized by court order, confirmed live on all three domains.",
+      "notes": "Re-checked live 2026-10-08. radaris.com, radaris.com/control/privacy, rehold.com and trustoria.com all show 'This Domain Has Been Transferred by Court Order' (Atlas Data Privacy Corp. v. Radaris.com et al., NJ Superior Court, Middlesex, MID-L-000847-24). A final default judgment of 2026-08-27 transferred the domains to Atlas. A permanent injunction bars disclosure of covered persons' Daniel's Law data across 'any subdomains, affiliated domains or sites' of the defendants. KrebsOnSecurity (2026-09-16) reports more than a dozen other domains of the group were also transferred. No people search or removal form remains. 'covers' lists the sibling domains named in the same judgment, not domains removed by a request. An appeal is possible, so re-check periodically. Tool action: send nothing. Why retired: Defunct: the domain was seized by court order, confirmed live on all three domains.",
       "checked": "2026-10-08"
     },
     {
       "id": "rehold",
       "name": "Rehold",
       "url": "https://rehold.com",
-      "notes": "Confirmed defunct by court-ordered domain transfer.",
+      "notes": "DEFUNCT. Re-checked on 2026-10-08: rehold.com and old paths such as /opt-out all show 'This Domain Has Been Transferred by Court Order'. Atlas Data Privacy Corp. v. Radaris.com et al., NJ Superior Court, Middlesex County, MID-L-000847-24, final default judgment of Aug 27, 2026 under Daniel's Law. Radaris.com and Trustoria.com were taken in the same judgment. There are no listings and no opt-out; support@atlas.net on the notice is not a removal channel. Krebs (Sept 2026) reports 14 Radaris-family domains transferred and 25+ more people-search sites in the same operation, naming only Veripages.com. Radaris has moved to vacate and plans to appeal, so recheck if the domain is ever returned. BADBOOL removed Rehold on 2026-09-27. Why retired: Confirmed defunct by court-ordered domain transfer.",
+      "checked": "2026-10-08"
+    },
+    {
+      "id": "trustoria",
+      "name": "Trustoria",
+      "url": "https://trustoria.com",
+      "notes": "Radaris sister site. Retired with Radaris (see radaris): radaris.com was transferred to Atlas Data Privacy on 2026-08-27. An appeal is possible, so re-check periodically.",
       "checked": "2026-10-08"
     }
   ],

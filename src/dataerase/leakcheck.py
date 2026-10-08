@@ -22,6 +22,8 @@ from .patterns import Matcher, allow_key, generic_hits
 MAX_FILE_BYTES = 5_000_000
 # Exact company/government contact details the commit check should accept.
 ALLOW_FILE = ".leakcheck-allow"
+# The one file where company inboxes (a broker's privacy@ address) and toll-free numbers are expected.
+BROKER_FILE = "src/dataerase/data/brokers.json"
 COMMIT_MARK = "@@@COMMIT:"
 # Files that should never be committed, whatever is inside them.
 BLOCKED_NAME = re.compile(
@@ -105,7 +107,7 @@ def scan_staged(root: Path) -> list[Finding]:
     allowed = load_allowlist(root)
     diff = _git(root, "diff", "--cached", "-U0", "--no-color", "--diff-filter=ACMR")
     for _, path, lineno, text in _added_lines(diff):
-        for label in generic_hits(text, allowed):
+        for label in generic_hits(text, allowed, company_contacts=(path == BROKER_FILE)):
             findings.append(Finding(f"{path}:{lineno}", f"looks like a {label}"))
     return findings
 

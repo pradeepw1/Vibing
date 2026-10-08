@@ -20,7 +20,9 @@ def main(argv: list[str] | None = None) -> int:
     _disable_core_dumps()
     args = _parser().parse_args(argv)
     try:
-        return args.run(args)
+        code = args.run(args)
+        sys.stdout.flush()  # so a closed pipe shows up here, not at exit
+        return code
     except (vault.VaultError, brokers.BrokerListError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -29,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except BrokenPipeError:
         # Output was piped into something like `head` that stopped reading. Not an error.
-        sys.stdout = open(os.devnull, "w")
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
     except Exception as e:
         # Deliberately no message and no traceback: either could contain your details.
@@ -59,7 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     brk = sub.add_parser("brokers", help="list the data brokers and how to get off each one")
     brk.add_argument("id", nargs="?", help="show everything about one broker")
     brk.add_argument("--category", choices=brokers.CATEGORIES)
-    brk.add_argument("--region", help="only ones you can use from here, e.g. US or US-CA")
+    brk.add_argument("--region", type=str.upper, help="only ones you can use from here, e.g. US or US-CA")
     brk.set_defaults(run=_brokers)
     return parser
 
