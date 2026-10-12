@@ -8,6 +8,16 @@ Open `index.html` in any browser. It has three parts:
 2. **Side by side.** Each row is a normal browsing moment: typing in the address bar, reading a page full of tracking code, clicking a link with `?fbclid=` on the end, and so on. Each cell says what happens, and "Show details" tells you how to change it, with sources.
 3. **Test your browser.** The page reads what any website could read about you without asking (time zone, screen, graphics chip, fonts, canvas and audio fingerprints) and turns it into a fingerprint code. Open the page in each browser you use to compare.
 
+## Watch it live
+
+The dashboard tells you what each browser does by default. To see what your own browsers actually send while you browse, run the watcher in `watch/` on your Mac:
+
+```sh
+python3 watch/watch.py --setup
+```
+
+Then open http://localhost:8899. It lists every company each browser contacts, live, and marks trackers and the browser's own maker. It only sees who is contacted and how much data goes each way, never the contents. See [`watch/README.md`](watch/README.md) for the full guide, including iPhone.
+
 ## Opening it on each browser
 
 - **Computer:** download `index.html` and open it in Chrome, Safari, DuckDuckGo and Brave one after another.

@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Browser Watch</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face { font-family: "Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); }
+:root {
+  /* Layout: same plain page as the dashboard. A status line and a one-sentence answer on top,
+     then the "who's getting your data" table, the browser comparison, the raw feed and help. */
+  --bg: #ffffff;
+  --ink: #16181c;
+  --ink-2: #4b515a;
+  --muted: #6b717b;
+  --rule: #e4e6ea;
+  --rule-strong: #c4c8cf;
+  --accent: #1f4fd1;
+  --good-ink: #0b6b1f;
+  --partial-ink: #7a5000;
+  --bad-ink: #a42727;
+  --font-body: "Plex Sans", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Plex Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-h1: clamp(28px, 3.8vw, 40px);
+  --fs-h2: 22px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111315; --ink: #e9ecf0; --ink-2: #b2b8c1; --muted: #8a909a; --rule: #25292e; --rule-strong: #3b4048;
+    --accent: #8fb0ff; --good-ink: #6fd27e; --partial-ink: #f0c25a; --bad-ink: #f28b84;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111315; --ink: #e9ecf0; --ink-2: #b2b8c1; --muted: #8a909a; --rule: #25292e; --rule-strong: #3b4048;
+  --accent: #8fb0ff; --good-ink: #6fd27e; --partial-ink: #f0c25a; --bad-ink: #f28b84;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.6 var(--font-body); }
+[hidden] { display: none !important; }
+h1 { margin: 0; font: 600 var(--fs-h1)/1.1 var(--font-body); letter-spacing: -0.015em; text-wrap: balance; }
+h2 { margin: 0; font: 600 var(--fs-h2)/1.25 var(--font-body); text-wrap: balance; }
+h3 { margin: 0; font: 600 16px/1.3 var(--font-body); }
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--muted); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+a:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible, input:focus-visible + span {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+.wrap { max-width: 1200px; margin-inline: auto; padding: 28px 16px 80px; }
+@media (min-width: 720px) { .wrap { padding-inline: 32px; } }
+section { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--rule); }
+.section-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; margin-bottom: 20px; }
+.section-head p { margin: 6px 0 0; max-width: 62ch; color: var(--ink-2); }
+
+/* Header */
+.eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.status { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status[data-state="on"] { color: var(--good-ink); }
+.status[data-state="on"]::before { background: currentColor; }
+.status[data-state="off"] { color: var(--bad-ink); }
+.status[data-state="off"]::before { background: currentColor; }
+.lede { margin: 14px 0 0; max-width: 62ch; font-size: 17px; line-height: 1.55; color: var(--ink-2); }
+
+/* Getting started */
+.start { border-top: 0; margin-top: 32px; padding: 18px 20px; border: 1px solid var(--rule-strong); border-radius: 4px; }
+.start ol { margin: 10px 0 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 70ch; }
+.copy { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.copy code { padding: 2px 6px; border: 1px solid var(--rule-strong); border-radius: 3px; user-select: all; overflow-wrap: anywhere; }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0 18px; }
+.tabs label { position: relative; display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--ink-2); }
+.tabs input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.tabs span { padding-block: 6px 4px; border-bottom: 2px solid transparent; }
+.tabs small { color: var(--muted); font-size: 12.5px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tabs label:hover { color: var(--ink); }
+.tabs input:checked + span { color: var(--ink); border-bottom-color: var(--ink); }
+@media (forced-colors: active) {
+  .tabs span { border-bottom-color: Canvas; }
+  .tabs input:checked + span { border-bottom-color: CanvasText; }
+}
+.tools { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.linkbtn {
+  appearance: none; padding: 4px 0; border: 0; background: none; color: var(--ink-2);
+  font: 400 14px/1.3 var(--font-body); cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--muted); text-underline-offset: 3px;
+}
+.linkbtn:hover { color: var(--ink); text-decoration-color: currentColor; }
+.btn {
+  appearance: none; min-height: 36px; padding: 6px 12px; border: 1px solid var(--ink); border-radius: 3px;
+  background: none; color: var(--ink); font: 600 13.5px/1.2 var(--font-body); cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--rule); }
+.webkit { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.webkit label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; color: var(--ink); }
+.answer { margin: 22px 0 0; max-width: 64ch; font-size: 17px; line-height: 1.5; }
+.answer b { font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; margin: 22px 0 0; }
+@media (min-width: 760px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stats div { padding-top: 10px; border-top: 1px solid var(--rule); min-width: 0; }
+.stats dt { font-size: 13px; color: var(--muted); }
+.stats dd { margin: 2px 0 0; font-size: 26px; line-height: 1.2; font-weight: 600; }
+
+/* Kind marks */
+.mark { display: inline-flex; align-items: baseline; gap: 5px; font: 600 13px/1.3 var(--font-body); white-space: nowrap; }
+.mark svg { width: 11px; height: 11px; flex: none; align-self: center; }
+.mark--tracker { color: var(--bad-ink); }
+.mark--maker { color: var(--partial-ink); }
+.mark--cdn, .mark--site { color: var(--muted); font-weight: 400; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font: 400 13px/1.3 var(--font-body); color: var(--muted); padding: 0 12px 8px 0; border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th.num { text-align: right; }
+.who-name { font-weight: 600; }
+.who-sub { font-weight: 400; color: var(--muted); }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.who-hosts { display: block; margin-top: 2px; font: 12.5px/1.45 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.live-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--good-ink); vertical-align: 1px; }
+@media (prefers-reduced-motion: no-preference) {
+  .live-dot { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+}
+.empty { margin: 14px 0 0; color: var(--muted); }
+.list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: 14px; color: var(--ink-2); }
+.list-tools select { padding: 5px 8px; border: 1px solid var(--muted); border-radius: 3px; background: var(--bg); color: var(--ink); font: 14px var(--font-body); }
+.list-tools label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.more-rows { margin-top: 10px; }
+@media (max-width: 640px) {
+  table.who thead { display: none; }
+  table.who tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  table.who td { display: block; padding: 0; border: 0; }
+  table.who td.c-who { grid-column: 1; }
+  table.who td.c-kind { grid-column: 2; grid-row: 1; justify-self: end; }
+  table.who td.c-num { grid-column: 1 / -1; text-align: left; color: var(--ink-2); font-size: 13px; }
+  table.who td.c-num::before { content: attr(data-label) ": "; color: var(--muted); }
+  table.who td.c-hide { display: none; }
+}
+
+/* Compare */
+.cmp td:first-child { font-weight: 600; }
+.quiet { margin-top: 20px; display: grid; gap: 10px; max-width: 72ch; }
+.quiet p { margin: 0; }
+.quiet ul { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.quiet details { padding-top: 10px; border-top: 1px solid var(--rule); }
+.quiet summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.countdown { font: 600 18px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  table.cmp thead { display: none; }
+  table.cmp tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  table.cmp td { display: block; padding: 0; border: 0; text-align: left; }
+  table.cmp td:first-child, table.cmp td.c-quiet { grid-column: 1 / -1; }
+  table.cmp td.num::before { content: attr(data-label) ": "; color: var(--muted); font-weight: 400; }
+}
+
+/* Feed */
+.feed { list-style: none; margin: 0; padding: 0; font: 13px/1.5 var(--font-mono); }
+.feed li { display: grid; grid-template-columns: 70px minmax(0, 150px) minmax(0, 1fr) auto; gap: 2px 14px; padding: 6px 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+.feed .f-time { color: var(--muted); }
+.feed .f-app { color: var(--ink-2); overflow-wrap: anywhere; }
+.feed .f-host { overflow-wrap: anywhere; }
+.feed .f-host .mark { margin-left: 8px; font-family: var(--font-body); font-size: 12px; }
+.feed .f-bytes { color: var(--ink-2); text-align: right; white-space: nowrap; }
+.feed .f-failed { color: var(--muted); text-decoration: line-through; }
+@media (max-width: 640px) {
+  .feed li { grid-template-columns: 64px minmax(0, 1fr); }
+  .feed .f-host { grid-column: 1 / -1; }
+  .feed .f-bytes { grid-column: 1 / -1; text-align: left; }
+}
+
+/* Help */
+.help { display: grid; gap: 32px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) { .help { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 56px; } }
+.help ol, .help ul { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 8px; font-size: 14.5px; }
+.note { font-size: 13.5px; color: var(--ink-2); }
+.foot { margin-top: 48px; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .linkbtn, .tabs label { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow"><span class="status" id="status" data-state="wait" role="status">Connecting to the watcher…</span><span aria-hidden="true">·</span><a href="#help">Setup and help</a></p>
+    <h1>What your browsers are sending, live</h1>
+    <p class="lede">Every server your browsers connect to shows up here as it happens. The watcher sees who gets contacted and how much data goes each way. It never sees what’s inside.</p>
+  </header>
+
+  <section class="start" id="start" hidden aria-labelledby="start-title">
+    <h2 id="start-title">Nothing has come through yet</h2>
+    <ol>
+      <li>Open <b>System Settings → Network → Wi-Fi → Details… → Proxies</b>.</li>
+      <li>Turn on <b>Automatic proxy configuration</b> and enter this address, then press OK:
+        <span class="copy"><code id="pac-url">http://127.0.0.1:8899/proxy.pac</code><button type="button" class="linkbtn" id="copy-pac">Copy</button></span></li>
+      <li>If Chrome or Brave were already open, quit and reopen them so they pick up the new setting.</li>
+      <li>Visit any website. It should appear below within a second or two.</li>
+    </ol>
+  </section>
+
+  <section id="now" aria-label="Right now">
+    <div class="controls">
+      <div class="tabs" role="radiogroup" aria-label="Show traffic from">
+        <label><input type="radio" name="view" value="all" checked><span>All<small id="n-all"></small></span></label>
+        <label><input type="radio" name="view" value="chrome"><span>Chrome<small id="n-chrome"></small></span></label>
+        <label><input type="radio" name="view" value="safari"><span>Safari<small id="n-safari"></small></span></label>
+        <label><input type="radio" name="view" value="ddg"><span>DuckDuckGo<small id="n-ddg"></small></span></label>
+        <label><input type="radio" name="view" value="brave"><span>Brave<small id="n-brave"></small></span></label>
+        <label id="tab-phone" hidden><input type="radio" name="view" value="phone"><span>Phone<small id="n-phone"></small></span></label>
+        <label><input type="radio" name="view" value="other"><span>Other apps<small id="n-other"></small></span></label>
+      </div>
+      <div class="tools">
+        <button type="button" class="linkbtn" id="pause">Pause</button>
+        <button type="button" class="linkbtn" id="save">Save as spreadsheet</button>
+        <button type="button" class="linkbtn" id="clear">Clear</button>
+      </div>
+    </div>
+    <div class="webkit" id="webkit" role="radiogroup" aria-labelledby="webkit-q" hidden>
+      <span id="webkit-q">Safari and DuckDuckGo use the same Apple engine, so the watcher can’t tell them apart. Which one are you using?</span>
+      <label><input type="radio" name="webkit" value="safari" checked> Safari</label>
+      <label><input type="radio" name="webkit" value="ddg"> DuckDuckGo</label>
+    </div>
+    <p class="answer" id="answer">Waiting for the first connection…</p>
+    <dl class="stats">
+      <div><dt>Companies contacted</dt><dd id="s-companies">0</dd></div>
+      <div><dt>Of those, trackers</dt><dd id="s-trackers">0</dd></div>
+      <div><dt>Sent to the browser’s maker</dt><dd id="s-maker">0 B</dd></div>
+      <div><dt>Sent in total</dt><dd id="s-up">0 B</dd></div>
+    </dl>
+  </section>
+
+  <section id="who" aria-labelledby="who-title">
+    <div class="section-head">
+      <div>
+        <h2 id="who-title">Who’s getting your data</h2>
+        <p>One line per company or website. “Sent” is how much your browser sent them, “Received” is how much came back.</p>
+      </div>
+      <div class="list-tools">
+        <label for="sort">Sort by
+          <select id="sort">
+            <option value="last">Most recent</option>
+            <option value="up">Most data sent</option>
+            <option value="conns">Most connections</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="only-trackers"> Trackers only</label>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="who">
+        <thead><tr><th scope="col">Who</th><th scope="col">Kind</th><th scope="col" class="num">Connections</th><th scope="col" class="num">Sent</th><th scope="col" class="num">Received</th><th scope="col" class="num">Last seen</th></tr></thead>
+        <tbody id="who-body"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="who-empty">Nothing here yet.</p>
+    <button type="button" class="linkbtn more-rows" id="who-more" hidden>Show all</button>
+  </section>
+
+  <section id="compare" aria-labelledby="compare-title">
+    <div class="section-head">
+      <div>
+        <h2 id="compare-title">Compare browsers</h2>
+        <p>Use one browser for a while, then the next. Totals build up here. The quiet test shows what a browser sends home when you leave it alone on a blank tab.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="cmp">
+        <thead><tr><th scope="col">Browser</th><th scope="col" class="num">Companies</th><th scope="col" class="num">Trackers</th><th scope="col" class="num">Sent to its maker</th><th scope="col" class="num">Sent in total</th><th scope="col">Quiet test</th></tr></thead>
+        <tbody id="cmp-body"></tbody>
+      </table>
+    </div>
+    <div class="quiet" id="quiet" aria-live="polite"></div>
+  </section>
+
+  <section id="feed" aria-labelledby="feed-title">
+    <div class="section-head">
+      <div>
+        <h2 id="feed-title">Live feed</h2>
+        <p>Every connection, newest first. A green dot means it’s still open.</p>
+      </div>
+    </div>
+    <ol class="feed" id="feed-list"></ol>
+    <p class="empty" id="feed-empty">Nothing yet.</p>
+    <button type="button" class="linkbtn more-rows" id="feed-more" hidden>Show more</button>
+  </section>
+
+  <section id="help" aria-labelledby="help-title">
+    <div class="section-head"><div><h2 id="help-title">Setup and help</h2></div></div>
+    <div class="help">
+      <div>
+        <h3>On this Mac</h3>
+        <ol>
+          <li>Keep the Terminal window with the watcher open.</li>
+          <li>System Settings → Network → Wi-Fi → Details… → Proxies → turn on <b>Automatic proxy configuration</b> → URL: <code class="pac-url-text">http://127.0.0.1:8899/proxy.pac</code> → OK. Or start the watcher with <code>--setup</code> and it does this for you.</li>
+          <li>Quit and reopen Chrome and Brave if they were open.</li>
+          <li>When you’re done: press Ctrl+C in Terminal and turn that switch off again (with <code>--setup</code> it switches off by itself).</li>
+        </ol>
+        <h3 style="margin-top:24px">On your iPhone</h3>
+        <ol>
+          <li>Start the watcher with <code>--phone</code>. Terminal shows an address like <code>http://192.168.1.20:8899/proxy.pac</code>.</li>
+          <li>On the iPhone: Settings → Wi-Fi → tap ⓘ next to your network → Configure Proxy → Automatic → paste that address → Save.</li>
+          <li>Phone traffic shows up under “Phone”. Switch Configure Proxy back to Off when you’re done.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>If something looks wrong</h3>
+        <ul>
+          <li><b>Nothing shows up.</b> Check the proxy address is exactly right, then quit and reopen the browser.</li>
+          <li><b>Safari shows nothing but Chrome does.</b> iCloud Private Relay may be sending Safari’s traffic around the watcher. Turn it off while you test (Settings → your name → iCloud → Private Relay).</li>
+          <li><b>Lots of “Other apps”.</b> Other Mac apps use the same setting. Pick a browser above to hide them.</li>
+          <li><b>Pages stop loading.</b> If the watcher stops while the setting is on, browsers should go direct. If they don’t, turn the setting off, or run <code>python3 watch/watch.py --off</code>.</li>
+          <li><b>“Browser maker”</b> means the company that makes the browser you’re looking at, e.g. Google for Chrome. Searching on google.com in Chrome counts there too, because the watcher can’t see what was sent.</li>
+          <li><b>Trackers</b> are matched against a built-in list of about 140 ad and analytics companies, plus servers whose names show they swap ad IDs (like <code>sync.</code> or <code>match.</code>). Anything else shows as a website, so the real number can be higher.</li>
+        </ul>
+        <p class="note">Nothing is stored. Closing the watcher forgets everything unless you saved a spreadsheet.</p>
+      </div>
+    </div>
+    <p class="foot">The watcher runs only on your Mac and sends nothing anywhere.</p>
+  </section>
+
+</div>
+<script>
+(() => {
+  'use strict';
+
+  const MAKER = { chrome: 'Google', safari: 'Apple', ddg: 'DuckDuckGo', brave: 'Brave' };
+  const NAME = { chrome: 'Chrome', safari: 'Safari', ddg: 'DuckDuckGo', brave: 'Brave', phone: 'Your phone', other: 'Other apps', unknown: 'Other apps' };
+  const KIND_RANK = { tracker: 3, maker: 2, site: 1, cdn: 0 };
+  const KIND_LABEL = { tracker: 'Tracker', maker: 'Browser maker', cdn: 'Content delivery', site: 'Website' };
+  const ICON = {
+    tracker: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    maker: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 1.7a4.3 4.3 0 0 1 0 8.6z" fill="currentColor"/></svg>',
+    cdn: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+    site: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="2.4" fill="currentColor"/></svg>'
+  };
+  const ROW_LIMIT = 25;
+  const FEED_STEP = 30;
+  const FEED_MAX = 300;
+
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+  };
+
+  const state = {
+    aggs: new Map(),
+    conns: new Map(),
+    started: 0,
+    total: 0,
+    settings: { webkitAs: 'safari' },
+    quiet: null,
+    quietResults: {},
+    view: store.get('watch-view') || 'all',
+    sort: store.get('watch-sort') || 'last',
+    onlyTrackers: false,
+    showAll: false,
+    feedShown: FEED_STEP,
+    paused: false,
+    connected: false,
+    skew: 0
+  };
+
+  // ---------- Formatting ----------
+
+  function bytes(n) {
+    if (!n) return '0 B';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return `${i === 0 ? n : n < 10 ? n.toFixed(1) : Math.round(n)} ${u[i]}`;
+  }
+  const now = () => Date.now() / 1000 - state.skew;
+  function ago(t) {
+    const s = Math.max(0, Math.round(now() - t));
+    if (s < 5) return 'now';
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    return `${Math.round(s / 3600)} h ago`;
+  }
+  const clock = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const plural = (n, one, many) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  const span = (sec) => (sec < 90 ? `${Math.round(sec)} seconds` : `${Math.round(sec / 60)} minutes`);
+  function names(list, max) {
+    const n = list.map((c) => esc(c.name));
+    if (n.length <= max) return n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n.join('');
+    return `${n.slice(0, max).join(', ')} and ${n.length - max} more`;
+  }
+  const mark = (k) => `<span class="mark mark--${k}">${ICON[k]}${KIND_LABEL[k]}</span>`;
+
+  function kindOf(row) {
+    if (row.kind === 'tracker') return 'tracker';
+    if (MAKER[row.browser] && row.company === MAKER[row.browser]) return 'maker';
+    if (row.kind === 'cdn') return 'cdn';
+    return 'site';
+  }
+  const inView = (browser, view) => view === 'all' || browser === view || (view === 'other' && (browser === 'other' || browser === 'unknown'));
+
+  // ---------- Grouping ----------
+
+  function rowsFor(view) {
+    const bySite = new Map();
+    for (const a of state.aggs.values()) {
+      if (!inView(a.browser, view)) continue;
+      const k = kindOf(a);
+      let r = bySite.get(a.site);
+      if (!r) {
+        r = { site: a.site, company: a.company, kind: k, conns: 0, open: 0, up: 0, down: 0, last: 0, hosts: [] };
+        bySite.set(a.site, r);
+      }
+      if (KIND_RANK[k] > KIND_RANK[r.kind]) r.kind = k;
+      r.company = r.company || a.company;
+      r.conns += a.conns; r.open += a.open; r.up += a.up; r.down += a.down;
+      r.last = Math.max(r.last, a.last);
+      for (const h of a.hosts) if (!r.hosts.includes(h) && r.hosts.length < 12) r.hosts.push(h);
+    }
+    return [...bySite.values()];
+  }
+
+  function totals(rows) {
+    const companies = new Set();
+    const trackers = new Set();
+    let maker = 0, up = 0;
+    for (const r of rows) {
+      const who = r.company || r.site;
+      companies.add(who);
+      if (r.kind === 'tracker') trackers.add(who);
+      if (r.kind === 'maker') maker += r.up;
+      up += r.up;
+    }
+    return { companies: companies.size, trackers: trackers.size, maker, up };
+  }
+
+  // ---------- Render ----------
+
+  let renderTimer = null;
+  function scheduleRender() {
+    if (renderTimer || state.paused) return;
+    renderTimer = setTimeout(() => { renderTimer = null; render(); }, 300);
+  }
+
+  function render() {
+    renderCounts();
+    renderSummary();
+    renderWho();
+    renderCompare();
+    renderFeed();
+    $('#start').hidden = state.total > 0 || !state.connected;
+    const sawWebkit = [...state.conns.values()].some((c) => /WebKit/.test(c.app || ''));
+    $('#webkit').hidden = !(sawWebkit || state.view === 'safari' || state.view === 'ddg');
+  }
+
+  function renderCounts() {
+    const views = ['all', 'chrome', 'safari', 'ddg', 'brave', 'phone', 'other'];
+    for (const v of views) {
+      const n = totals(rowsFor(v)).companies;
+      const el = $(`#n-${v}`);
+      if (el) el.textContent = n ? ` ${n}` : '';
+    }
+    $('#tab-phone').hidden = ![...state.aggs.values()].some((a) => a.browser === 'phone') && state.view !== 'phone';
+  }
+
+  function renderSummary() {
+    const rows = rowsFor(state.view);
+    const t = totals(rows);
+    $('#s-companies').textContent = t.companies.toLocaleString();
+    $('#s-trackers').textContent = t.trackers.toLocaleString();
+    $('#s-maker').textContent = MAKER[state.view] ? bytes(t.maker) : '—';
+    $('#s-up').textContent = bytes(t.up);
+    const since = state.started ? clock(state.started).replace(/:\d\d(?=\s|$)/, '') : '';
+    const v = state.view;
+    let html;
+    if (!rows.length) {
+      html = v === 'all' ? 'Waiting for the first connection…' : `Nothing from ${esc(NAME[v])} yet. Open it and visit a few sites.`;
+    } else {
+      const who = v === 'all' ? 'Your browsers and apps have' : `<b>${esc(NAME[v])}</b> has`;
+      html = `${who} contacted <b>${plural(t.companies, 'company', 'companies')}</b> since ${esc(since)}, ${t.trackers ? `<b>${t.trackers.toLocaleString()}</b> of them ${t.trackers === 1 ? 'a tracker' : 'trackers'}` : 'none of them on our tracker list'}.`;
+      if (MAKER[v]) html += ` It sent ${bytes(t.up)} in total, ${bytes(t.maker)} of it to ${esc(MAKER[v])}, the company that makes ${esc(NAME[v])}.`;
+    }
+    $('#answer').innerHTML = html;
+  }
+
+  function renderWho() {
+    let rows = rowsFor(state.view);
+    if (state.onlyTrackers) rows = rows.filter((r) => r.kind === 'tracker');
+    const key = state.sort;
+    rows.sort((a, b) => (key === 'up' ? b.up - a.up : key === 'conns' ? b.conns - a.conns : 0) || b.last - a.last);
+    const shown = state.showAll ? rows : rows.slice(0, ROW_LIMIT);
+    $('#who-body').innerHTML = shown.map((r) => {
+      const name = r.company && r.company !== r.site ? `${esc(r.company)} <span class="who-sub">· ${esc(r.site)}</span>` : esc(r.site);
+      const hosts = r.hosts.slice(0, 3).join(', ') + (r.hosts.length > 3 ? ` and ${r.hosts.length - 3} more` : '');
+      return `<tr>
+        <td class="c-who"><span class="who-name">${name}</span>${r.open ? '<span class="live-dot" title="Connection open"></span><span class="vh"> (open now)</span>' : ''}<span class="who-hosts">${esc(hosts)}</span></td>
+        <td class="c-kind">${mark(r.kind)}</td>
+        <td class="num c-num c-hide" data-label="Connections">${r.conns.toLocaleString()}</td>
+        <td class="num c-num" data-label="Sent">${bytes(r.up)}</td>
+        <td class="num c-num c-hide" data-label="Received">${bytes(r.down)}</td>
+        <td class="num c-num" data-label="Last seen">${ago(r.last)}</td>
+      </tr>`;
+    }).join('');
+    $('#who-empty').hidden = rows.length > 0;
+    $('#who-empty').textContent = state.onlyTrackers ? 'No trackers yet.' : 'Nothing here yet.';
+    const more = $('#who-more');
+    more.hidden = rows.length <= ROW_LIMIT;
+    more.textContent = state.showAll ? 'Show fewer' : `Show all ${rows.length}`;
+  }
+
+  function renderCompare() {
+    const q = state.quiet;
+    $('#cmp-body').innerHTML = ['chrome', 'safari', 'ddg', 'brave'].map((b) => {
+      const t = totals(rowsFor(b));
+      const res = state.quietResults[b];
+      let quiet;
+      if (q && q.browser === b) {
+        quiet = `<span class="countdown" data-quiet-end="${q.start + q.seconds}">…</span> <button type="button" class="linkbtn" data-quiet-stop>Stop</button>`;
+      } else if (res) {
+        quiet = `${res.companies.length ? names(res.companies, 2) : 'Nothing'} <button type="button" class="linkbtn" data-quiet="${b}">Run again</button>`;
+      } else {
+        quiet = `<button type="button" class="btn" data-quiet="${b}"${q ? ' disabled' : ''}>Start 2-minute test</button>`;
+      }
+      return `<tr>
+        <td>${esc(NAME[b])}</td>
+        <td class="num" data-label="Companies">${t.companies}</td>
+        <td class="num" data-label="Trackers">${t.trackers}</td>
+        <td class="num" data-label="Sent to ${esc(MAKER[b])}">${bytes(t.maker)}</td>
+        <td class="num" data-label="Sent in total">${bytes(t.up)}</td>
+        <td class="c-quiet">${quiet}</td>
+      </tr>`;
+    }).join('');
+
+    const parts = [];
+    if (q) {
+      parts.push(`<p><b>Quiet test running for ${esc(NAME[q.browser])}.</b> Leave it on one blank tab and don’t touch it. Other browsers can stay closed.</p>`);
+      if (q.companies && q.companies.length) parts.push(`<p>So far: ${q.companies.map((c) => esc(c.name)).join(', ')}.</p>`);
+    }
+    const latest = Object.values(state.quietResults).reduce((m, r) => Math.max(m, r.start), 0);
+    for (const b of ['chrome', 'safari', 'ddg', 'brave']) {
+      const res = state.quietResults[b];
+      if (!res) continue;
+      const items = res.companies.map((c) => `<li>${esc(c.name)}${c.kind === 'tracker' ? ` ${mark('tracker')}` : ''}: ${plural(c.conns, 'connection', 'connections')}, ${bytes(c.up)} sent <span class="note">(${esc(c.hosts.join(', '))})</span></li>`).join('');
+      parts.push(`<details${res.start === latest ? ' open' : ''}><summary>Quiet test: left alone for ${span(res.seconds)}, ${esc(NAME[b])} contacted ${plural(res.companies.length, 'company', 'companies')}</summary>
+        ${items ? `<ul>${items}</ul>` : '<p>Nothing at all. It stayed quiet.</p>'}
+        <p class="note">Started at ${esc(clock(res.start))}.</p></details>`);
+    }
+    $('#quiet').innerHTML = parts.join('');
+    tickCountdown();
+  }
+
+  function tickCountdown() {
+    document.querySelectorAll('[data-quiet-end]').forEach((el) => {
+      const left = Math.max(0, Math.round(Number(el.dataset.quietEnd) - now()));
+      el.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left`;
+    });
+  }
+
+  function renderFeed() {
+    const list = [...state.conns.values()]
+      .filter((c) => inView(c.browser, state.view))
+      .sort((a, b) => b.start - a.start);
+    const more = $('#feed-more');
+    more.hidden = list.length <= state.feedShown || state.feedShown >= FEED_MAX;
+    list.length = Math.min(list.length, state.feedShown);
+    $('#feed-list').innerHTML = list.map((c) => {
+      const k = kindOf(c);
+      const who = c.browser === 'other' || c.browser === 'unknown' ? (c.app || 'Unknown app') : (NAME[c.browser] || c.browser);
+      const open = c.state === 'open' ? '<span class="live-dot" title="Still open"></span><span class="vh"> (still open)</span>' : '';
+      const failed = c.state === 'failed';
+      return `<li>
+        <span class="f-time">${esc(clock(c.start))}</span>
+        <span class="f-app">${esc(who)}</span>
+        <span class="f-host${failed ? ' f-failed' : ''}">${esc(c.host)}${k !== 'site' ? mark(k) : ''}${open}</span>
+        <span class="f-bytes">${failed ? 'couldn’t connect' : `↑ ${bytes(c.up)} · ↓ ${bytes(c.down)}`}</span>
+      </li>`;
+    }).join('');
+    $('#feed-empty').hidden = list.length > 0;
+  }
+
+  // ---------- Live data ----------
+
+  function applySnapshot(d) {
+    state.aggs.clear();
+    state.conns.clear();
+    state.started = d.started;
+    state.total = d.total;
+    state.skew = Date.now() / 1000 - d.now;
+    state.settings = d.settings;
+    state.quiet = d.quiet;
+    state.quietResults = d.quietResults || {};
+    for (const a of d.aggs) state.aggs.set(`${a.browser}|${a.site}`, a);
+    for (const c of d.conns) state.conns.set(c.id, c);
+    syncWebkit();
+  }
+
+  function applyUpdate(d) {
+    state.total = d.total;
+    state.skew = Date.now() / 1000 - d.now;
+    for (const a of d.aggs) state.aggs.set(`${a.browser}|${a.site}`, a);
+    for (const c of d.conns) if (c.start >= state.started - 1) state.conns.set(c.id, c);
+    if ('quiet' in d) state.quiet = d.quiet;
+    if (state.conns.size > 600) {
+      const ids = [...state.conns.keys()].sort((a, b) => a - b);
+      for (const id of ids.slice(0, state.conns.size - 400)) state.conns.delete(id);
+    }
+  }
+
+  function syncWebkit() {
+    const el = document.querySelector(`input[name="webkit"][value="${state.settings.webkitAs}"]`);
+    if (el) el.checked = true;
+  }
+
+  function setStatus(kind, text) {
+    const el = $('#status');
+    el.dataset.state = kind;
+    el.textContent = text;
+  }
+
+  function connect() {
+    const es = new EventSource('/events');
+    es.addEventListener('open', () => {
+      state.connected = true;
+      setStatus('on', 'Watching');
+    });
+    es.addEventListener('error', () => {
+      state.connected = false;
+      setStatus('off', 'Lost touch with the watcher. Is it still running in Terminal?');
+    });
+    es.addEventListener('snapshot', (e) => { applySnapshot(JSON.parse(e.data)); render(); });
+    es.addEventListener('update', (e) => { applyUpdate(JSON.parse(e.data)); scheduleRender(); });
+    es.addEventListener('settings', (e) => { state.settings = JSON.parse(e.data); syncWebkit(); });
+    es.addEventListener('quiet', (e) => { state.quiet = JSON.parse(e.data); renderCompare(); });
+    es.addEventListener('quietResults', (e) => { state.quietResults = JSON.parse(e.data); renderCompare(); });
+  }
+
+  function post(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Watch': '1' },
+      body: JSON.stringify(body || {})
+    });
+  }
+
+  // ---------- Controls ----------
+
+  document.querySelectorAll('input[name="view"]').forEach((el) => {
+    if (el.value === state.view) el.checked = true;
+    el.addEventListener('change', () => {
+      if (!el.checked) return;
+      state.view = el.value;
+      state.showAll = false;
+      state.feedShown = FEED_STEP;
+      store.set('watch-view', state.view);
+      render();
+    });
+  });
+  if (!document.querySelector('input[name="view"]:checked')) {
+    state.view = 'all';
+    document.querySelector('input[name="view"][value="all"]').checked = true;
+  }
+  document.querySelectorAll('input[name="webkit"]').forEach((el) => {
+    el.addEventListener('change', () => { if (el.checked) post('/api/settings', { webkitAs: el.value }); });
+  });
+  $('#sort').value = state.sort;
+  $('#sort').addEventListener('change', (e) => { state.sort = e.target.value; store.set('watch-sort', state.sort); renderWho(); });
+  $('#only-trackers').addEventListener('change', (e) => { state.onlyTrackers = e.target.checked; renderWho(); });
+  $('#who-more').addEventListener('click', () => { state.showAll = !state.showAll; renderWho(); });
+  $('#feed-more').addEventListener('click', () => { state.feedShown = Math.min(FEED_MAX, state.feedShown + FEED_STEP); renderFeed(); });
+  $('#pause').addEventListener('click', (e) => {
+    state.paused = !state.paused;
+    e.currentTarget.textContent = state.paused ? 'Resume' : 'Pause';
+    if (!state.paused) render();
+  });
+  const clearBtn = $('#clear');
+  clearBtn.addEventListener('click', () => {
+    if (clearBtn.dataset.confirm) {
+      delete clearBtn.dataset.confirm;
+      clearBtn.textContent = 'Clear';
+      post('/api/clear');
+      return;
+    }
+    clearBtn.dataset.confirm = '1';
+    clearBtn.textContent = 'Click again to clear everything';
+    setTimeout(() => { delete clearBtn.dataset.confirm; clearBtn.textContent = 'Clear'; }, 4000);
+  });
+  $('#compare').addEventListener('click', (e) => {
+    const start = e.target.closest('[data-quiet]');
+    if (start) { post('/api/quiet', { browser: start.dataset.quiet, seconds: 120 }); return; }
+    if (e.target.closest('[data-quiet-stop]')) post('/api/quiet/stop');
+  });
+  $('#save').addEventListener('click', () => {
+    const cols = ['browser', 'company', 'site', 'kind', 'connections', 'bytes_sent', 'bytes_received', 'first_seen', 'last_seen', 'servers'];
+    const cell = (v) => {
+      let s = String(v == null ? '' : v);
+      if (/^[=+\-@]/.test(s)) s = `'${s}`;
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const iso = (t) => new Date(t * 1000).toISOString();
+    const lines = [cols.join(',')];
+    for (const a of state.aggs.values()) {
+      lines.push([NAME[a.browser] || a.browser, a.company, a.site, KIND_LABEL[kindOf(a)], a.conns, a.up, a.down, iso(a.first), iso(a.last), a.hosts.join(' ')].map(cell).join(','));
+    }
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
+    const link = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    link.href = URL.createObjectURL(blob);
+    link.download = `browser-watch-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  });
+
+  const pacUrl = `http://127.0.0.1:${location.port || 80}/proxy.pac`;
+  $('#pac-url').textContent = pacUrl;
+  document.querySelectorAll('.pac-url-text').forEach((el) => { el.textContent = pacUrl; });
+  $('#copy-pac').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const done = () => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); };
+    try {
+      navigator.clipboard.writeText(pacUrl).then(done, () => window.getSelection().selectAllChildren($('#pac-url')));
+    } catch (err) {
+      window.getSelection().selectAllChildren($('#pac-url'));
+    }
+  });
+
+  // Relative times and the countdown keep moving even when nothing new arrives.
+  setInterval(() => {
+    tickCountdown();
+    if (!state.paused && state.aggs.size) { renderWho(); }
+  }, 5000);
+  setInterval(tickCountdown, 1000);
+
+  connect();
+})();
+</script>
+</body>
+</html>
