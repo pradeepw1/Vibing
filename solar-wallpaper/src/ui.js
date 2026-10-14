@@ -39,10 +39,17 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
   viewSel.append(lookAt, lookFrom);
   const pill = $("#pov");
   const pillName = $("#pov .name");
-  $("#pov-back").addEventListener("click", goBack);
+  // While idle the Back pill and the settings button are hidden. A click that
+  // lands on one as it reappears was meant for the sky, not for them.
+  const justWoke = (e) => e.detail > 0 && performance.now() - wokeAt < 400; // detail is 0 for Space and Enter
+  $("#pov-back").addEventListener("click", (e) => justWoke(e) || goBack());
+  // Whether the last focus change came from Tab (rather than a click).
+  let tabbing = false;
   viewSel.addEventListener("change", () => {
     set("view", viewSel.value);
-    viewSel.blur(); // so Esc and the other keys work straight away
+    // Picked with the mouse: let go, so Esc and the other keys work straight
+    // away. Reached with Tab: keep it, so the arrow keys step through the list.
+    if (!tabbing) viewSel.blur();
   });
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
@@ -50,7 +57,8 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
   const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
-  menuBtn.addEventListener("click", () => {
+  menuBtn.addEventListener("click", (e) => {
+    if (justWoke(e)) return;
     panel.hidden = !panel.hidden;
     menuBtn.setAttribute("aria-expanded", String(!panel.hidden));
   });
@@ -82,7 +90,9 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
 
   // Hide the button and cursor after a few seconds of no mouse movement.
   let idleTimer = 0;
+  let wokeAt = -Infinity;
   function wake() {
+    if (document.body.classList.contains("idle")) wokeAt = performance.now();
     document.body.classList.remove("idle");
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => panel.hidden && document.body.classList.add("idle"), 3000);
@@ -92,11 +102,12 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
   wake();
 
   // --- Keyboard ---
-  // Whether the last focus change came from Tab (rather than a click).
-  let tabbing = false;
   addEventListener("pointerdown", () => (tabbing = false), true);
   addEventListener("keydown", (e) => {
-    if (e.key === "Tab") tabbing = true;
+    if (e.key === "Tab") {
+      tabbing = true;
+      wake(); // show the buttons you're stepping through
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     // Leave keys alone that a focused control needs: the dropdown uses most
     // keys, and buttons and tick boxes reached with Tab are pressed with
@@ -104,8 +115,9 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
     // then Space should still pause.
     const t = e.target;
     if (t instanceof HTMLSelectElement && e.key !== "Escape" && e.key !== "Backspace") return;
-    const control = t instanceof HTMLButtonElement || t instanceof HTMLInputElement;
-    if (control && (e.key === " " || e.key === "Enter")) {
+    // Buttons take Space and Enter, tick boxes only Space.
+    const takes = t instanceof HTMLButtonElement ? e.key === " " || e.key === "Enter" : t instanceof HTMLInputElement && e.key === " ";
+    if (takes) {
       if (tabbing) return;
       t.blur();
     }

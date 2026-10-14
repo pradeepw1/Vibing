@@ -120,7 +120,8 @@ function jumpToNow() {
 
 /** Leave the view from a body, back to whatever you were looking at before. */
 function goBack() {
-  if (viewpoint(settings.view)) set("view", lastLookView);
+  // Only saved if the view we're leaving was (not one reached by a click).
+  if (viewpoint(settings.view)) set("view", lastLookView, { remember: savedView === settings.view });
 }
 
 const ui = createUI({ settings, bodies, set, goLive, jumpToNow, goBack, backLabel: () => VIEWS.find((v) => v.id === lastLookView)?.label ?? "the overview" });
@@ -729,8 +730,8 @@ window.livelyPropertyListener = (name, value) => {
   if (name === "view") {
     value = typeof value === "number" ? LOOK_AT[value]?.id : value;
     if (!value) return;
-    if (livelyFrom && settings.view === livelyFrom) {
-      // Standing where Look from put us: this is where Back goes.
+    if (livelyFrom && viewpoint(settings.view)) {
+      // Look from is set and we're on a body: this is only where Back goes.
       lastLookView = value;
       ui.sync();
       return;
