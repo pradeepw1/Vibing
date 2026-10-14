@@ -30,7 +30,7 @@ const BIG = 8 * DEG; // discs grow less as they near this size, and ones already
 const WARP_REACH = 12 * DEG; // stretching near a disc fades out by this far from it
 const ROUNDS = 8; // times every close pair gets nudged
 const SIDE = 0.1; // how strongly a body is drawn round to its real side of another, each round
-const PULL = 1; // pairs stop pulling together once their target gap is this much (times touching) wider than touching
+const PULL = 0.3; // pairs stop pulling together once their target gap is this much (times touching) wider than touching
 const MAX_DEPTH = 700; // nearer than the star and Milky Way shells round the camera (850-1000)
 
 const RADIUS_KM = new Map([[SUN.id, SUN.radiusKm], ...PLANETS.map((p) => [p.id, p.radiusKm]), ...MOONS.map((m) => [m.id, m.radiusKm])]);
@@ -251,44 +251,44 @@ const _carry = new Quaternion();
 /**
  * Moves a pair towards its stretched gap: `r` should sit `target` from `c`.
  * The gap is put right in full (times the pair's weight; pulling together
- * only for discs that really touch). The side `r` is on is only leaned
- * towards its real side (carried along with wherever `c` has been moved
- * to), so a body near several others can slide round to where all the gaps
- * work out; but the closer `r` is drawn to `c`, the more the real side
- * decides, so a body pushed out from near the middle of a disc doesn't
- * flip about. A `clearOnly` pair is only ever pushed apart.
+ * only for discs that really touch), and `r` is leaned a little round `c`
+ * towards the side it's really on (carried along with wherever `c` has been
+ * moved to), so a body near several others can slide round to where all
+ * the gaps work out. A `clearOnly` pair is only ever pushed apart, straight
+ * out.
  */
 function nudge(pair) {
-  const { c, r } = pair;
-  const gap = c.dir.angleTo(r.dir);
-  let weight;
-  if (gap < pair.target) weight = pair.clearOnly ? 1 : pair.weight;
-  else {
-    if (pair.clearOnly) return;
-    weight = pair.weight * pair.pull;
-    if (weight <= 0) return;
-  }
-  move(pair, pair.target, gap, pair.clearOnly ? 0 : SIDE, weight);
+  const gap = pair.c.dir.angleTo(pair.r.dir);
+  let out;
+  if (gap < pair.target) out = pair.clearOnly ? 1 : pair.weight;
+  else out = pair.clearOnly ? 0 : pair.weight * pair.pull;
+  move(pair, pair.target, gap, out, pair.clearOnly ? 0 : pair.weight * SIDE);
 }
 
 /** Pushes a pair of discs that don't really touch just clear of each other, if they're drawn touching. */
 function clear(pair) {
   const goal = Math.min(pair.target, pair.touchShown * 1.02);
   const gap = pair.c.dir.angleTo(pair.r.dir);
-  if (gap < goal) move(pair, goal, gap, pair.clearOnly ? 0 : SIDE, 1);
+  if (gap < goal) move(pair, goal, gap, 1, 0);
 }
 
-/** Moves r (and c, by their shares) so r sits `goal` from c, `weight` of the way. */
-function move(pair, goal, gap, lean, weight) {
+/**
+ * Moves r (and c, by their shares): `out` of the way to sitting `goal` from
+ * c, and `round` of the way round c to its real side. Pushed out from near
+ * c's middle, it goes the way its real side is, so it can't flip from one
+ * side to the other as it passes the middle.
+ */
+function move(pair, goal, gap, out, round) {
   const { c, r } = pair;
+  if (out <= 0 && round <= 0) return;
   _side.copy(r.realDir).addScaledVector(c.realDir, -c.realDir.dot(r.realDir));
   _side.applyQuaternion(_carry.setFromUnitVectors(c.realDir, c.dir)).normalize();
   _toward.copy(r.dir).addScaledVector(c.dir, -c.dir.dot(r.dir));
-  lean = Math.max(lean, 1 - smoothstep((2 * gap) / Math.max(goal, 1e-9)));
   if (_toward.lengthSq() < 1e-20) _toward.copy(_side);
-  else _toward.normalize().lerp(_side, lean);
-  turn(c.dir, _toward.add(c.dir), goal, _want);
-  _move.subVectors(_want, r.dir).multiplyScalar(weight);
+  else _toward.normalize().lerp(_side, 1 - smoothstep((2 * gap) / Math.max(goal, 1e-9))).normalize();
+  _move.set(0, 0, 0);
+  if (out > 0) _move.add(turn(c.dir, _want.copy(c.dir).add(_toward), goal, _want).sub(r.dir).multiplyScalar(out));
+  if (round > 0) _move.add(turn(c.dir, _want.copy(c.dir).add(_side), gap, _want).sub(r.dir).multiplyScalar(round));
   if (pair.shareR) shift(r, pair.shareR);
   if (pair.shareC) shift(c, -pair.shareC);
 }

@@ -403,9 +403,11 @@ export function createSystem(scene, pixelRatio) {
       else lockedQuaternion(tmp.negate(), axes[def.parent].pole, b.mesh.quaternion);
 
       // Moons that would whizz round in a few frames are just a blur; fade them
-      // out (but never the one you're standing on, or just leaving).
+      // out (but never the one you're standing on, or just leaving). Eased, so
+      // one doesn't pop in or out as you arrive or leave.
       const stepsPerOrbit = (def.periodDays * DAY_MS) / Math.max(msPerFrame, 1);
-      b.fade = grounds.has(def.id) ? 1 : Math.min(1, Math.max(0, (stepsPerOrbit - 6) / 10));
+      const fade = grounds.has(def.id) ? 1 : Math.min(1, Math.max(0, (stepsPerOrbit - 6) / 10));
+      b.fade = b.fade === undefined || dtReal === 0 ? fade : b.fade + (fade - b.fade) * Math.min(1, dtReal / 0.3);
       b.material.uniforms.opacity.value = b.fade;
       b.material.transparent = b.fade < 1; // solid moons draw with the solid things, so rings sort right
       b.mesh.visible = b.fade > 0.01;

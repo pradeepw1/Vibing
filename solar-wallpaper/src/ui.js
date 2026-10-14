@@ -102,10 +102,11 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
   wake();
 
   // --- Keyboard ---
-  addEventListener("pointerdown", () => (tabbing = false), true);
+  // (Shown on the page too, so a button you've tabbed to stays in sight while idle.)
+  addEventListener("pointerdown", () => document.body.classList.toggle("tabbing", (tabbing = false)), true);
   addEventListener("keydown", (e) => {
     if (e.key === "Tab") {
-      tabbing = true;
+      document.body.classList.toggle("tabbing", (tabbing = true));
       wake(); // show the buttons you're stepping through
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return;

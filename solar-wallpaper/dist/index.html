@@ -48,9 +48,9 @@
     background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px);
     transition: opacity .4s; }
   #menu-btn:hover { border-color: rgba(255,255,255,.25); }
-  .idle #menu-btn:not([aria-expanded="true"]):not(:focus-visible) { opacity: 0; pointer-events: none; }
+  .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0; pointer-events: none; }
   canvas.pointing { cursor: pointer; }
-  .idle, .idle canvas { cursor: none; }
+  .idle, .idle canvas, .idle .label { cursor: none; }
 
   #panel { position: fixed; top: calc(68px + var(--safe-top)); right: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 86px - var(--safe-top) - var(--safe-bottom)); overflow: auto;
     background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; padding: 16px; backdrop-filter: blur(14px); }
@@ -78,7 +78,9 @@
     border: 1px solid var(--panel-line); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
   #pov button:hover { border-color: rgba(255,255,255,.3); }
   #pov[hidden] { display: none; }
-  .idle #pov:not(:has(:focus-visible)) { opacity: 0; pointer-events: none; }
+  .idle #pov { opacity: 0; pointer-events: none; }
+  /* Reached with Tab: stay in sight while idle. */
+  .idle.tabbing #menu-btn:focus, .idle.tabbing #pov:focus-within { opacity: 1; pointer-events: auto; }
 
   #loading { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
     color: var(--muted); transition: opacity .8s; pointer-events: none; }

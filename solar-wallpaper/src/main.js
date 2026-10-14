@@ -229,6 +229,7 @@ const pov = { id: null, leaving: false, from: null, blend: 1, camOffset: new Vec
 const povCam = createPovCamera(renderer.domElement);
 const povPose = povCam.newPose();
 let tween = null; // camera move into, out of, or between views from a body
+let settle = false; // just jumped onto a body: lay the sky out again once the camera is there
 const Y_UP = new Vector3(0, 1, 0);
 const lookMatrix = new Matrix4();
 const MOVE_MS = 2600;
@@ -239,24 +240,27 @@ const MOVE_MS = 2600;
  * is drawn. `belts` says where the asteroids start, as they can't be snapshotted.
  */
 function onScreen() {
-  const target = pov.id && !pov.leaving ? { kind: "sky", id: pov.id, offset: system.skyAnchor.clone().sub(system.overviews.get(pov.id)) } : { kind: "overview" };
+  const target =
+    pov.id && !pov.leaving
+      ? { kind: "sky", id: pov.id, offset: system.skyAnchor.clone().sub(system.overviews.get(pov.id)) }
+      : { kind: "overview", ground: pov.id ? null : nextTo([...bodies.keys()]) };
   if (!tween) return target;
   const before = pov.from?.kind === "snapshot" ? pov.from.belts : pov.from;
   return {
     kind: "snapshot",
     map: system.snapshot(),
     share: system.overviewShare,
-    ground: nearGround(),
+    ground: nextTo([tween?.left, pov.id]), // the one it's leaving or the one it's reaching
     belts: pov.blend > 0.5 || !before ? target : before,
   };
 }
 
-/** During a move, the body the camera is right next to, if any: the one it's leaving or the one it's reaching. */
-function nearGround() {
+/** Of the bodies `ids`, the one the camera is right next to, if any. */
+function nextTo(ids) {
   let best = null;
   let closest = 14; // in the body's radii: as high as you can go standing on one
-  for (const id of [tween?.left, pov.id]) {
-    const b = id && bodies.get(id);
+  for (const id of ids) {
+    const b = id && id !== "sun" && bodies.get(id);
     if (!b) continue;
     const d = camera.position.distanceTo(b.group.position) / (b.radius * b.group.scale.x);
     if (d < closest) [best, closest] = [id, d];
@@ -291,6 +295,7 @@ function enterPov(id, instant) {
   pov.blend = instant ? 1 : 0;
   focus = { body: bodies.get(id), radius: 1, elevation: 0 };
   system.setGround(id, left); // the body we're leaving keeps its fine sphere until we're away
+  if (instant) settle = true;
   if (!returning) povCam.reset(bodies.get(id).kind === "moon", povFov(camera.aspect), camera.aspect);
   povCam.state.enabled = true;
   controls.enabled = false;
@@ -357,6 +362,18 @@ function povTarget() {
   return povCam.pose(b.group.position, b.radius * b.group.scale.x, aim, povFov(camera.aspect), povPose, height, ringPole);
 }
 
+const toTurn = new Quaternion();
+
+/** Like three's slerp, but follows `b` as given rather than always taking the short way round. */
+function slerpAlong(a, b, t, out) {
+  const theta = Math.acos(MathUtils.clamp(a.dot(b), -1, 1));
+  const s = Math.sin(theta);
+  if (s < 1e-6) return out.copy(t < 0.5 ? a : b); // the same turn either way
+  const wa = Math.sin((1 - t) * theta) / s;
+  const wb = Math.sin(t * theta) / s;
+  return out.set(a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb).normalize();
+}
+
 const rel0 = new Vector3();
 const ride = new Vector3();
 const rel1 = new Vector3();
@@ -408,16 +425,23 @@ function movePovCamera(now, dt) {
       ride.copy(tween.from.position).add(left.group.position).sub(tween.leftStart);
       camera.position.lerpVectors(ride, camera.position, MathUtils.smoothstep(e, 0, 0.35));
     }
-    // Never end up inside the body we're arriving at or leaving. Keep the
-    // near plane as far out as the nearest of their surfaces allows: depth
-    // stays sharp, and no ground right under the camera gets cut away.
+    // Never pass through anything on the way (the planet two of its moons go
+    // round, say). Keep the near plane as far out as the nearest surface
+    // allows: depth stays sharp, and no ground right under the camera gets
+    // cut away.
     let gap = Infinity;
-    for (const b of left ? [ground, left] : [ground]) {
+    for (const b of bodies.values()) {
       const r = b.radius * b.group.scale.x;
       if (camera.position.distanceTo(b.group.position) < r * 1.01) camera.position.sub(b.group.position).setLength(r * 1.01).add(b.group.position);
       gap = Math.min(gap, camera.position.distanceTo(b.group.position) - r);
     }
-    camera.quaternion.slerpQuaternions(tween.from.quaternion, to.quaternion, e);
+    // Turn towards where we're heading. That keeps moving (at high speed, or
+    // if you drag), so follow it round smoothly rather than always taking the
+    // short way, which would flip right round once it passes halfway.
+    toTurn.copy(to.quaternion);
+    if (toTurn.dot(tween.lastTurn ?? tween.from.quaternion) < 0) toTurn.set(-toTurn.x, -toTurn.y, -toTurn.z, -toTurn.w);
+    tween.lastTurn = (tween.lastTurn ?? new Quaternion()).copy(toTurn);
+    slerpAlong(tween.from.quaternion, toTurn, e, camera.quaternion);
     camera.fov = tween.from.fov + (to.fov - tween.from.fov) * e;
     camera.near = MathUtils.clamp(0.3 * gap, 0.0004, 0.01);
     camera.updateProjectionMatrix();
@@ -664,6 +688,26 @@ let lastFrame = startTime;
 let lastTick = startTime;
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Moves everything to `date` (and the asteroids). */
+function layOut(date, dt, seconds) {
+  system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, seconds, pov.id ? pov : null);
+  belts.update(A.MakeTime(date).tt, beltView());
+}
+
+/**
+ * Straight after jumping onto a body with no move, the sky was laid out
+ * round the old camera. Now the camera is in place, lay it out again round
+ * the new one, so the first frame doesn't twitch.
+ */
+function settleSky(now, date, seconds) {
+  settle = false;
+  for (let i = 0; i < 2 && pov.id; i++) {
+    layOut(date, 0, seconds);
+    movePovCamera(now, 0);
+    updateSkyCentre();
+  }
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   for (const step of painters) step(10 / painters.length);
@@ -677,9 +721,7 @@ function frame(now) {
   tickClock(dt);
   const date = new Date(clock.time);
   updateBlend(now);
-  const looking = pov.id ? pov : null;
-  system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, (now - startTime) / 1000, looking);
-  belts.update(A.MakeTime(date).tt, beltView());
+  layOut(date, dt, (now - startTime) / 1000);
   for (const p of belts.parts) p.visible = settings.belts;
 
   if (pov.id) movePovCamera(now, dt);
@@ -689,6 +731,7 @@ function frame(now) {
     controls.update(dt);
   }
   updateSkyCentre();
+  if (settle) settleSky(now, date, (now - startTime) / 1000);
   fadeStarsWhenSpinning(dt);
   sky.group.position.copy(camera.position);
   sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
@@ -754,9 +797,6 @@ window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povC
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
 flyTo(settings.view, true);
-if (pov.id) {
-  system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0, pov);
-  movePovCamera(performance.now(), 0);
-}
+if (settle) settleSky(performance.now(), new Date(clock.time), 0);
 startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);
 requestAnimationFrame(frame);
