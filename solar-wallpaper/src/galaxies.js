@@ -31,29 +31,29 @@ export const GALAXIES = [
     id: "lmc", name: "Large Magellanic Cloud", lightYears: "160,000 light-years",
     ra: 80.894, dec: -69.756, major: 10.75, minor: 9.17, pa: 170, shape: BARRED_CLOUD, light: 0.07,
     // Its bar, and the Tarantula Nebula (30 Doradus), a big pink star-forming cloud.
-    bar: 115, spot: { ra: 84.676, dec: -69.101 },
+    bar: 120, spot: { ra: 84.677, dec: -69.101 },
   },
   {
     id: "smc", name: "Small Magellanic Cloud", lightYears: "200,000 light-years",
-    ra: 13.187, dec: -72.829, major: 5.33, minor: 3.08, pa: 45, shape: CLOUD, light: 0.06,
+    ra: 13.1867, dec: -72.8286, major: 5.33, minor: 3.08, pa: 45, shape: CLOUD, light: 0.06,
   },
   {
-    id: "sgr", name: "Sagittarius Dwarf", lightYears: "70,000 light-years",
+    id: "sgr", name: "Sagittarius Dwarf", lightYears: "85,000 light-years",
     // The nearest galaxy we know of, but spread thin behind the middle of the
     // Milky Way, so it's only just there.
-    ra: 283.83, dec: -30.545, major: 7.5, minor: 3.6, pa: 104, shape: FAINT, light: 0.006,
+    ra: 283.8313, dec: -30.5453, major: 7.5, minor: 3.6, pa: 104, shape: FAINT, light: 0.006,
   },
   {
     id: "m31", name: "Andromeda Galaxy", lightYears: "2.5 million light-years",
-    ra: 10.6846, dec: 41.269, major: 3.17, minor: 1.0, pa: 38, shape: SPIRAL, light: 0.6, winding: 2.2,
+    ra: 10.6847, dec: 41.2688, major: 3.17, minor: 1.03, pa: 35, shape: SPIRAL, light: 0.6, winding: 2.2,
   },
   {
     id: "m33", name: "Triangulum Galaxy", lightYears: "2.7 million light-years",
-    ra: 23.4625, dec: 30.66, major: 1.18, minor: 0.7, pa: 23, shape: SPIRAL, light: 0.4, winding: 1.6,
+    ra: 23.4621, dec: 30.6599, major: 1.18, minor: 0.695, pa: 23, shape: SPIRAL, light: 0.4, winding: 1.6,
   },
   // Andromeda's two brightest companions. Too small to name at this scale.
-  { id: "m32", ra: 10.674, dec: 40.865, major: 0.145, minor: 0.108, pa: 170, shape: DWARF, light: 0.5 },
-  { id: "m110", ra: 10.092, dec: 41.685, major: 0.365, minor: 0.182, pa: 170, shape: DWARF, light: 0.3 },
+  { id: "m32", ra: 10.6742, dec: 40.8653, major: 0.145, minor: 0.108, pa: 170, shape: DWARF, light: 0.5 },
+  { id: "m110", ra: 10.092, dec: 41.6853, major: 0.365, minor: 0.183, pa: 170, shape: DWARF, light: 0.3 },
 ];
 
 /** Unit direction (scene axes) of a J2000 right ascension and declination, in degrees. */
