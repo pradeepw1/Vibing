@@ -124,7 +124,7 @@ function goBack() {
   if (viewpoint(settings.view)) set("view", lastLookView, { remember: savedView === settings.view });
 }
 
-const ui = createUI({ settings, bodies, set, goLive, jumpToNow, goBack, backLabel: () => VIEWS.find((v) => v.id === lastLookView)?.label ?? "the overview" });
+const ui = createUI({ settings, bodies, galaxies: sky.galaxies, set, goLive, jumpToNow, goBack, backLabel: () => VIEWS.find((v) => v.id === lastLookView)?.label ?? "the overview" });
 
 // --- Camera: views, smooth flights and following a planet ---
 function viewFor(id) {
@@ -792,7 +792,7 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);

@@ -1,6 +1,6 @@
-// The background: stars and the Milky Way, turned to where the real Milky Way
-// sits in the sky. The stars themselves are made up, but they crowd towards the
-// galaxy's plane like real ones do.
+// The background: stars, the Milky Way and the nearest galaxies, turned to
+// where the real ones sit in the sky. The stars themselves are made up, but
+// they crowd towards the galaxy's plane like real ones do.
 import {
   BackSide,
   LineBasicMaterial,
@@ -17,6 +17,7 @@ import {
   Vector3,
 } from "three";
 import { eqjToScene } from "./ephemeris.js";
+import { createGalaxies } from "./galaxies.js";
 import { clamp, random } from "./noise.js";
 import * as shaders from "./shaders.js";
 
@@ -98,6 +99,9 @@ export function createSky(pixelRatio) {
   starPoints.frustumCulled = false;
   group.add(starPoints);
 
+  const galaxies = createGalaxies();
+  group.add(galaxies.group);
+
   // The ecliptic: the line across the sky that the Sun and planets follow.
   // Only shown in the view from a body.
   const eclipticPoints = [];
@@ -117,14 +121,17 @@ export function createSky(pixelRatio) {
   return {
     group,
     starMat,
+    /** The named galaxies, for labels. */
+    galaxies: galaxies.named,
     /**
-     * Dims the stars and Milky Way (1 = full). Used when the view turns so fast
+     * Dims the stars, the Milky Way and the galaxies (1 = full). Used when the view turns so fast
      * against the stars that they'd only streak.
      */
     setStarFade(amount) {
       starMat.uniforms.opacity.value = amount;
       milkyMat.opacity = amount;
       starPoints.visible = milky.visible = amount > 0.01; // not the ecliptic line: it doesn't streak
+      galaxies.setFade(amount);
     },
     /** Fades the ecliptic line in (1) or out (0). */
     setEcliptic(amount) {

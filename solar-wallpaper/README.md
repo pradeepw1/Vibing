@@ -22,6 +22,7 @@ It's one web page. It runs in any browser and works as a desktop wallpaper on Wi
 | Eclipses | Moons go dark in their planet's shadow: Io every 42 hours, our Moon (turning red) during real lunar eclipses |
 | Asteroid belt, Trojans, Kuiper belt | Made-up rocks on real-looking orbits. They follow Kepler's laws, leave the real Kirkwood gaps, and the Trojans stay 60° ahead of and behind Jupiter |
 | Milky Way | Placed where the real one is in the sky. The stars themselves are made up |
+| Nearest galaxies | The Large and Small Magellanic Clouds, the Sagittarius Dwarf, Andromeda (with its two small companions) and Triangulum, at their real places in the sky, real sizes and real tilt, each with its name and distance. Their look is painted in code |
 | Sizes and distances | **Squashed** so everything fits on one screen. Directions are never changed, only distances, so line-ups and phases stay true |
 | Planet surfaces | Painted in code. Big features are in the right places (coastlines, the Moon's dark seas, Mars's ice caps, Jupiter's belts, Pluto's heart). Small detail is made up |
 
@@ -38,6 +39,8 @@ Everything in that sky is in the direction it really is from where you stand, wi
 Discs are drawn bigger than real so you can see them (the Sun and the Moon are both about 5½ degrees across, not half a degree). Small ones grow the most and ones that are already big hardly at all (Jupiter from Io is its real size, 19 degrees across), and a bigger real disc always stays bigger, so the Sun and the Moon still match from Earth. Wherever two discs come close, the gap between them is stretched just enough that they only touch when the real ones do, as seen from somewhere on that planet or moon. So eclipses, transits and the Moon passing over a planet happen on their real dates and only then: the Moon covers the Sun from Earth on 2 August 2027, and the tests check that it doesn't at any other new moon that year, and that from Earth no two discs touch when they shouldn't at any time in 2026. From Jupiter's moons, where Jupiter fills a big part of the sky, it's right almost all of the time.
 
 Jupiter's moons are shown where they were when their light left (about 40 minutes earlier from Earth), so they cross Jupiter at the times listed in sky almanacs.
+
+The nearest galaxies are out there too, in the same places from every planet because they're so far away. Andromeda and Triangulum are in the northern autumn sky; the two Magellanic Clouds sit near the south pole of the sky, so they show up behind the planets when you look down on the solar system.
 
 ## Use it as your wallpaper
 
@@ -101,6 +104,7 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/paint-worker.js`, `src/painter.js` | Do that painting in the background, so the animation never stutters |
 | `src/shaders.js` | Lighting, night-side city lights, ring shadows, the Sun's surface, orbit trails, asteroids |
 | `src/belts.js`, `src/sky.js` | Asteroids and the Kuiper belt; stars and the Milky Way |
+| `src/galaxies.js` | The nearest galaxies: where they are, how big, and how they're painted |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |

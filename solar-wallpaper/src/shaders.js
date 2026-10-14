@@ -402,6 +402,83 @@ export const stars = {
   `,
 };
 
+// The nearest galaxies (see galaxies.js). uv runs across the patch in units
+// of the galaxy's catalogue half-sizes, so in uv the galaxy's own disc is round.
+export const galaxy = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float shape;    // 0 spiral, 1 cloud with a bar, 2 cloud, 3 small dwarf, 4 faint dwarf
+    uniform float light;
+    uniform float opacity;
+    uniform float squash;   // short axis over long axis, as seen
+    uniform float winding;  // how tightly the arms wind
+    uniform float bar;      // angle of the bar from the long axis (radians)
+    uniform vec2 spot;      // a pink star-forming cloud, in uv
+    uniform float seed;
+    uniform vec3 coreColor;
+    uniform vec3 diskColor;
+    varying vec2 vUv;
+    ${snoise}
+    float fbm(vec2 p) {
+      float sum = 0.0;
+      float amp = 0.5;
+      for (int i = 0; i < 4; i++) {
+        sum += amp * snoise(vec3(p, seed));
+        p *= 2.1;
+        amp *= 0.5;
+      }
+      return sum;
+    }
+    void main() {
+      vec2 p = vUv;                     // in the galaxy's own plane
+      vec2 q = vec2(p.x, p.y * squash); // as it looks on the sky, in long half-axes
+      float r = length(p);
+      float edge = 1.0 - smoothstep(0.7, 1.38, r);
+      float core = 0.0;
+      float disk = 0.0;
+      vec3 spotGlow = vec3(0.0);
+      if (shape < 0.5) {
+        // A bright middle, a disc fading outwards, and two arms winding out,
+        // with darker dust lanes between them.
+        float th = atan(p.y, p.x);
+        float arms = 0.5 + 0.5 * cos(2.0 * (th - winding * log(r + 0.04)) + seed);
+        float lumpy = 0.8 + 0.4 * fbm(p * 5.0);
+        core = exp(-length(q) / 0.03) * 1.4 + exp(-length(q) / 0.1) * 0.45;
+        disk = exp(-r * 2.4) * mix(0.3, 1.0, arms) * lumpy;
+        disk *= 1.0 - 0.4 * smoothstep(0.25, 0.0, arms) * smoothstep(0.12, 0.45, r);
+      } else if (shape < 2.5) {
+        // The Magellanic Clouds: lumpy and irregular.
+        float lumpy = max(0.0, 0.6 + 0.7 * fbm(p * 2.4 + 3.0));
+        disk = exp(-r * r * 2.2) * lumpy;
+        if (shape < 1.5) {
+          vec2 b = vec2(cos(bar) * q.x + sin(bar) * q.y, -sin(bar) * q.x + cos(bar) * q.y);
+          core = exp(-(b.x * b.x / 0.1 + b.y * b.y / 0.007)) * (0.75 + 0.35 * fbm(p * 7.0));
+          float d = length((p - spot) * vec2(1.0, squash)) / 0.06;
+          spotGlow = vec3(1.0, 0.42, 0.62) * exp(-d * d) * 0.8;
+        } else {
+          core = exp(-dot(q, q) / 0.06) * 0.3;
+        }
+      } else if (shape < 3.5) {
+        // A small, smooth glow, brighter in the middle.
+        disk = exp(-r * r * 3.0);
+        core = exp(-r * r * 14.0) * 0.5;
+      } else {
+        // Spread thin: a soft, even haze.
+        disk = exp(-r * r * 2.0) * (0.85 + 0.25 * fbm(p * 2.0));
+      }
+      vec3 color = (coreColor * core + diskColor * disk + spotGlow) * edge;
+      gl_FragColor = vec4(color * light * opacity, 1.0);
+      ${outputChunks}
+    }
+  `,
+};
+
 // Little dots that keep far-away planets visible when they're smaller than a pixel.
 export const markers = {
   vertexShader: /* glsl */ `

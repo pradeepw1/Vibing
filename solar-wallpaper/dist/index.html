@@ -35,6 +35,8 @@
   .label.moon { font-size: 10px; color: rgba(190, 205, 230, 0.55); }
   .label.sun { color: rgba(255, 214, 150, 0.75); }
   .label:hover, .label.hover { color: var(--text); }
+  .label.galaxy { pointer-events: none !important; cursor: default; display: grid; font-size: 10px; color: rgba(205, 200, 235, 0.5); }
+  .label.galaxy .far { font-size: 9px; letter-spacing: 0.04em; text-transform: none; color: rgba(205, 200, 235, 0.38); }
 
   #clock { position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); pointer-events: none; text-shadow: 0 1px 6px #000; }
   #clock .date { font-size: clamp(18px, 2.2vw, 28px); font-weight: 300; letter-spacing: 0.01em; }

@@ -5,7 +5,7 @@ import { SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, backLabel }) {
+export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -201,6 +201,20 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
   labels.sort((a, b) => rank[a.body.kind] - rank[b.body.kind] || b.body.radius - a.body.radius);
   for (const l of labels) l.width = l.body.def.name.length * 7.5 + 6;
 
+  // The nearest galaxies: a name and how far away, not clickable.
+  const galaxyLabels = galaxies.map((g) => {
+    const el = document.createElement("div");
+    el.className = "label galaxy";
+    const name = document.createElement("span");
+    name.textContent = g.name;
+    const far = document.createElement("span");
+    far.className = "far";
+    far.textContent = g.lightYears;
+    el.append(name, far);
+    labelsEl.append(el);
+    return { galaxy: g, el, shown: null, x: 0, y: 0, width: g.name.length * 7 + 6 };
+  });
+
   const v = new Vector3();
   const camDir = new Vector3();
   const placed = [];
@@ -254,8 +268,8 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
           const hit = toBody.intersectSphere(ground, hitGround);
           show = !hit || hit.distanceTo(camera.position) > far;
         }
-        show &&= !placed.some((p) => x < p.x + p.w && p.x < x + l.width && Math.abs(y - p.y) < 13);
-        if (show) placed.push({ x, y, w: l.width });
+        show &&= !overlaps(x, y, l.width, 13);
+        if (show) placed.push({ x, y, w: l.width, h: 13 });
         if (show && (x !== l.x || y !== l.y)) {
           l.el.style.transform = `translate(${x}px, ${y}px)`;
           l.x = x;
@@ -268,7 +282,40 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, bac
         l.shown = show;
       }
     }
+
+    // Galaxies are as good as infinitely far away: in the same direction from
+    // wherever the camera is.
+    for (const l of galaxyLabels) {
+      const { direction, distance } = l.galaxy;
+      let show = direction.dot(camDir) > 0.05;
+      if (show) {
+        v.copy(camera.position).addScaledVector(direction, distance).project(camera);
+        const px = ((v.x + 1) / 2) * width;
+        const py = ((1 - v.y) / 2) * height;
+        const x = Math.round(px + 8);
+        const y = Math.round(py + 4);
+        show = x > -100 && x < width + 20 && y > -30 && y < height + 20;
+        show &&= !discs.some((d) => Math.hypot(px - d.x, py - d.y) < d.r);
+        if (show && ground) {
+          toBody.origin.copy(camera.position);
+          toBody.direction.copy(direction);
+          show = !toBody.intersectSphere(ground, hitGround);
+        }
+        show &&= !overlaps(x, y, l.width, 26);
+        if (show) placed.push({ x, y, w: l.width, h: 26 });
+        if (show && (x !== l.x || y !== l.y)) {
+          l.el.style.transform = `translate(${x}px, ${y}px)`;
+          l.x = x;
+          l.y = y;
+        }
+      }
+      if (show !== l.shown) {
+        l.el.style.opacity = show ? "1" : "0";
+        l.shown = show;
+      }
+    }
   }
+  const overlaps = (x, y, w, h) => placed.some((p) => x < p.x + p.w && p.x < x + w && y < p.y + p.h && p.y < y + h);
 
   /** Highlights the name of the body under the pointer (or none). */
   let hovered = null;
