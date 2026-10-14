@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Solar System Live</title>
 <meta name="description" content="A live wallpaper of the solar system, with every planet where it really is right now.">
 <style>
@@ -18,10 +18,10 @@
     --chip: rgba(255, 255, 255, 0.06);
     --chip-on: rgba(255, 203, 116, 0.18);
     --gutter: 24px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
-  /* Space is dark whatever the system theme, so the tokens stay the same. */
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sky: #02030a; } }
-  :root[data-theme="dark"] { --sky: #02030a; }
+  /* Space is dark whatever the system theme, so there is one look on purpose. */
 
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--text);
@@ -36,7 +36,7 @@
   .label.moon { font-size: 10px; color: rgba(190, 205, 230, 0.55); }
   .label.sun { color: rgba(255, 214, 150, 0.75); }
 
-  #clock { position: fixed; left: var(--gutter); bottom: var(--gutter); pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #clock { position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); pointer-events: none; text-shadow: 0 1px 6px #000; }
   #clock .date { font-size: clamp(18px, 2.2vw, 28px); font-weight: 300; letter-spacing: 0.01em; }
   #clock .time { font-size: clamp(13px, 1.2vw, 16px); color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 2px; }
   #clock .rate { margin-top: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
@@ -44,14 +44,14 @@
   #clock .dot.off { background: var(--accent); box-shadow: none; animation: none; }
   @keyframes pulse { 50% { opacity: .35; } }
 
-  #menu-btn { position: fixed; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--panel-line);
+  #menu-btn { position: fixed; top: calc(18px + var(--safe-top)); right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--panel-line);
     background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px);
     transition: opacity .4s; }
   #menu-btn:hover { border-color: rgba(255,255,255,.25); }
   .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0; }
   .idle { cursor: none; }
 
-  #panel { position: fixed; top: 68px; right: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 86px); overflow: auto;
+  #panel { position: fixed; top: calc(68px + var(--safe-top)); right: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 86px - var(--safe-top) - var(--safe-bottom)); overflow: auto;
     background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; padding: 16px; backdrop-filter: blur(14px); }
   #panel[hidden] { display: none; }
   #panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
@@ -70,7 +70,7 @@
   .note + .note { margin-top: 6px; }
   kbd { font: 11px ui-monospace, monospace; padding: 0 4px; border: 1px solid var(--panel-line); border-radius: 4px; }
 
-  #loading { position: fixed; right: var(--gutter); bottom: var(--gutter); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  #loading { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
     color: var(--muted); transition: opacity .8s; pointer-events: none; }
   #loading.done { opacity: 0; }
   #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
@@ -78,8 +78,8 @@
 
   @media (max-width: 600px) {
     :root { --gutter: 16px; }
-    #menu-btn { top: 12px; right: 12px; }
-    #panel { top: 60px; right: 16px; left: 16px; width: auto; }
+    #menu-btn { top: calc(12px + var(--safe-top)); right: 16px; }
+    #panel { top: calc(60px + var(--safe-top)); right: 16px; left: 16px; width: auto; }
   }
 </style>
 </head>
