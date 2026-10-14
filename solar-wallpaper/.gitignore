@@ -1,0 +1,5 @@
+node_modules/
+# Built by `npm run textures` (dev preview only)
+tools/textures.js
+# The repo root ignores dist/ (for Python builds), but this one is the wallpaper itself
+!dist/

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar System Live</title>
+<meta name="description" content="A live wallpaper of the solar system, with every planet where it really is right now.">
+<style>
+  :root {
+    color-scheme: dark;
+    --sky: #02030a;
+    --panel: rgba(12, 15, 24, 0.78);
+    --panel-line: rgba(255, 255, 255, 0.09);
+    --text: #e9edf5;
+    --muted: #9aa5b8;
+    --faint: rgba(233, 237, 245, 0.62);
+    --accent: #ffcb74;
+    --chip: rgba(255, 255, 255, 0.06);
+    --chip-on: rgba(255, 203, 116, 0.18);
+    --gutter: 24px;
+  }
+  /* Space is dark whatever the system theme, so the tokens stay the same. */
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sky: #02030a; } }
+  :root[data-theme="dark"] { --sky: #02030a; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--text);
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .label { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: auto; cursor: pointer;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+    text-shadow: 0 1px 3px #000; transition: opacity .3s; will-change: transform; user-select: none; }
+  .label:hover { color: var(--text); }
+  .label.moon { font-size: 10px; color: rgba(190, 205, 230, 0.55); }
+  .label.sun { color: rgba(255, 214, 150, 0.75); }
+
+  #clock { position: fixed; left: var(--gutter); bottom: var(--gutter); pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #clock .date { font-size: clamp(18px, 2.2vw, 28px); font-weight: 300; letter-spacing: 0.01em; }
+  #clock .time { font-size: clamp(13px, 1.2vw, 16px); color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  #clock .rate { margin-top: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  #clock .dot { width: 7px; height: 7px; border-radius: 50%; background: #5ee08f; box-shadow: 0 0 8px #5ee08f; animation: pulse 2.4s ease-in-out infinite; }
+  #clock .dot.off { background: var(--accent); box-shadow: none; animation: none; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  #menu-btn { position: fixed; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--panel-line);
+    background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px);
+    transition: opacity .4s; }
+  #menu-btn:hover { border-color: rgba(255,255,255,.25); }
+  .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0; }
+  .idle { cursor: none; }
+
+  #panel { position: fixed; top: 68px; right: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 86px); overflow: auto;
+    background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; padding: 16px; backdrop-filter: blur(14px); }
+  #panel[hidden] { display: none; }
+  #panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  #panel section + section { margin-top: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--panel-line); background: var(--chip); color: var(--text); border-radius: 999px; padding: 5px 10px;
+    font: inherit; font-size: 12px; cursor: pointer; }
+  .chip:hover { border-color: rgba(255,255,255,.25); }
+  .chip[aria-pressed="true"] { background: var(--chip-on); border-color: rgba(255, 203, 116, .55); color: #fff3dc; }
+  select { width: 100%; font: inherit; color: var(--text); background: var(--chip); border: 1px solid var(--panel-line); border-radius: 10px; padding: 7px 10px; }
+  select option { background: #141824; }
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .toggles input { accent-color: var(--accent); }
+  .note { color: var(--muted); font-size: 11.5px; margin: 0; }
+  .note + .note { margin-top: 6px; }
+  kbd { font: 11px ui-monospace, monospace; padding: 0 4px; border: 1px solid var(--panel-line); border-radius: 4px; }
+
+  #loading { position: fixed; right: var(--gutter); bottom: var(--gutter); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); transition: opacity .8s; pointer-events: none; }
+  #loading.done { opacity: 0; }
+  #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+  #error[hidden] { display: none; }
+
+  @media (max-width: 600px) {
+    :root { --gutter: 16px; }
+    #menu-btn { top: 12px; right: 12px; }
+    #panel { top: 60px; right: 16px; left: 16px; width: auto; }
+  }
+</style>
+</head>
+<body>
+<div id="labels"></div>
+
+<div id="clock" aria-live="off">
+  <div class="date"></div>
+  <div class="time"></div>
+  <div class="rate"><span class="dot"></span><span class="rate-text"></span></div>
+</div>
+
+<button id="menu-btn" type="button" aria-label="Settings" aria-expanded="false" aria-controls="panel">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-25 12 12)"/>
+  </svg>
+</button>
+
+<aside id="panel" hidden>
+  <section>
+    <h2>Time</h2>
+    <div class="chips" id="speeds"></div>
+    <div class="chips" style="margin-top:8px">
+      <button class="chip" id="pause" type="button" aria-pressed="false">Pause</button>
+      <button class="chip" id="reverse" type="button" aria-pressed="false">Run backwards</button>
+      <button class="chip" id="now" type="button">Back to now</button>
+    </div>
+  </section>
+  <section>
+    <h2>View</h2>
+    <select id="view" aria-label="View"></select>
+  </section>
+  <section>
+    <h2>Show</h2>
+    <div class="toggles">
+      <label><input type="checkbox" id="labels-on"> Names</label>
+      <label><input type="checkbox" id="orbits-on"> Orbits</label>
+      <label><input type="checkbox" id="belts-on"> Asteroids</label>
+      <label><input type="checkbox" id="clock-on"> Clock</label>
+      <label><input type="checkbox" id="drift-on"> Slow camera drift</label>
+    </div>
+  </section>
+  <section>
+    <p class="note">Every planet and moon is where it really is at the time shown. Sizes and distances are squashed so it all fits; directions are real.</p>
+    <p class="note">Drag to turn, scroll to zoom, click a name to follow it. Keys: <kbd>Space</kbd> pause, <kbd>←</kbd><kbd>→</kbd> speed, <kbd>N</kbd> now, <kbd>H</kbd> hide all.</p>
+  </section>
+</aside>
+
+<div id="loading">Painting planets…</div>
+<div id="error" hidden>This needs WebGL, which this browser or wallpaper app doesn't have turned on.</div>
+
+<script src="solar.js"></script>
+</body>
+</html>

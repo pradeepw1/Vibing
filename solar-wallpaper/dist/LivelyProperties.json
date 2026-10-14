@@ -1,0 +1,69 @@
+{
+  "speed": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "Speed",
+    "items": [
+      "Live",
+      "1 min/s",
+      "1 hour/s",
+      "1 day/s",
+      "1 week/s",
+      "1 month/s",
+      "1 year/s"
+    ]
+  },
+  "view": {
+    "type": "dropdown",
+    "value": 1,
+    "text": "View",
+    "items": [
+      "Whole solar system",
+      "Out to Jupiter",
+      "Inner planets",
+      "The Sun",
+      "Mercury",
+      "Venus",
+      "Earth",
+      "Mars",
+      "Jupiter",
+      "Saturn",
+      "Uranus",
+      "Neptune",
+      "Pluto"
+    ]
+  },
+  "labels": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show names"
+  },
+  "orbits": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show orbits"
+  },
+  "belts": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show asteroids"
+  },
+  "clock": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show clock"
+  },
+  "drift": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Slow camera drift"
+  },
+  "fps": {
+    "type": "slider",
+    "value": 30,
+    "text": "Frames per second (lower saves power)",
+    "min": 10,
+    "max": 60,
+    "step": 5
+  }
+}

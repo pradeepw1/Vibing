@@ -1,0 +1,22 @@
+{
+  "name": "solar-wallpaper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A live wallpaper of the solar system, with every planet where it really is right now.",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "land": "node tools/make-land.mjs",
+    "test": "node --test test/*.test.mjs",
+    "textures": "esbuild tools/texture-preview.js --bundle --format=iife --outfile=tools/textures.js"
+  },
+  "dependencies": {
+    "astronomy-engine": "2.1.19",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
+  }
+}
