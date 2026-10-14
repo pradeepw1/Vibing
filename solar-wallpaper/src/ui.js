@@ -1,10 +1,11 @@
 // The clock, the settings panel, planet names and keyboard shortcuts.
-import { Vector3 } from "three";
-import { SPEEDS, VIEWS } from "./settings.js";
+import { Ray, Vector3 } from "three";
+import { SPEEDS, viewpoint, VIEWS } from "./settings.js";
 
 const $ = (sel) => document.querySelector(sel);
+const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
+export function createUI({ settings, bodies, set, goLive, jumpToNow, goBack, backLabel }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -27,8 +28,22 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
     speedBox.append(b);
   }
   const viewSel = $("#view");
-  for (const v of VIEWS) viewSel.append(new Option(v.label, v.id));
-  viewSel.addEventListener("change", () => set("view", viewSel.value));
+  const lookAt = document.createElement("optgroup");
+  lookAt.label = "Look at";
+  const lookFrom = document.createElement("optgroup");
+  lookFrom.label = "Look from";
+  for (const v of VIEWS) (v.from ? lookFrom : lookAt).append(new Option(v.label, v.id));
+  const extra = new Option("", ""); // for views from moons that aren't in the list
+  extra.hidden = true;
+  lookFrom.append(extra);
+  viewSel.append(lookAt, lookFrom);
+  const pill = $("#pov");
+  const pillName = $("#pov .name");
+  $("#pov-back").addEventListener("click", goBack);
+  viewSel.addEventListener("change", () => {
+    set("view", viewSel.value);
+    viewSel.blur(); // so Esc and the other keys work straight away
+  });
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
@@ -44,7 +59,20 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
     for (const b of speedBox.children) b.setAttribute("aria-pressed", String(b.dataset.speed === settings.speed));
     $("#pause").setAttribute("aria-pressed", String(settings.paused));
     $("#reverse").setAttribute("aria-pressed", String(settings.reverse));
-    if (VIEWS.some((v) => v.id === settings.view)) viewSel.value = settings.view;
+    const from = viewpoint(settings.view);
+    const listed = VIEWS.some((v) => v.id === settings.view);
+    extra.hidden = listed || !from; // only for views from moons that aren't in the list
+    if (!extra.hidden) {
+      extra.value = settings.view;
+      extra.textContent = fromName(from);
+    }
+    if (listed || from) viewSel.value = settings.view;
+    // The way back shows even in wallpaper mode: a click may have brought you here.
+    pill.hidden = !from || hiddenAll;
+    if (from) {
+      pillName.textContent = fromName(from);
+      $("#pov-back").title = `Back: ${backLabel()}`;
+    }
     for (const [id, key] of Object.entries(toggles)) $(`#${id}`).checked = settings[key];
     menuBtn.hidden = !settings.ui || hiddenAll;
     if (!settings.ui || hiddenAll) panel.hidden = true;
@@ -64,8 +92,35 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
   wake();
 
   // --- Keyboard ---
+  // Whether the last focus change came from Tab (rather than a click).
+  let tabbing = false;
+  addEventListener("pointerdown", () => (tabbing = false), true);
   addEventListener("keydown", (e) => {
-    if (e.target instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Tab") tabbing = true;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // Leave keys alone that a focused control needs: the dropdown uses most
+    // keys, and buttons and tick boxes reached with Tab are pressed with
+    // Space and Enter. One just clicked with the mouse keeps focus too, but
+    // then Space should still pause.
+    const t = e.target;
+    if (t instanceof HTMLSelectElement && e.key !== "Escape" && e.key !== "Backspace") return;
+    const control = t instanceof HTMLButtonElement || t instanceof HTMLInputElement;
+    if (control && (e.key === " " || e.key === "Enter")) {
+      if (tabbing) return;
+      t.blur();
+    }
+    // The digit row and number pad, by key position: the same on every keyboard layout.
+    const digit = /^(?:Digit|Numpad)([0-9])$/.exec(e.code)?.[1];
+    if (digit) {
+      if (digit === "0") set("view", "middle");
+      else {
+        // 1-9: look at a planet. Shift+1-9: look from it.
+        const planet = VIEWS.filter((v) => v.target && v.target !== "sun")[Number(digit) - 1].id;
+        set("view", e.shiftKey ? `from-${planet}` : planet);
+      }
+      e.preventDefault();
+      return;
+    }
     const i = SPEEDS.findIndex((s) => s.id === settings.speed);
     switch (e.key) {
       case " ": set("paused", !settings.paused); break;
@@ -76,11 +131,17 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
       case "l": set("labels", !settings.labels); break;
       case "o": set("orbits", !settings.orbits); break;
       case "h": hiddenAll = !hiddenAll; sync(); break;
+      case "Escape": if (!panel.hidden) { panel.hidden = true; menuBtn.setAttribute("aria-expanded", "false"); } else goBack(); break;
+      case "Backspace":
+      case "b": goBack(); break; // Esc is taken by the browser in full screen
+      case "Enter":
+        // Looking at a planet: look from it instead.
+        if (viewpoint(settings.view) || !bodies.has(settings.view) || settings.view === "sun") return;
+        set("view", `from-${settings.view}`);
+        break;
       case "f": document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); break;
-      case "0": set("view", "middle"); break;
       default:
-        if (e.key >= "1" && e.key <= "9") set("view", VIEWS.filter((v) => v.target !== "sun")[Number(e.key) - 1].id);
-        else return;
+        return;
     }
     e.preventDefault();
   });
@@ -115,7 +176,9 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
     const el = document.createElement("div");
     el.className = `label ${body.kind}`;
     el.textContent = body.def.name;
-    el.addEventListener("click", () => set("view", body.id));
+    // Clicking a name shows the sky from that body (the Sun's: look at the Sun).
+    el.title = body.kind === "sun" ? "Look at the Sun" : `See the sky from ${body.def.name === "Moon" ? "the Moon" : body.def.name}`;
+    el.addEventListener("click", () => set("view", body.kind === "sun" ? "sun" : `from-${body.id}`, { remember: false }));
     labelsEl.append(el);
     labels.push({ body, el, shown: null, x: 0, y: 0 });
   }
@@ -128,17 +191,35 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
   const v = new Vector3();
   const camDir = new Vector3();
   const placed = [];
-  function updateLabels(camera, width, height) {
+  const toBody = new Ray();
+  const hitGround = new Vector3();
+  function updateLabels(camera, width, height, standingOn = null, ground = null) {
     if (!settings.labels || hiddenAll) return;
     camera.getWorldDirection(camDir);
     const scale = (camera.projectionMatrix.elements[5] * height) / 2;
     placed.length = 0;
+    // Discs of everything big enough on screen to hide something behind it.
+    const discs = [];
+    for (const l of labels) {
+      const b = l.body;
+      v.copy(b.group.position);
+      const depth = v.clone().sub(camera.position).dot(camDir);
+      if (depth <= 0.01) continue;
+      const r = (b.radius * b.group.scale.x * scale) / depth;
+      if (r < 3) continue;
+      v.project(camera);
+      discs.push({ body: b, x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height, r, depth });
+    }
     for (const l of labels) {
       const { body } = l;
       v.copy(body.group.position);
       const depth = v.clone().sub(camera.position).dot(camDir);
-      let show = depth > 0.01;
-      if (body.kind === "moon") {
+      let show = depth > 0.01 && body.id !== standingOn;
+      if (body.kind === "moon" && standingOn) {
+        // From a body, name the moons of its own family; other planets' moons are too close to them to label.
+        const family = bodies.get(standingOn).kind === "moon" ? bodies.get(standingOn).parent.id : standingOn;
+        show &&= body.parent.id === family && body.fade > 0.5;
+      } else if (body.kind === "moon") {
         const near = camera.position.distanceTo(body.parent.group.position) / body.parent.radius;
         show &&= near < 30 && body.fade > 0.5;
       }
@@ -146,10 +227,20 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
         v.project(camera);
         const px = ((v.x + 1) / 2) * width;
         const py = ((1 - v.y) / 2) * height;
-        const r = (body.radius * scale) / depth;
+        const r = (body.radius * body.group.scale.x * scale) / depth;
         const x = Math.round(px + Math.max(r * 0.7, 4) + 4);
         const y = Math.round(py + Math.max(r * 0.7, 4) - 4);
         show = x > -100 && x < width + 20 && y > -20 && y < height + 20;
+        show &&= !discs.some((d) => d.body !== body && d.depth < depth && Math.hypot(px - d.x, py - d.y) < d.r);
+        if (show && ground) {
+          // Below the horizon of the body we stand on?
+          toBody.origin.copy(camera.position);
+          toBody.direction.copy(body.group.position).sub(camera.position);
+          const far = toBody.direction.length();
+          toBody.direction.divideScalar(far);
+          const hit = toBody.intersectSphere(ground, hitGround);
+          show = !hit || hit.distanceTo(camera.position) > far;
+        }
         show &&= !placed.some((p) => x < p.x + p.w && p.x < x + l.width && Math.abs(y - p.y) < 13);
         if (show) placed.push({ x, y, w: l.width });
         if (show && (x !== l.x || y !== l.y)) {
@@ -166,10 +257,18 @@ export function createUI({ settings, bodies, set, goLive, jumpToNow }) {
     }
   }
 
+  /** Highlights the name of the body under the pointer (or none). */
+  let hovered = null;
+  function hover(id) {
+    if (hovered === id) return;
+    for (const l of labels) l.el.classList.toggle("hover", l.body.id === id);
+    hovered = id;
+  }
+
   function doneLoading() {
     $("#loading").classList.add("done");
   }
 
   sync();
-  return { sync, updateClock, updateLabels, doneLoading };
+  return { sync, updateClock, updateLabels, doneLoading, hover };
 }

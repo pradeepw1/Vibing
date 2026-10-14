@@ -1,6 +1,6 @@
 // Hands out the surface painting. Uses a background worker when the browser
 // allows it, and otherwise paints on the page a little each frame.
-import { paint, paintClouds, paintMilkyWay } from "./surfaces.js";
+import { painterFor } from "./surfaces.js";
 
 /* global PAINT_WORKER_SOURCE */
 
@@ -15,8 +15,9 @@ function makeWorker() {
 }
 
 /**
- * Paints every job in `jobs` (body ids, "clouds" or "milkyway"), calling
- * onPainted(job, { map, extra }) with ImageData as each one is ready, then onDone().
+ * Paints every job in `jobs` (body ids, "clouds" or "milkyway", optionally
+ * with a size like "moon@2048"), calling onPainted(job, { map, extra }) with
+ * ImageData as each one is ready, then onDone().
  * Returns step(budgetMs), to be called every frame; it only does work in the
  * fallback mode.
  */
@@ -59,7 +60,7 @@ export function startPainting(jobs, onPainted, onDone) {
           return;
         }
         currentJob = left.shift();
-        current = currentJob === "clouds" ? paintClouds() : currentJob === "milkyway" ? paintMilkyWay() : paint(currentJob);
+        current = painterFor(currentJob);
       }
       const r = current.next();
       if (r.done) {

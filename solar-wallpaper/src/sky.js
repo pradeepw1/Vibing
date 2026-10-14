@@ -3,6 +3,8 @@
 // galaxy's plane like real ones do.
 import {
   BackSide,
+  LineBasicMaterial,
+  LineLoop,
   BufferGeometry,
   Float32BufferAttribute,
   Group,
@@ -77,7 +79,9 @@ export function createSky(pixelRatio) {
   const group = new Group();
   const basis = galacticBasis();
 
-  const milkyMat = new MeshBasicMaterial({ color: 0x000000, side: BackSide, depthWrite: false });
+  // Transparent from the start, so it can fade with the stars (three.js won't
+  // switch an opaque material to see-through without rebuilding it).
+  const milkyMat = new MeshBasicMaterial({ color: 0x000000, side: BackSide, depthWrite: false, transparent: true });
   const milky = new Mesh(new SphereGeometry(1000, 64, 32), milkyMat);
   milky.quaternion.setFromRotationMatrix(basis.matrix);
   milky.renderOrder = -2;
@@ -85,7 +89,7 @@ export function createSky(pixelRatio) {
 
   const starMat = new ShaderMaterial({
     ...shaders.stars,
-    uniforms: { pixelRatio: { value: pixelRatio } },
+    uniforms: { pixelRatio: { value: pixelRatio }, opacity: { value: 1 } },
     depthWrite: false,
     transparent: true,
   });
@@ -94,9 +98,39 @@ export function createSky(pixelRatio) {
   starPoints.frustumCulled = false;
   group.add(starPoints);
 
+  // The ecliptic: the line across the sky that the Sun and planets follow.
+  // Only shown in the view from a body.
+  const eclipticPoints = [];
+  for (let i = 0; i < 256; i++) {
+    const a = (i / 256) * 2 * Math.PI;
+    eclipticPoints.push(Math.cos(a) * 850, 0, Math.sin(a) * 850);
+  }
+  const eclipticGeo = new BufferGeometry();
+  eclipticGeo.setAttribute("position", new Float32BufferAttribute(eclipticPoints, 3));
+  const eclipticMat = new LineBasicMaterial({ color: 0xc9a46a, transparent: true, opacity: 0, depthWrite: false });
+  const ecliptic = new LineLoop(eclipticGeo, eclipticMat);
+  ecliptic.renderOrder = -1;
+  ecliptic.frustumCulled = false;
+  ecliptic.visible = false;
+  group.add(ecliptic);
+
   return {
     group,
     starMat,
+    /**
+     * Dims the stars and Milky Way (1 = full). Used when the view turns so fast
+     * against the stars that they'd only streak.
+     */
+    setStarFade(amount) {
+      starMat.uniforms.opacity.value = amount;
+      milkyMat.opacity = amount;
+      starPoints.visible = milky.visible = amount > 0.01; // not the ecliptic line: it doesn't streak
+    },
+    /** Fades the ecliptic line in (1) or out (0). */
+    setEcliptic(amount) {
+      eclipticMat.opacity = 0.22 * amount;
+      ecliptic.visible = amount > 0.01;
+    },
     /** Shows the painted Milky Way (a texture made from paintMilkyWay()'s result). */
     setMilkyWay(texture) {
       milkyMat.map = texture;

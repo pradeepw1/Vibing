@@ -611,6 +611,18 @@ export function* paintMilkyWay(width = 1024) {
   return img;
 }
 
+/**
+ * The painter for a job name: a body id, "clouds" or "milkyway", optionally
+ * with a size, like "moon@2048".
+ */
+export function painterFor(job) {
+  const [name, size] = job.split("@");
+  const width = size ? Number(size) : undefined;
+  if (name === "clouds") return paintClouds(width);
+  if (name === "milkyway") return paintMilkyWay(width);
+  return paint(name, width);
+}
+
 /** Runs a painter generator to the end and returns what it made. */
 export function finish(gen) {
   let r;

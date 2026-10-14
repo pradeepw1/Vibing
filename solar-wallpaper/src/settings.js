@@ -3,7 +3,7 @@
 //   2. whatever you last picked in the settings panel (saved in this browser)
 //   3. the page address, e.g. index.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
-import { PLANETS } from "./bodies.js";
+import { MOONS, PLANETS } from "./bodies.js";
 
 // "live" runs at real speed. If the clock is on today's date, it stays locked to now.
 export const SPEEDS = [
@@ -22,7 +22,17 @@ export const VIEWS = [
   { id: "inner", label: "Inner planets", target: "sun", radius: 15, elevation: 38 },
   { id: "sun", label: "The Sun", target: "sun", radius: 6, elevation: 15 },
   ...PLANETS.map((p) => ({ id: p.id, label: p.name, target: p.id })),
+  // Standing on a body, looking out. Added at the end so wallpaper apps that
+  // store the list position keep pointing at the same view.
+  ...PLANETS.map((p) => ({ id: `from-${p.id}`, label: `From ${p.name}`, from: p.id })),
+  { id: "from-moon", label: "From the Moon", from: "moon" },
 ];
+
+/** The body a "from-..." view stands on (any planet or moon), or null. */
+export function viewpoint(viewId) {
+  const id = typeof viewId === "string" && viewId.startsWith("from-") ? viewId.slice(5) : null;
+  return id && (PLANETS.some((p) => p.id === id) || MOONS.some((m) => m.id === id)) ? id : null;
+}
 
 export const DEFAULTS = {
   speed: "live",
@@ -66,7 +76,7 @@ export function parse(key, value) {
     case "speed":
       return SPEEDS.some((s) => s.id === value) ? value : undefined;
     case "view":
-      return VIEWS.some((v) => v.id === value) ? value : undefined;
+      return VIEWS.some((v) => v.id === value) || viewpoint(value) ? value : undefined;
     case "fps": {
       const n = Math.round(Number(value));
       return n >= 5 && n <= 240 ? n : undefined;

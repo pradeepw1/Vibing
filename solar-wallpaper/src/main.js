@@ -1,9 +1,10 @@
 // Starts everything: the renderer, the scene, the clock and the camera.
-import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from "three";
+import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Raycaster, Scene, Sphere, Vector2, Vector3, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as A from "astronomy-engine";
 import { createBelts } from "./belts.js";
-import { loadSettings, parse, save, SPEEDS, speedRate, VIEWS } from "./settings.js";
+import { createPovCamera, povFov } from "./povcam.js";
+import { loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { createSystem, texture } from "./system.js";
 import { startPainting } from "./painter.js";
@@ -70,26 +71,43 @@ function tickClock(dt) {
 }
 
 // --- Settings changes, from the panel, keys or a wallpaper app ---
-function set(key, value) {
+// A view picked by clicking a planet isn't saved: on a desktop wallpaper a
+// stray click shouldn't change what you see after a restart. Views picked in
+// the panel, the address or a wallpaper app are.
+let savedView = settings.view;
+// The last "look at" view, which Back returns to.
+let lastLookView = viewpoint(settings.view) ? "middle" : settings.view;
+
+function store() {
+  save({ ...settings, view: savedView });
+}
+
+/** Changes a setting. `how`: { remember: false } for clicks, { instant: true } to skip the camera move. */
+function set(key, value, how = {}) {
   if (key === "view") {
-    if (!VIEWS.some((v) => v.id === value) && !bodies.has(value)) return;
+    if (!VIEWS.some((v) => v.id === value) && !viewpoint(value) && !bodies.has(value)) return;
   } else {
     value = parse(key, value);
     if (value === undefined) return;
   }
   settings[key] = value;
-  if (key === "view") flyTo(value);
+  if (key === "view") {
+    if (how.remember !== false) savedView = value;
+    flyTo(value, how.instant ?? performance.now() < instantUntil);
+  }
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
-  save(settings);
+  store();
   ui.sync();
 }
+// Settings a wallpaper app pushes in as the page starts are applied without a camera move.
+let instantUntil = performance.now() + 1500;
 
 function goLive() {
   Object.assign(settings, { speed: "live", reverse: false, paused: false });
   clock.time = Date.now();
   clock.synced = true;
-  save(settings);
+  store();
   ui.sync();
 }
 
@@ -100,7 +118,12 @@ function jumpToNow() {
   ui.sync();
 }
 
-const ui = createUI({ settings, bodies, set, goLive, jumpToNow });
+/** Leave the view from a body, back to whatever you were looking at before. */
+function goBack() {
+  if (viewpoint(settings.view)) set("view", lastLookView);
+}
+
+const ui = createUI({ settings, bodies, set, goLive, jumpToNow, goBack, backLabel: () => VIEWS.find((v) => v.id === lastLookView)?.label ?? "the overview" });
 
 // --- Camera: views, smooth flights and following a planet ---
 function viewFor(id) {
@@ -108,14 +131,18 @@ function viewFor(id) {
   const body = bodies.get(preset?.target ?? id);
   let radius = preset?.radius;
   if (!radius) {
-    const moonReach = Math.max(0, ...(body.moons ?? []).map((m) => m.group.position.distanceTo(body.group.position)));
+    // Measured in the overview layout, which is where we're going even if the
+    // view from a body is still on screen.
+    const at = (b) => system.overviews.get(b.id) ?? b.group.position;
+    const moonReach = Math.max(0, ...(body.moons ?? []).map((m) => at(m).distanceTo(at(body))));
     radius = Math.max(body.radius * (body.ring ? 4.5 : 3.2), moonReach * 1.12);
   }
   return { body, radius, elevation: preset?.elevation ?? 18 };
 }
 
+const OVERVIEW_FOV = 45;
 function fitDistance(radius) {
-  const vfov = camera.fov * DEG;
+  const vfov = OVERVIEW_FOV * DEG;
   const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
   return radius / Math.sin(Math.min(vfov, hfov) / 2);
 }
@@ -128,17 +155,19 @@ const lastFocus = new Vector3();
 function offsetFor(view, keepAzimuth) {
   const dist = fitDistance(view.radius);
   let azimuth;
+  // Directions come from real positions: they're the same as the overview's,
+  // and stay right while coming back from the view from a body.
   if (view.body.id === "sun") {
     // Keep turning from where we are, or start looking over Earth's shoulder.
-    const from = keepAzimuth ? camera.position.clone().sub(controls.target) : bodies.get("earth").group.position.clone();
+    const from = keepAzimuth ? camera.position.clone().sub(controls.target) : system.real.get("earth").clone();
     azimuth = Math.atan2(from.x, from.z) + (keepAzimuth ? 0 : 25 * DEG);
   } else {
     // Look from partway round towards the Sun, so you see day and night.
     // Try a few angles and take the first one with no other planet in the way.
-    const toSun = view.body.group.position.clone().negate();
+    const toSun = system.real.get(view.body.id).clone().negate();
     const sunAz = Math.atan2(toSun.x, toSun.z);
     const tries = [70, -70, 110, -110, 40, -40].map((d) => sunAz + d * DEG);
-    azimuth = tries.find((az) => !blocked(view, offsetAt(az, view.elevation, dist))) ?? tries[0];
+    azimuth = pov.id ? tries[0] : (tries.find((az) => !blocked(view, offsetAt(az, view.elevation, dist))) ?? tries[0]);
   }
   return offsetAt(azimuth, view.elevation, dist);
 }
@@ -154,7 +183,7 @@ function blocked(view, offset) {
   const cam = target.clone().add(offset);
   const dir = offset.clone().negate().normalize();
   const len = offset.length();
-  const halfFov = (camera.fov / 2) * DEG * Math.max(1, camera.aspect);
+  const halfFov = (OVERVIEW_FOV / 2) * DEG * Math.max(1, camera.aspect);
   for (const b of bodies.values()) {
     if (b === view.body || b.kind === "moon") continue;
     const rel = b.group.position.clone().sub(cam);
@@ -166,6 +195,10 @@ function blocked(view, offset) {
 }
 
 function flyTo(id, instant = false) {
+  const from = viewpoint(id);
+  if (from) return enterPov(from, instant);
+  lastLookView = id;
+  if (pov.id) return leavePov(id, instant);
   const view = viewFor(id);
   const offset = offsetFor(view, focus?.body.id === "sun" && view.body.id === "sun");
   controls.minDistance = view.body.radius * 1.4;
@@ -185,6 +218,384 @@ function flyTo(id, instant = false) {
     toOffset: offset,
   };
   controls.enabled = false;
+}
+
+// --- The view from a body ---
+// pov.id is the body we stand on (or are leaving). A change of view blends
+// from pov.from (a description of what was on screen when it started) to the
+// new layout, with pov.blend running 0 -> 1 alongside the camera move.
+const pov = { id: null, leaving: false, from: null, blend: 1, camOffset: new Vector3() }; // camOffset: camera relative to the ground body, for centring the sky
+const povCam = createPovCamera(renderer.domElement);
+const povPose = povCam.newPose();
+let tween = null; // camera move into, out of, or between views from a body
+const Y_UP = new Vector3(0, 1, 0);
+const lookMatrix = new Matrix4();
+const MOVE_MS = 2600;
+
+/**
+ * What's on screen now, for a new change of view to start from: the overview,
+ * a body's sky, or (if a change is already under way) exactly where everything
+ * is drawn. `belts` says where the asteroids start, as they can't be snapshotted.
+ */
+function onScreen() {
+  const target = pov.id && !pov.leaving ? { kind: "sky", id: pov.id, offset: system.skyAnchor.clone().sub(system.overviews.get(pov.id)) } : { kind: "overview" };
+  if (!tween) return target;
+  const before = pov.from?.kind === "snapshot" ? pov.from.belts : pov.from;
+  return {
+    kind: "snapshot",
+    map: system.snapshot(),
+    share: system.overviewShare,
+    ground: nearGround(),
+    belts: pov.blend > 0.5 || !before ? target : before,
+  };
+}
+
+/** During a move, the body the camera is right next to, if any: the one it's leaving or the one it's reaching. */
+function nearGround() {
+  let best = null;
+  let closest = 14; // in the body's radii: as high as you can go standing on one
+  for (const id of [tween?.left, pov.id]) {
+    const b = id && bodies.get(id);
+    if (!b) continue;
+    const d = camera.position.distanceTo(b.group.position) / (b.radius * b.group.scale.x);
+    if (d < closest) [best, closest] = [id, d];
+  }
+  return best;
+}
+
+/** Starts a camera move from where it is now. `left`: the body the camera starts next to, if any. */
+function startTween(kind, left, extra) {
+  tween = {
+    kind,
+    start: performance.now(),
+    duration: MOVE_MS,
+    from: camPose(),
+    left,
+    leftStart: left && bodies.get(left).group.position.clone(),
+    ...extra,
+  };
+}
+
+/** The body the camera is next to as a change of view starts. */
+const startingGround = (from) => (from?.kind === "sky" ? from.id : (from?.ground ?? null));
+
+function enterPov(id, instant) {
+  if (id === pov.id && !pov.leaving) return; // already there or on the way
+  const returning = id === pov.id; // changed our mind while leaving
+  pov.from = instant ? null : onScreen();
+  let left = startingGround(pov.from);
+  if (left === id) left = null;
+  pov.id = id;
+  pov.leaving = false;
+  pov.blend = instant ? 1 : 0;
+  focus = { body: bodies.get(id), radius: 1, elevation: 0 };
+  system.setGround(id, left); // the body we're leaving keeps its fine sphere until we're away
+  if (!returning) povCam.reset(bodies.get(id).kind === "moon", povFov(camera.aspect), camera.aspect);
+  povCam.state.enabled = true;
+  controls.enabled = false;
+  flight = null;
+  if (instant) tween = null;
+  else startTween("in", left, { center: bodies.get(id).group.position.clone() });
+  sharpen(id);
+}
+
+function leavePov(viewId, instant) {
+  const view = viewFor(viewId);
+  focus = view;
+  povCam.state.enabled = false;
+  const offset = offsetFor(view, false);
+  if (instant) {
+    finishLeaving(view, offset);
+    return;
+  }
+  pov.from = onScreen();
+  const left = startingGround(pov.from);
+  pov.leaving = true;
+  pov.blend = 0;
+  system.setGround(pov.id, left !== pov.id ? left : null);
+  startTween("out", left, { view, offset, center: view.body.group.position.clone() });
+}
+
+function finishLeaving(view, offset) {
+  system.setGround(null);
+  pov.id = pov.from = null;
+  pov.leaving = false;
+  pov.blend = 1;
+  tween = null;
+  camera.up.copy(Y_UP);
+  camera.layers.set(0);
+  controls.target.copy(view.body.group.position);
+  camera.position.copy(controls.target).add(offset);
+  controls.minDistance = view.body.radius * 1.4;
+  controls.enabled = true;
+  lastFocus.copy(view.body.group.position);
+  camera.near = 0.01;
+  camera.fov = OVERVIEW_FOV;
+  camera.updateProjectionMatrix();
+}
+
+function camPose() {
+  return { position: camera.position.clone(), quaternion: camera.quaternion.clone(), fov: camera.fov, near: camera.near };
+}
+
+const aim = new Vector3();
+/** Where the camera wants to be in the view from `pov.id` right now. */
+function povTarget() {
+  const b = bodies.get(pov.id);
+  // Planets: built around the Sun, low over the horizon. Moons: around their
+  // planet, risen just clear of the horizon.
+  let height = 14;
+  if (b.kind === "moon") {
+    const parent = b.parent.group;
+    aim.subVectors(parent.position, b.group.position);
+    const parentAngle = Math.atan((b.parent.radius * parent.scale.x) / aim.length()) / DEG;
+    aim.normalize();
+    height = Math.min(parentAngle * 0.85 + 5, 30);
+  } else aim.copy(b.material.uniforms.sunDir.value);
+  const ringPole = b.ring ? b.material.uniforms.ringNormal.value : null;
+  return povCam.pose(b.group.position, b.radius * b.group.scale.x, aim, povFov(camera.aspect), povPose, height, ringPole);
+}
+
+const rel0 = new Vector3();
+const ride = new Vector3();
+const rel1 = new Vector3();
+const dir0 = new Vector3();
+/**
+ * Moves the camera along a curve round `center`: the direction turns and the
+ * distance shrinks or grows smoothly, so it never cuts through the body.
+ */
+function swing(center, fromPos, fromCenter, toPos, e) {
+  rel0.subVectors(fromPos, fromCenter);
+  rel1.subVectors(toPos, center);
+  const d0 = Math.max(rel0.length(), 1e-6);
+  const d1 = Math.max(rel1.length(), 1e-6);
+  dir0.copy(rel0).divideScalar(d0);
+  const q = new Quaternion().setFromUnitVectors(dir0, rel1.divideScalar(d1));
+  const turned = dir0.applyQuaternion(new Quaternion().slerp(q, e));
+  return camera.position.copy(center).addScaledVector(turned, Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e));
+}
+
+/** Runs the camera while in, or moving into or out of, the view from a body. */
+function movePovCamera(now, dt) {
+  const ground = bodies.get(pov.id);
+  const groundR = ground.radius * ground.group.scale.x;
+  if (tween) {
+    const t = Math.min(1, (now - tween.start) / tween.duration);
+    const e = ease(t);
+    let to;
+    let center;
+    if (tween.kind === "in") {
+      to = povTarget();
+      to.fov = povFov(camera.aspect);
+      center = ground.group.position;
+    } else {
+      center = tween.view.body.group.position;
+      const position = center.clone().add(tween.offset);
+      to = {
+        position,
+        quaternion: new Quaternion().setFromRotationMatrix(lookMatrix.lookAt(position, center, Y_UP)),
+        fov: OVERVIEW_FOV,
+        near: 0.01,
+      };
+    }
+    swing(center, tween.from.position, tween.center, to.position, e);
+    // At first, ride along with the body we start next to: at high speed it
+    // carries on along its orbit (and the place we're heading for can swing
+    // round the old sky), so it mustn't be left behind in the first frames.
+    const left = tween.left && bodies.get(tween.left);
+    if (left) {
+      ride.copy(tween.from.position).add(left.group.position).sub(tween.leftStart);
+      camera.position.lerpVectors(ride, camera.position, MathUtils.smoothstep(e, 0, 0.35));
+    }
+    // Never end up inside the body we're arriving at or leaving. Keep the
+    // near plane as far out as the nearest of their surfaces allows: depth
+    // stays sharp, and no ground right under the camera gets cut away.
+    let gap = Infinity;
+    for (const b of left ? [ground, left] : [ground]) {
+      const r = b.radius * b.group.scale.x;
+      if (camera.position.distanceTo(b.group.position) < r * 1.01) camera.position.sub(b.group.position).setLength(r * 1.01).add(b.group.position);
+      gap = Math.min(gap, camera.position.distanceTo(b.group.position) - r);
+    }
+    camera.quaternion.slerpQuaternions(tween.from.quaternion, to.quaternion, e);
+    camera.fov = tween.from.fov + (to.fov - tween.from.fov) * e;
+    camera.near = MathUtils.clamp(0.3 * gap, 0.0004, 0.01);
+    camera.updateProjectionMatrix();
+    if (t >= 1) {
+      if (tween.kind === "out") finishLeaving(tween.view, tween.offset);
+      else {
+        tween = null;
+        pov.from = null;
+        pov.blend = 1;
+        system.setGround(pov.id); // let go of the body we hopped from, if any
+      }
+    }
+    return;
+  }
+  if (settings.drift && !reducedMotion) povCam.drift(dt);
+  const p = povTarget();
+  camera.position.copy(p.position);
+  camera.quaternion.copy(p.quaternion);
+  camera.up.copy(p.up);
+  camera.fov = povFov(camera.aspect);
+}
+
+/** How far the change of view has got, from the camera move's progress. */
+function updateBlend(now) {
+  pov.blend = tween ? ease(Math.min(1, (now - tween.start) / tween.duration)) : 1;
+}
+
+/** What the asteroid belts should show (see belts.update). */
+const beltsFrom = new Vector3();
+function beltView() {
+  if (!pov.id) return null;
+  const sky = (d) => (d?.kind === "sky" ? { real: system.real.get(d.id), shown: beltsFrom.copy(system.overviews.get(d.id)).add(d.offset) } : null);
+  const start = pov.from?.kind === "snapshot" ? pov.from.belts : pov.from;
+  return {
+    blend: pov.from ? pov.blend : 1,
+    to: pov.leaving ? null : { real: system.real.get(pov.id), shown: system.skyAnchor },
+    from: pov.from ? sky(start) : null,
+  };
+}
+
+// Standing on a body, the view stays turned to the Sun (or the planet), so at
+// fast speeds the stars sweep past. Past a point that's just a blur: fade them.
+const lastTurn = new Quaternion();
+let turnRate = 0;
+let wasSteady = false;
+function fadeStarsWhenSpinning(dt) {
+  // Only time turning the view counts: not a camera jump, and not you looking around.
+  const steady = Boolean(pov.id && !tween) && performance.now() - povCam.state.lastInput > 400 && !povCam.state.dragging;
+  if (!steady || !wasSteady || dt <= 0) {
+    turnRate = 0;
+    sky.setStarFade(1);
+  } else {
+    const degPerSec = (lastTurn.angleTo(camera.quaternion) / DEG / dt) || 0;
+    turnRate += (degPerSec - turnRate) * Math.min(1, dt * 3); // smoothed
+    sky.setStarFade(1 - Math.min(1, Math.max(0, (turnRate - 10) / 50)));
+  }
+  wasSteady = steady;
+  lastTurn.copy(camera.quaternion);
+}
+
+/** Where the sky is centred: on the camera once it's down near the ground, so directions are right from there. */
+function updateSkyCentre() {
+  if (!pov.id) return;
+  const b = bodies.get(pov.id);
+  const r = b.radius * b.group.scale.x;
+  pov.camOffset.subVectors(camera.position, b.group.position);
+  const d = pov.camOffset.length();
+  pov.camOffset.multiplyScalar(Math.min(1, Math.max(0, (3 * r - d) / (1.5 * r))));
+}
+
+/**
+ * Draws the frame. Standing on a body, the sky and the ground get separate
+ * passes: one depth range can't cover both the ground a few metres away and
+ * planets far off without things showing through each other.
+ */
+function render() {
+  if (!pov.id || tween) {
+    camera.layers.enableAll();
+    renderer.autoClear = true;
+    renderer.render(scene, camera);
+    return;
+  }
+  const b = bodies.get(pov.id);
+  const r = b.radius * b.group.scale.x;
+  renderer.autoClear = false;
+  renderer.clear();
+  camera.layers.set(0);
+  camera.near = 0.5;
+  camera.far = 3000;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  renderer.clearDepth();
+  camera.layers.set(1);
+  camera.near = povPose.near;
+  camera.far = r * (povCam.state.altitude + 4);
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  camera.far = 3000;
+}
+
+// --- Clicking a planet or moon ---
+const raycaster = new Raycaster();
+const pointer = new Vector2();
+let press = null;
+let quietUntil = 0; // ignore clicks for a moment after one (double-clicks on a desktop)
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  press = e.button === 0 && e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+});
+renderer.domElement.addEventListener("pointerup", (e) => {
+  const now = performance.now();
+  if (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6 || now - press.t > 700) return;
+  press = null;
+  if (tween || now < quietUntil) return; // mid-flight, clicks would land on things that are moving
+  const hit = pick(e.clientX, e.clientY, e.pointerType === "touch" ? 22 : 9);
+  if (!hit) return;
+  quietUntil = now + 400;
+  visit(hit);
+});
+
+/** Where clicking (or tapping) a body takes you. */
+function visit(body) {
+  // The Sun's name takes you to look at it; its disc in the middle of the screen
+  // is too easy to hit by accident, so clicking that does nothing.
+  if (body.kind === "sun") return;
+  set("view", `from-${body.id}`, { remember: false });
+}
+
+// Show which body a click would go to. Checked again every few frames while
+// the pointer rests, as things move under it.
+let resting = null; // where the mouse is, if it is over the canvas
+let hoverChecked = 0;
+renderer.domElement.addEventListener("pointermove", (e) => {
+  resting = e.buttons || e.pointerType === "touch" ? null : { x: e.clientX, y: e.clientY };
+  hoverChecked = 0;
+});
+renderer.domElement.addEventListener("pointerleave", () => (resting = null));
+function updateHover(now) {
+  if (now - hoverChecked < 200) return;
+  hoverChecked = now;
+  const hit = resting && !tween && !document.body.classList.contains("idle") ? pick(resting.x, resting.y, 9) : null;
+  const target = hit && hit.kind !== "sun" ? hit : null;
+  renderer.domElement.classList.toggle("pointing", Boolean(target));
+  ui.hover(target?.id ?? null);
+}
+
+/**
+ * The body under a screen point. Small or far ones get a few pixels of slack,
+ * and planets win near-misses over their tiny moons (click a moon's name, or
+ * zoom in, to get the moon).
+ */
+function pick(x, y, slack = 9) {
+  pointer.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const ray = raycaster.ray;
+  const pxPerWorld = (camera.projectionMatrix.elements[5] * innerHeight) / 2; // at distance 1
+  // Standing on a body, anything behind the ground can't be clicked.
+  let groundAt = Infinity;
+  if (pov.id) {
+    const g = bodies.get(pov.id);
+    const hit = ray.intersectSphere(new Sphere(g.group.position, g.radius * g.group.scale.x), tmp);
+    if (hit) groundAt = hit.distanceTo(camera.position);
+  }
+  let best = null;
+  for (const b of bodies.values()) {
+    if (b.id === pov.id || !b.mesh.visible) continue;
+    const center = b.group.position;
+    const along = tmp.subVectors(center, camera.position).dot(ray.direction);
+    if (along <= 0 || along > groundAt) continue;
+    const scale = pxPerWorld / along; // pixels per scene unit at that distance
+    const off = Math.sqrt(ray.distanceSqToPoint(center)) * scale; // pixels from its centre
+    const miss = off - b.radius * b.group.scale.x * scale; // pixels outside its edge
+    const onRings = b.ring && off < b.radius * b.group.scale.x * 2.27 * scale; // Saturn's rings count too
+    if (miss > slack && !onRings) continue;
+    // A direct hit on the nearest disc wins; otherwise the closest near-miss
+    // (or Saturn's rings), planets before their moons.
+    const score = miss <= 0 ? -1e6 + along : (onRings ? 2 : miss) + (b.kind === "moon" ? 8 : 0);
+    if (!best || score < best.score) best = { body: b, score };
+  }
+  return best?.body ?? null;
 }
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -218,16 +629,32 @@ function moveCamera(now) {
 const SURFACES = ["earth", "clouds", "milkyway", "moon", "jupiter", "saturn", "mars", "venus", "mercury", "uranus",
   "neptune", "pluto", "io", "europa", "ganymede", "callisto", "titan", "charon", "triton", "rhea", "iapetus",
   "phobos", "deimos", "miranda", "ariel", "umbriel", "titania", "oberon"];
-let paintStep = () => {};
+const painters = []; // each one does a little work per frame if it has no worker
+const sharpness = new Map(); // job -> width of the best map shown so far
 
-function startPaint(firstId) {
+function showSurface(job, images) {
+  const name = job.split("@")[0];
+  if ((sharpness.get(name) ?? 0) > images.map.width) return; // a sharper one already arrived
+  sharpness.set(name, images.map.width);
+  if (name === "milkyway") sky.setMilkyWay(texture(images.map));
+  else system.applySurface(name, images);
+}
+
+function startPaint(...first) {
   const order = [...SURFACES];
-  if (order.includes(firstId)) order.unshift(...order.splice(order.indexOf(firstId), 1));
-  paintStep = startPainting(
-    order,
-    (job, images) => (job === "milkyway" ? sky.setMilkyWay(texture(images.map)) : system.applySurface(job, images)),
-    () => ui.doneLoading(),
-  );
+  for (const id of first.filter(Boolean).reverse()) if (order.includes(id)) order.unshift(...order.splice(order.indexOf(id), 1));
+  painters.push(startPainting(order, showSurface, () => ui.doneLoading()));
+}
+
+/** The body you stand on fills half the screen, so paint it again in more detail. */
+const SHARP = 2048;
+const queued = new Set();
+function sharpen(id) {
+  const jobs = [id, ...(id === "earth" ? ["clouds"] : [])]
+    .filter((j) => (sharpness.get(j) ?? 0) < SHARP && !queued.has(j))
+    .map((j) => `${j}@${SHARP}`);
+  for (const j of jobs) queued.add(j.split("@")[0]);
+  if (jobs.length) painters.push(startPainting(jobs, showSurface, () => {}));
 }
 
 // --- The loop ---
@@ -238,7 +665,7 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function frame(now) {
   requestAnimationFrame(frame);
-  paintStep(10);
+  for (const step of painters) step(10 / painters.length);
   const gap = 1000 / settings.fps;
   const elapsed = now - lastFrame;
   if (elapsed < gap - 1) return;
@@ -248,19 +675,31 @@ function frame(now) {
 
   tickClock(dt);
   const date = new Date(clock.time);
-  system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, (now - startTime) / 1000);
-  belts.update(A.MakeTime(date).tt);
+  updateBlend(now);
+  const looking = pov.id ? pov : null;
+  system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, (now - startTime) / 1000, looking);
+  belts.update(A.MakeTime(date).tt, beltView());
   for (const p of belts.parts) p.visible = settings.belts;
 
-  moveCamera(now);
-  controls.autoRotate = settings.drift && !reducedMotion && !flight;
-  controls.update(dt);
+  if (pov.id) movePovCamera(now, dt);
+  else {
+    moveCamera(now);
+    controls.autoRotate = settings.drift && !reducedMotion && !flight;
+    controls.update(dt);
+  }
+  updateSkyCentre();
+  fadeStarsWhenSpinning(dt);
   sky.group.position.copy(camera.position);
-  system.fitGlow(camera.position.length());
+  sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
+  system.fitGlow(camera);
 
-  renderer.render(scene, camera);
+  render();
   ui.updateClock(clock.time, clock.synced && !settings.paused);
-  ui.updateLabels(camera, innerWidth, innerHeight);
+  const ground = pov.id && bodies.get(pov.id);
+  // Label as seen from the ground only once we're down there (or on the way back up).
+  const down = ground && (!tween || camera.position.distanceTo(ground.group.position) < 3 * ground.radius * ground.group.scale.x);
+  ui.updateLabels(camera, innerWidth, innerHeight, down ? pov.id : null, down && new Sphere(ground.group.position, ground.radius * ground.group.scale.x));
+  updateHover(now);
 }
 
 addEventListener("resize", () => {
@@ -272,9 +711,32 @@ addEventListener("resize", () => {
 // --- Wallpaper apps ---
 // Lively Wallpaper (Windows): see LivelyProperties.json next to index.html.
 // Lists arrive as a position in the list, so turn those back into names.
+// The View list there holds the "look at" views; "Look from" picks a body to
+// see the sky from (or Nothing), so the wallpaper app's own setting is always
+// the one that counts when it starts up again.
+const LOOK_AT = VIEWS.filter((v) => !v.from);
+const LOOK_FROM = VIEWS.filter((v) => v.from);
+let livelyFrom = null;
 window.livelyPropertyListener = (name, value) => {
+  if (name === "back") return goBack();
+  if (name === "from") {
+    const view = typeof value === "number" ? LOOK_FROM[value - 1]?.id : value && value !== "none" ? `from-${value}` : null;
+    livelyFrom = viewpoint(view) ? view : null;
+    if (livelyFrom) set("view", livelyFrom);
+    else goBack();
+    return;
+  }
+  if (name === "view") {
+    value = typeof value === "number" ? LOOK_AT[value]?.id : value;
+    if (!value) return;
+    if (livelyFrom && settings.view === livelyFrom) {
+      // Standing where Look from put us: this is where Back goes.
+      lastLookView = value;
+      ui.sync();
+      return;
+    }
+  }
   if (name === "speed") value = typeof value === "number" ? SPEEDS[value]?.id : value;
-  if (name === "view") value = typeof value === "number" ? VIEWS[value]?.id : value;
   if (name === "speed" && value === "live") goLive();
   else set(name, value);
 };
@@ -286,10 +748,14 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
 flyTo(settings.view, true);
-startPaint(focus.body.id);
+if (pov.id) {
+  system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0, pov);
+  movePovCamera(performance.now(), 0);
+}
+startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);
 requestAnimationFrame(frame);

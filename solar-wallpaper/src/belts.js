@@ -4,7 +4,7 @@
 // orbit and moves by Kepler's laws, so the belt shears and flows the way the
 // real one does. The main belt has the real Kirkwood gaps (where Jupiter's pull
 // clears orbits out), and the Trojans ride 60 degrees ahead of and behind Jupiter.
-import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, Points, ShaderMaterial } from "three";
+import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, Points, ShaderMaterial, Vector3 } from "three";
 import { SCALE } from "./ephemeris.js";
 import { random } from "./noise.js";
 import * as shaders from "./shaders.js";
@@ -118,6 +118,13 @@ function material(color, opacity, pixelRatio, sizeScale) {
       sizeScale: { value: sizeScale },
       color: { value: new Color(color) },
       opacity: { value: opacity },
+      povBlend: { value: 0 },
+      toSky: { value: 0 },
+      observerReal: { value: new Vector3() },
+      observerShown: { value: new Vector3() },
+      fromSky: { value: 0 },
+      fromReal: { value: new Vector3() },
+      fromShown: { value: new Vector3() },
     },
     transparent: true,
     depthWrite: false,
@@ -136,9 +143,28 @@ export function createBelts(pixelRatio) {
   for (const p of parts) p.frustumCulled = false;
   return {
     parts,
-    /** `days` = days since J2000 (2000-01-01 12:00 TT). */
-    update(days) {
-      for (const p of parts) p.material.uniforms.days.value = days;
+    /**
+     * `days` = days since J2000 (2000-01-01 12:00 TT).
+     * `view` = null for the overview, or { blend, to, from } where `to` and
+     * `from` are each null (the overview) or { real, shown }: the sky seen
+     * from a body at real position `real`, centred at `shown` (see pov.js).
+     */
+    update(days, view = null) {
+      for (const p of parts) {
+        const u = p.material.uniforms;
+        u.days.value = days;
+        u.povBlend.value = view ? view.blend : 0;
+        u.toSky.value = view?.to ? 1 : 0;
+        u.fromSky.value = view?.from ? 1 : 0;
+        if (view?.to) {
+          u.observerReal.value.copy(view.to.real);
+          u.observerShown.value.copy(view.to.shown);
+        }
+        if (view?.from) {
+          u.fromReal.value.copy(view.from.real);
+          u.fromShown.value.copy(view.from.shown);
+        }
+      }
     },
   };
 }

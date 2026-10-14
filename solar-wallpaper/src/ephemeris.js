@@ -167,31 +167,29 @@ function circlePlane(moon, parentPole) {
 const startAngle = (id) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 3600, 7) / 10 * DEG;
 
 /**
- * Where a moon is, relative to its planet, already squashed for display.
+ * Where a moon really is relative to its planet, in AU along scene axes (not squashed).
  * `axes` maps planet id to { pole, primeMeridian } in scene directions.
  * `galilean` is astronomy-engine's JupiterMoons() result for this moment
  * (optional; it's worked out here if missing).
  */
-export function moonOffset(moon, time, axes, out = new Vector3(), galilean) {
-  const parent = PLANET_BY_ID[moon.parent];
-  const parentShown = displayRadius(parent.radiusKm);
-  let distKm;
+export function realMoonOffset(moon, time, axes, out = new Vector3(), galilean) {
   if (moon.orbit === "moon" || moon.orbit === "galilean") {
     const v = moon.orbit === "moon" ? A.GeoMoon(time) : (galilean ?? A.JupiterMoons(time))[moon.id];
-    eqjToScene(v.x, v.y, v.z, out);
-    distKm = out.length() * AU_KM;
-    out.normalize();
-  } else if (moon.orbit === "charon") {
-    out.copy(axes[moon.parent].primeMeridian);
-    distKm = moon.aKm;
-  } else {
-    const t = A.MakeTime(time);
-    const { u, v } = circlePlane(moon, axes[moon.parent].pole);
-    const angle = startAngle(moon.id) + (2 * Math.PI * t.tt) / moon.periodDays;
-    out.copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle));
-    distKm = moon.aKm;
+    return eqjToScene(v.x, v.y, v.z, out);
   }
-  return out.multiplyScalar(moonDistance(distKm, parent.radiusKm, parentShown));
+  if (moon.orbit === "charon") return out.copy(axes[moon.parent].primeMeridian).multiplyScalar(moon.aKm / AU_KM);
+  const t = A.MakeTime(time);
+  const { u, v } = circlePlane(moon, axes[moon.parent].pole);
+  const angle = startAngle(moon.id) + (2 * Math.PI * t.tt) / moon.periodDays;
+  return out.copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle)).multiplyScalar(moon.aKm / AU_KM);
+}
+
+/** Where a moon is drawn relative to its planet: the real direction, squashed distance. */
+export function moonOffset(moon, time, axes, out = new Vector3(), galilean) {
+  const parent = PLANET_BY_ID[moon.parent];
+  realMoonOffset(moon, time, axes, out, galilean);
+  const distKm = out.length() * AU_KM;
+  return out.normalize().multiplyScalar(moonDistance(distKm, parent.radiusKm, displayRadius(parent.radiusKm)));
 }
 
 /** Points along a moon's path around its planet (relative to the planet). */
@@ -217,4 +215,34 @@ export function planetAxes(time) {
     axes[p.id] = { north, spin, pole, quaternion: q, primeMeridian: new Vector3(1, 0, 0).applyQuaternion(q) };
   }
   return axes;
+}
+
+const LIGHT_AU_PER_DAY = 173.1446;
+const JOVIAN = MOONS.filter((m) => m.orbit === "galilean");
+
+/**
+ * Where everything really is, in AU along scene axes (not squashed), keyed by
+ * body id. The Sun is at the origin. Moons use `axes` (see planetAxes()).
+ *
+ * With `observerId`, Jupiter's four big moons are placed where that body sees
+ * them: where they were when their light left, about 40 minutes earlier from
+ * Earth. That shifts when they cross Jupiter by as much. (For everything else
+ * the delay changes nothing you could see.)
+ */
+export function realPositions(time, axes, galilean = A.JupiterMoons(time), out = new Map(), observerId = null) {
+  const get = (id) => out.get(id) ?? out.set(id, new Vector3()).get(id);
+  get("sun").set(0, 0, 0);
+  for (const p of PLANETS) {
+    const v = A.HelioVector(A.Body[p.body], time);
+    eqjToScene(v.x, v.y, v.z, get(p.id));
+  }
+  for (const m of MOONS) realMoonOffset(m, time, axes, get(m.id), galilean).add(out.get(m.parent));
+  const family = observerId && (MOONS.find((m) => m.id === observerId)?.parent ?? observerId);
+  if (observerId && family !== "jupiter") {
+    const t = A.MakeTime(time);
+    const lightDays = out.get("jupiter").distanceTo(out.get(observerId)) / LIGHT_AU_PER_DAY;
+    const seen = A.JupiterMoons(t.AddDays(-lightDays));
+    for (const m of JOVIAN) realMoonOffset(m, t, axes, out.get(m.id), seen).add(out.get("jupiter"));
+  }
+  return out;
 }

@@ -32,9 +32,9 @@
   .label { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: auto; cursor: pointer;
     font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
     text-shadow: 0 1px 3px #000; transition: opacity .3s; will-change: transform; user-select: none; }
-  .label:hover { color: var(--text); }
   .label.moon { font-size: 10px; color: rgba(190, 205, 230, 0.55); }
   .label.sun { color: rgba(255, 214, 150, 0.75); }
+  .label:hover, .label.hover { color: var(--text); }
 
   #clock { position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); pointer-events: none; text-shadow: 0 1px 6px #000; }
   #clock .date { font-size: clamp(18px, 2.2vw, 28px); font-weight: 300; letter-spacing: 0.01em; }
@@ -49,7 +49,8 @@
     transition: opacity .4s; }
   #menu-btn:hover { border-color: rgba(255,255,255,.25); }
   .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0; }
-  .idle { cursor: none; }
+  canvas.pointing { cursor: pointer; }
+  .idle, .idle canvas { cursor: none; }
 
   #panel { position: fixed; top: calc(68px + var(--safe-top)); right: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 86px - var(--safe-top) - var(--safe-bottom)); overflow: auto;
     background: var(--panel); border: 1px solid var(--panel-line); border-radius: 16px; padding: 16px; backdrop-filter: blur(14px); }
@@ -70,6 +71,15 @@
   .note + .note { margin-top: 6px; }
   kbd { font: 11px ui-monospace, monospace; padding: 0 4px; border: 1px solid var(--panel-line); border-radius: 4px; }
 
+  #pov { position: fixed; top: calc(18px + var(--safe-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+    padding: 6px 6px 6px 14px; border-radius: 999px; border: 1px solid var(--panel-line); background: var(--panel); backdrop-filter: blur(10px);
+    font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); transition: opacity .4s; }
+  #pov button { font: inherit; letter-spacing: .04em; text-transform: none; font-size: 12px; color: var(--text); background: var(--chip);
+    border: 1px solid var(--panel-line); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  #pov button:hover { border-color: rgba(255,255,255,.3); }
+  #pov[hidden] { display: none; }
+  .idle #pov { opacity: 0; }
+
   #loading { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
     color: var(--muted); transition: opacity .8s; pointer-events: none; }
   #loading.done { opacity: 0; }
@@ -79,6 +89,7 @@
   @media (max-width: 600px) {
     :root { --gutter: 16px; }
     #menu-btn { top: calc(12px + var(--safe-top)); right: 16px; }
+    #pov { top: calc(12px + var(--safe-top)); }
     #panel { top: calc(60px + var(--safe-top)); right: 16px; left: 16px; width: auto; }
   }
 </style>
@@ -124,9 +135,15 @@
   </section>
   <section>
     <p class="note">Every planet and moon is where it really is at the time shown. Sizes and distances are squashed so it all fits; directions are real.</p>
-    <p class="note">Drag to turn, scroll to zoom, click a name to follow it. Keys: <kbd>Space</kbd> pause, <kbd>←</kbd><kbd>→</kbd> speed, <kbd>N</kbd> now, <kbd>H</kbd> hide all.</p>
+    <p class="note">Click a planet or moon to see the sky from there. Drag to look around, scroll to go higher or lower, <kbd>Esc</kbd> or Back to return.</p>
+    <p class="note">Keys: <kbd>Space</kbd> pause, <kbd>←</kbd><kbd>→</kbd> speed, <kbd>N</kbd> now, <kbd>1</kbd>–<kbd>9</kbd> look at a planet, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> look from it, <kbd>H</kbd> hide all.</p>
   </section>
 </aside>
+
+<div id="pov" hidden>
+  <span class="name"></span>
+  <button id="pov-back" type="button">Back</button>
+</div>
 
 <div id="loading">Painting planets…</div>
 <div id="error" hidden>This needs WebGL, which this browser or wallpaper app doesn't have turned on.</div>

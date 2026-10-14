@@ -16,7 +16,7 @@
   "view": {
     "type": "dropdown",
     "value": 1,
-    "text": "View",
+    "text": "Look at",
     "items": [
       "Whole solar system",
       "Out to Jupiter",
@@ -31,6 +31,24 @@
       "Uranus",
       "Neptune",
       "Pluto"
+    ]
+  },
+  "from": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "Look from",
+    "items": [
+      "Nothing",
+      "From Mercury",
+      "From Venus",
+      "From Earth",
+      "From Mars",
+      "From Jupiter",
+      "From Saturn",
+      "From Uranus",
+      "From Neptune",
+      "From Pluto",
+      "From the Moon"
     ]
   },
   "labels": {

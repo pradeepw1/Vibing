@@ -1,9 +1,9 @@
 // Runs in a background thread: paints one surface per message and sends the
 // pixels back, so painting never makes the animation stutter.
-import { finish, paint, paintClouds, paintMilkyWay } from "./surfaces.js";
+import { finish, painterFor } from "./surfaces.js";
 
 self.onmessage = ({ data: { job } }) => {
-  const out = finish(job === "clouds" ? paintClouds() : job === "milkyway" ? paintMilkyWay() : paint(job));
+  const out = finish(painterFor(job));
   const images = out instanceof ImageData ? { map: out } : out;
   const msg = { job };
   const transfer = [];

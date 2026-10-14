@@ -2,6 +2,7 @@
 import * as A from "astronomy-engine";
 import {
   AdditiveBlending,
+  Quaternion,
   BackSide,
   BufferGeometry,
   CanvasTexture,
@@ -24,7 +25,7 @@ import {
   Vector3,
   Vector4,
 } from "three";
-import { MOONS, PLANETS, SATURN_RINGS, SUN } from "./bodies.js";
+import { AU_KM, MOONS, PLANETS, SATURN_RINGS, SUN } from "./bodies.js";
 import {
   bodyQuaternion,
   displayRadius,
@@ -33,19 +34,24 @@ import {
   moonOrbit,
   planetOrbit,
   planetPosition,
+  realPositions,
   SCALE,
   sceneLongitude,
 } from "./ephemeris.js";
+import { skyLayout, sunlight } from "./pov.js";
 import * as shaders from "./shaders.js";
 import { ringStrip } from "./surfaces.js";
 
-const SPIN_CAP = 240; // degrees per real second; faster spins are slowed down so they don't flicker
+const SPIN_CAP = 240;
+const GROUND_SPIN_CAP = 15; // degrees per real second, for the body you stand on // degrees per real second; faster spins are slowed down so they don't flicker
 const YEAR_MS = 365.25 * 86400e3;
 const DAY_MS = 86400e3;
 const GAS_GIANTS = new Set(["jupiter", "saturn", "uranus", "neptune", "venus"]);
 
 const sphere = new SphereGeometry(1, 96, 48);
 const smallSphere = new SphereGeometry(1, 40, 20);
+// The body you stand on fills half the screen, so it gets a much finer sphere.
+const groundSphere = new SphereGeometry(1, 384, 192);
 
 export function texture(image) {
   const canvas = document.createElement("canvas");
@@ -80,6 +86,9 @@ function planetMaterial(def, isMoon) {
       map: { value: null },
       hasMap: { value: 0 },
       baseColor: { value: new Color(def.color ?? "#9a958e") },
+      sunDir: { value: new Vector3(1, 0, 0) },
+      sunlight: { value: 1 }, // 0..1: how much of the Sun isn't hidden by its planet (eclipses)
+      eclipseTint: { value: new Color(def.id === "moon" ? "#7a2a12" : "#000000") }, // Earth's sunsets light the eclipsed Moon red
       ambient: { value: 0.006 }, // night sides stay almost black
       wrap: { value: GAS_GIANTS.has(def.id) ? 0.12 : 0.02 },
       atmosphere: { value: new Vector4(...atmo) },
@@ -104,6 +113,7 @@ function haloFor(def, radius) {
     uniforms: {
       color: { value: new Color(r, g, b) },
       center: { value: new Vector3() },
+      sunDir: { value: new Vector3(1, 0, 0) },
       strength: { value: strength * 0.9 },
       edge: { value: Math.sqrt(1 - 1 / (scale * scale)) },
     },
@@ -114,6 +124,7 @@ function haloFor(def, radius) {
   });
   const mesh = new Mesh(smallSphere, mat);
   mesh.scale.setScalar(radius * scale);
+  mesh.userData = { strength: strength * 0.9, scale };
   return mesh;
 }
 
@@ -152,8 +163,10 @@ export function createSystem(scene, pixelRatio) {
     glows.push({ sprite: s, size: SCALE.sunRadius * size });
   }
   /** Keeps the Sun's glare from washing over the whole sky when the camera is close. */
-  function fitGlow(cameraDistance) {
-    for (const g of glows) g.sprite.scale.setScalar(Math.min(g.size, Math.max(cameraDistance * 0.9, SCALE.sunRadius * 2.5)));
+  function fitGlow(camera) {
+    const s = sunGroup.scale.x;
+    const dist = camera.position.distanceTo(sunGroup.position) / s; // in the Sun's own units
+    for (const g of glows) g.sprite.scale.setScalar(Math.min(g.size, Math.max(dist * 0.9, SCALE.sunRadius * 2.5)));
   }
   root.add(sunGroup);
   bodies.set("sun", { id: "sun", def: SUN, kind: "sun", radius: SCALE.sunRadius, group: sunGroup, mesh: sunMesh, spinOffset: 0, lastSpin: null });
@@ -186,6 +199,7 @@ export function createSystem(scene, pixelRatio) {
           center: { value: new Vector3() },
           planetRadius: { value: radius },
           normal: { value: new Vector3() },
+          sunDir: { value: new Vector3(1, 0, 0) },
           ambient: { value: 0.01 },
         },
         transparent: true,
@@ -203,7 +217,7 @@ export function createSystem(scene, pixelRatio) {
     if (def.id === "earth") {
       const cloudMat = new ShaderMaterial({
         ...shaders.clouds,
-        uniforms: { map: { value: null }, ambient: { value: 0.004 } },
+        uniforms: { map: { value: null }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
         transparent: true,
         depthWrite: false,
       });
@@ -263,23 +277,27 @@ export function createSystem(scene, pixelRatio) {
   const tmp = new Vector3();
   const pole = new Vector3();
 
-  function displaySpin(body, spin, dtReal) {
+  function displaySpin(body, spin, dtReal, capPerSecond = SPIN_CAP) {
     if (body.lastSpin === null) {
       body.lastSpin = spin;
       return spin;
     }
     const dW = spin - body.lastSpin;
     body.lastSpin = spin;
-    const cap = SPIN_CAP * Math.max(dtReal, 1 / 240);
+    const cap = capPerSecond * Math.max(dtReal, 1 / 240);
     if (Math.abs(dW) > cap) body.spinOffset += Math.sign(dW) * cap - dW;
     else body.spinOffset -= Math.sign(body.spinOffset) * Math.min(Math.abs(body.spinOffset), cap - Math.abs(dW));
     body.spinOffset = ((((body.spinOffset + 180) % 360) + 360) % 360) - 180;
     return spin + body.spinOffset;
   }
 
+  const grounds = new Set();
   function orient(body, bodyName, time, dtReal) {
     const axis = A.RotationAxis(A.Body[bodyName], time);
-    bodyQuaternion(axis.north, displaySpin(body, axis.spin, dtReal), body.mesh.quaternion);
+    // The ground you stand on fills the screen, so it may only turn slowly.
+    const cap = grounds.has(body.id) ? GROUND_SPIN_CAP : SPIN_CAP;
+    bodyQuaternion(axis.north, displaySpin(body, axis.spin, dtReal, cap), body.mesh.quaternion);
+    return axis;
   }
 
   function resampleOrbits(body, timeMs, time) {
@@ -296,32 +314,78 @@ export function createSystem(scene, pixelRatio) {
     return true;
   }
 
-  const axes = {};
+  const axes = {}; // planet poles and prime meridians as drawn
+  const trueAxes = {}; // the same with the true spin
+  const trueTurn = new Quaternion();
+  const real = new Map(); // id -> real position in AU (scene axes), Sun at the origin
+  const seen = new Map(); // the same as seen from the body we stand on (light-time for Jupiter's moons)
+  const seenBefore = new Map(); // and from the body we're coming from
+  const sky = new Map(); // layout of the view from a body
+  const skyBefore = new Map(); // the previous body's sky, while hopping between them
+  const shown = new Vector3();
+  const overviewSpot = new Vector3();
+  const overviews = new Map(); // where each body sits in the overview this frame
+  const overview = (id) => overviews.get(id) ?? overviewSpot.set(0, 0, 0);
+  const skyAnchor = new Vector3(); // where the view from a body is centred
+  const beforeAnchor = new Vector3(); // where the sky we are leaving is centred
+  const ZERO = new Vector3();
+  let overviewShare = 1;
+  const _target = { position: new Vector3(), scale: 1 };
+  const _start = { position: new Vector3(), scale: 1 };
+  const place = (position, scale, out = _target) => {
+    out.position.copy(position);
+    out.scale = scale;
+    return out;
+  };
+
+  /** Where everything is drawn right now, to start a change of view from. */
+  function snapshot() {
+    const map = new Map();
+    for (const b of bodies.values()) map.set(b.id, { position: b.group.position.clone(), scale: b.group.scale.x });
+    return map;
+  }
 
   /**
    * Moves everything to `date`.
    * dtReal: real seconds since the last frame. simRate: simulated ms per real ms.
+   * pov: null for the overview, or { id, leaving, from, blend, camOffset }:
+   *   id        the body we stand on (or are leaving)
+   *   leaving   heading back to the overview
+   *   from      where the current change of view started: { kind: "overview" },
+   *             { kind: "sky", id, offset } (offset: the sky's centre relative to
+   *             the body) or { kind: "snapshot", map, share, ground }; null once
+   *             settled. `ground` is the body the camera started next to, if any
+   *   blend     0..1, how far the change of view has got
+   *   camOffset where to centre the sky, relative to the body
    */
-  function update(date, dtReal, simRate, camera, viewHeight, showOrbits, realSeconds) {
+  function update(date, dtReal, simRate, camera, viewHeight, showOrbits, realSeconds, pov = null) {
     const time = A.MakeTime(date);
     const timeMs = date.getTime();
+    // The body we stand on, and while moving away the one we're leaving: both
+    // are "ground" close to the camera.
+    grounds.clear();
+    if (pov) grounds.add(pov.id);
+    if (pov?.from?.kind === "sky") grounds.add(pov.from.id);
+    if (pov?.from?.ground) grounds.add(pov.from.ground);
     sunMat.uniforms.time.value = realSeconds;
+    sunGroup.position.set(0, 0, 0); // the view from a body may have moved it
     orient(bodies.get("sun"), "Sun", time, dtReal);
 
     for (const def of PLANETS) {
       const b = bodies.get(def.id);
       planetPosition(def, time, b.group.position);
-      orient(b, def.body, time, dtReal);
+      const axis = orient(b, def.body, time, dtReal);
       pole.set(0, 1, 0).applyQuaternion(b.mesh.quaternion);
-      axes[def.id] = {
-        pole: pole.clone(),
-        primeMeridian: new Vector3(1, 0, 0).applyQuaternion(b.mesh.quaternion),
-      };
-      b.material.uniforms.center.value.copy(b.group.position);
-      if (b.halo) b.halo.material.uniforms.center.value.copy(b.group.position);
+      const a = axes[def.id] ?? (axes[def.id] = { pole: new Vector3(), primeMeridian: new Vector3() });
+      a.pole.copy(pole);
+      a.primeMeridian.set(1, 0, 0).applyQuaternion(b.mesh.quaternion);
+      // The same without the slowed-down spin, for real positions (Charon).
+      bodyQuaternion(axis.north, axis.spin, trueTurn);
+      const t = trueAxes[def.id] ?? (trueAxes[def.id] = { pole: new Vector3(), primeMeridian: new Vector3() });
+      t.pole.set(0, 1, 0).applyQuaternion(trueTurn);
+      t.primeMeridian.set(1, 0, 0).applyQuaternion(trueTurn);
       if (b.ring) {
         b.material.uniforms.ringNormal.value.copy(pole);
-        b.ring.material.uniforms.center.value.copy(b.group.position);
         b.ring.material.uniforms.normal.value.copy(pole);
       }
       if (b.clouds) b.clouds.rotation.y = ((timeMs / DAY_MS) * 0.05) % (2 * Math.PI); // slow drift on the winds
@@ -338,44 +402,205 @@ export function createSystem(scene, pixelRatio) {
       if (def.orbit === "moon") orient(b, "Moon", time, dtReal);
       else lockedQuaternion(tmp.negate(), axes[def.parent].pole, b.mesh.quaternion);
 
-      // Moons that would whizz round in a few frames are just a blur; fade them out.
+      // Moons that would whizz round in a few frames are just a blur; fade them
+      // out (but never the one you're standing on, or just leaving).
       const stepsPerOrbit = (def.periodDays * DAY_MS) / Math.max(msPerFrame, 1);
-      b.fade = Math.min(1, Math.max(0, (stepsPerOrbit - 6) / 10));
+      b.fade = grounds.has(def.id) ? 1 : Math.min(1, Math.max(0, (stepsPerOrbit - 6) / 10));
       b.material.uniforms.opacity.value = b.fade;
+      b.material.transparent = b.fade < 1; // solid moons draw with the solid things, so rings sort right
       b.mesh.visible = b.fade > 0.01;
 
       // Moon orbits show up when you're close to the planet.
       const near = camera.position.distanceTo(b.parent.group.position) / b.parent.radius;
       const show = Math.min(1, Math.max(0, (32 - near) / 12)) * b.fade;
       b.orbit.material.uniforms.opacity.value = 0.22 * show;
-      b.orbit.visible = showOrbits && show > 0.01;
+      // In the view from a body they'd be stretched along with their planet;
+      // on the way back out they fade in once the planet is its usual size.
+      const settled = !pov || (pov.leaving && Math.abs(b.parent.group.scale.x - 1) < 0.05);
+      b.orbit.visible = showOrbits && show > 0.01 && settled;
     }
 
     // At most one orbit resample per frame keeps frames smooth.
     for (const b of bodies.values()) if (b.orbit && resampleOrbits(b, timeMs, time)) break;
 
+    for (const b of bodies.values()) (overviews.get(b.id) ?? overviews.set(b.id, new Vector3()).get(b.id)).copy(b.group.position);
+
+    // Real positions. Looking from a body, use the true spin (not the slowed-down
+    // one used for drawing fast spins), so Charon is where it really is, and
+    // see Jupiter's moons as they were when their light left.
+    realPositions(time, axes, galilean, real);
+    if (pov) realPositions(time, trueAxes, galilean, seen, pov.id);
+    if (pov?.from?.kind === "sky") realPositions(time, trueAxes, galilean, seenBefore, pov.from.id);
+    const shownPositions = pov ? seen : real;
+
+    // Each body is lit from the real direction of the Sun, wherever it's drawn,
+    // and moons go dark in their planet's shadow.
+    for (const def of MOONS) {
+      const b = bodies.get(def.id);
+      b.material.uniforms.sunlight.value = sunlight(shownPositions.get(def.id), shownPositions.get(def.parent), b.parent.def.radiusKm);
+    }
+    for (const b of bodies.values()) {
+      if (b.kind === "sun") continue;
+      const dir = tmp.copy(real.get(b.id)).negate().normalize();
+      b.material.uniforms.sunDir.value.copy(dir);
+      if (b.halo) b.halo.material.uniforms.sunDir.value.copy(dir);
+      if (b.ring) b.ring.material.uniforms.sunDir.value.copy(dir);
+      if (b.clouds) b.clouds.material.uniforms.sunDir.value.copy(dir);
+    }
+
+    // Looking from a body: lay everything else out again around it. A change
+    // of view blends from where things were when it started (pov.from) to
+    // where they're going: the overview when leaving, else the body's sky.
+    const toSky = pov && !pov.leaving;
+    const from = pov?.from ?? null;
+    const blend = from ? pov.blend : 1;
+    if (pov) skyAnchor.copy(overview(pov.id)).add(pov.camOffset ?? ZERO);
+    if (toSky) skyLayout(pov.id, seen, skyAnchor, sky);
+    // The sky we're leaving stays centred on its body, which carries on along its orbit.
+    if (from?.kind === "sky") skyLayout(from.id, seenBefore, beforeAnchor.copy(overview(from.id)).add(from.offset), skyBefore);
+    const target = (b) => {
+      if (!toSky || b.id === pov.id) return place(overview(b.id), 1);
+      const s = sky.get(b.id);
+      return place(s.position, s.radius / b.radius);
+    };
+    const start = (b) => {
+      if (from.kind === "snapshot") {
+        const s = from.map.get(b.id);
+        return place(s.position, s.scale, _start);
+      }
+      if (from.kind === "sky" && b.id !== from.id) {
+        const s = skyBefore.get(b.id);
+        return place(s.position, s.radius / b.radius, _start);
+      }
+      return place(overview(b.id), 1, _start);
+    };
+    for (const b of bodies.values()) {
+      let scale = 1;
+      if (pov) {
+        const to = target(b);
+        if (from) {
+          const a = start(b);
+          b.group.position.copy(a.position).lerp(to.position, blend);
+          scale = Math.exp(Math.log(a.scale) + (Math.log(to.scale) - Math.log(a.scale)) * blend);
+        } else {
+          b.group.position.copy(to.position);
+          scale = to.scale;
+        }
+      }
+      b.group.scale.setScalar(scale);
+      if (b.ring) {
+        b.material.uniforms.ringRadii.value.set(SATURN_RINGS.inner, SATURN_RINGS.outer).multiplyScalar(b.radius * scale);
+        b.ring.material.uniforms.planetRadius.value = b.radius * scale;
+      }
+      if (b.kind !== "sun") {
+        b.material.uniforms.center.value.copy(b.group.position);
+        if (b.halo) b.halo.material.uniforms.center.value.copy(b.group.position);
+        if (b.ring) b.ring.material.uniforms.center.value.copy(b.group.position);
+      }
+    }
+    // How much of the overview is on screen (1 = all of it), for orbit lines and the ecliptic.
+    const fromOverview = from ? (from.kind === "overview" ? 1 : from.kind === "snapshot" ? from.share : 0) : toSky ? 0 : 1;
+    overviewShare = pov ? fromOverview * (1 - blend) + (toSky ? 0 : 1) * blend : 1;
+    // The glow round the body you stand on would fill the whole sky once the
+    // camera is inside it, so fade it out as the camera gets close.
+    for (const b of bodies.values()) {
+      if (!b.halo) continue;
+      let k = 1;
+      if (grounds.has(b.id)) {
+        const r = b.radius * b.group.scale.x * b.halo.userData.scale;
+        const d = camera.position.distanceTo(b.group.position);
+        k = Math.min(1, Math.max(0, (d - r) / (r * 0.15)));
+      }
+      b.halo.material.uniforms.strength.value = b.halo.userData.strength * k;
+      b.halo.visible = k > 0.001;
+    }
+
+    // Orbit lines belong to the overview; they fade out in the view from a body.
+    for (const b of bodies.values()) {
+      if (!b.orbit) continue;
+      const u = b.orbit.material.uniforms.opacity;
+      if (b.kind === "planet") u.value = 0.5 * overviewShare;
+      else u.value *= overviewShare * overviewShare;
+      b.orbit.visible &&= u.value > 0.01;
+    }
+
     const mp = markers.geometry.attributes.position;
-    planetsOnly.forEach((b, i) => mp.setXYZ(i, b.group.position.x, b.group.position.y, b.group.position.z));
-    mp.needsUpdate = true;
+    const mr = markers.geometry.attributes.radius;
+    const ma = markers.geometry.attributes.alpha;
+    planetsOnly.forEach((b, i) => {
+      mp.setXYZ(i, b.group.position.x, b.group.position.y, b.group.position.z);
+      mr.setX(i, b.radius * b.group.scale.x);
+      ma.setX(i, toSky && b.id === pov.id ? 0 : 0.9);
+    });
+    mp.needsUpdate = mr.needsUpdate = ma.needsUpdate = true;
     markerMat.uniforms.viewHeight.value = viewHeight;
+  }
+
+  let ground = null;
+  /**
+   * The body you stand on: swaps in the fine sphere, and moves it (with its
+   * clouds, glow and rings) onto layer 1, which is drawn in its own pass so its
+   * close-up depth doesn't fight with the far-off sky. null puts things back.
+   */
+  function setGround(id, alsoFine = null) {
+    for (const part of ground?.parts ?? []) {
+      part.mesh.geometry = part.geometry;
+      part.mesh.layers.set(0);
+    }
+    if (ground?.ring) ground.ring.layers.set(0);
+    ground = null;
+    const b = id && bodies.get(id);
+    if (!b) return;
+    const parts = [b.mesh, b.clouds, b.halo].filter(Boolean).map((mesh) => ({ mesh, geometry: mesh.geometry }));
+    for (const part of parts) {
+      part.mesh.geometry = groundSphere;
+      part.mesh.layers.set(1);
+    }
+    if (b.ring) b.ring.layers.set(1);
+    // While hopping away, the body we're leaving keeps its fine sphere too.
+    const old = alsoFine && bodies.get(alsoFine);
+    for (const mesh of old ? [old.mesh, old.clouds, old.halo].filter(Boolean) : []) {
+      parts.push({ mesh, geometry: mesh.geometry });
+      mesh.geometry = groundSphere;
+    }
+    ground = { id, parts, ring: b.ring };
   }
 
   /** Puts a freshly painted surface on its body. `images` holds ImageData. */
   function applySurface(job, images) {
+    const swap = (uniform, image) => {
+      uniform.value?.dispose(); // free the old one's GPU memory
+      uniform.value = texture(image);
+    };
     if (job === "clouds") {
       const earth = bodies.get("earth");
-      earth.clouds.material.uniforms.map.value = texture(images.map);
+      swap(earth.clouds.material.uniforms.map, images.map);
       earth.clouds.visible = true;
       return;
     }
     const b = bodies.get(job);
-    b.material.uniforms.map.value = texture(images.map);
+    swap(b.material.uniforms.map, images.map);
     b.material.uniforms.hasMap.value = 1;
     if (images.extra) {
-      b.material.uniforms.extraMap.value = texture(images.extra);
+      swap(b.material.uniforms.extraMap, images.extra);
       b.material.uniforms.hasExtra.value = 1;
     }
   }
 
-  return { bodies, update, applySurface, fitGlow, orbitGroup, markers };
+  return {
+    bodies,
+    update,
+    applySurface,
+    fitGlow,
+    setGround,
+    snapshot,
+    orbitGroup,
+    markers,
+    real,
+    overviews,
+    skyAnchor,
+    get overviewShare() {
+      return overviewShare;
+    },
+  };
 }

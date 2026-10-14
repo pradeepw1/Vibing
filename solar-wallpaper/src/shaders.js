@@ -1,6 +1,7 @@
 // GLSL for everything that isn't a stock three.js material.
-// Lighting is done by hand: the Sun sits at the origin, so the light direction
-// at any point is just "towards the origin".
+// Lighting is done by hand. Each body gets `sunDir`, the real direction from
+// it to the Sun, rather than working it out from where the body is drawn: in
+// the view from a planet, bodies are drawn somewhere else than where they are.
 
 const worldVertex = /* glsl */ `
   varying vec3 vWorldPos;
@@ -11,7 +12,8 @@ const worldVertex = /* glsl */ `
     vec4 wp = modelMatrix * vec4(position, 1.0);
     vWorldPos = wp.xyz;
     vNormal = normalize(mat3(modelMatrix) * normal);
-    gl_Position = projectionMatrix * viewMatrix * wp;
+    // modelViewMatrix is built on the CPU in double precision, so close-ups don't shimmer.
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
@@ -28,6 +30,9 @@ export const planet = {
     uniform sampler2D map;
     uniform vec3 baseColor;
     uniform float hasMap;
+    uniform vec3 sunDir;         // real direction to the Sun
+    uniform float sunlight;      // how much of the Sun isn't hidden by a planet (eclipses)
+    uniform vec3 eclipseTint;
     uniform float ambient;
     uniform float wrap;          // softens the day/night line (thick atmospheres)
     uniform vec4 atmosphere;     // rim colour + strength
@@ -48,7 +53,7 @@ export const planet = {
 
     void main() {
       vec3 N = normalize(vNormal);
-      vec3 L = normalize(-vWorldPos);
+      vec3 L = sunDir;
       vec3 V = normalize(cameraPosition - vWorldPos);
       float ndl = dot(N, L);
       float diffuse = clamp((ndl + wrap) / (1.0 + wrap), 0.0, 1.0);
@@ -66,7 +71,8 @@ export const planet = {
       }
 
       vec3 albedo = hasMap > 0.5 ? texture2D(map, vUv).rgb : baseColor;
-      vec3 col = albedo * (diffuse + ambient);
+      vec3 col = albedo * (diffuse * sunlight + ambient);
+      col += albedo * eclipseTint * (1.0 - sunlight) * smoothstep(-0.1, 0.3, ndl);
 
       if (hasExtra > 0.5) {
         vec3 extra = texture2D(extraMap, vUv).rgb;
@@ -92,13 +98,14 @@ export const clouds = {
   vertexShader: worldVertex,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform vec3 sunDir;
     uniform float ambient;
     varying vec3 vWorldPos;
     varying vec3 vNormal;
     varying vec2 vUv;
     void main() {
       vec3 N = normalize(vNormal);
-      float ndl = dot(N, normalize(-vWorldPos));
+      float ndl = dot(N, sunDir);
       float c = texture2D(map, vUv).r;
       float light = clamp((ndl + 0.1) / 1.1, 0.0, 1.0);
       gl_FragColor = vec4(vec3(0.98) * (light + ambient), c * 0.92);
@@ -114,6 +121,7 @@ export const halo = {
   fragmentShader: /* glsl */ `
     uniform vec3 color;
     uniform vec3 center;
+    uniform vec3 sunDir;
     uniform float strength;
     uniform float edge;    // how far in the planet's edge sits, as a dot product
     varying vec3 vWorldPos;
@@ -122,7 +130,7 @@ export const halo = {
       vec3 N = normalize(vNormal);
       vec3 V = normalize(cameraPosition - vWorldPos);
       float g = clamp(-dot(N, V) / edge, 0.0, 1.0);
-      float sunny = smoothstep(-0.35, 0.6, dot(normalize(vWorldPos - center), normalize(-center)));
+      float sunny = smoothstep(-0.35, 0.6, dot(normalize(vWorldPos - center), sunDir));
       gl_FragColor = vec4(color * strength * g * g * sunny, 1.0);
       ${outputChunks}
     }
@@ -139,7 +147,7 @@ export const rings = {
       vLocal = position.xy;
       vec4 wp = modelMatrix * vec4(position, 1.0);
       vWorldPos = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `,
   fragmentShader: /* glsl */ `
@@ -148,6 +156,7 @@ export const rings = {
     uniform vec3 center;         // planet centre (world)
     uniform float planetRadius;  // world units
     uniform vec3 normal;         // ring plane normal (world)
+    uniform vec3 sunDir;
     uniform float ambient;
     varying vec3 vWorldPos;
     varying vec2 vLocal;
@@ -156,7 +165,7 @@ export const rings = {
       if (f < 0.0 || f > 1.0) discard;
       vec4 tex = texture2D(map, vec2(f, 0.5));
 
-      vec3 L = normalize(-vWorldPos);
+      vec3 L = sunDir;
       // In the planet's shadow?
       vec3 oc = vWorldPos - center;
       float b = dot(oc, L);
@@ -240,7 +249,7 @@ export const sun = {
       vec4 wp = modelMatrix * vec4(position, 1.0);
       vWorldPos = wp.xyz;
       vNormal = normalize(mat3(modelMatrix) * normal);
-      gl_Position = projectionMatrix * viewMatrix * wp;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `,
   fragmentShader: /* glsl */ `
@@ -302,6 +311,15 @@ export const belt = {
     uniform float orbitPower;
     uniform float pixelRatio;
     uniform float sizeScale;
+    // Changing view blends from one layout to another (each the overview, or the
+    // sky seen from some body): the "from" one to the "to" one, by povBlend.
+    uniform float povBlend;
+    uniform float toSky;         // 1: the target is the sky seen from a body
+    uniform vec3 observerReal;   // that body's real position (AU, scene axes)
+    uniform vec3 observerShown;  // where its sky is centred
+    uniform float fromSky;       // 1: the start is the sky seen from a body
+    uniform vec3 fromReal;
+    uniform vec3 fromShown;
     attribute vec3 shape;        // a (AU), e, inclination
     attribute vec4 angles;       // node, perihelion, mean anomaly at J2000, mean motion (rad/day)
     attribute float bright;
@@ -320,7 +338,24 @@ export const belt = {
       float y1 = xv * sw + yv * cw;
       vec3 ecl = vec3(x1 * cn - y1 * ci * sn, x1 * sn + y1 * ci * cn, y1 * si);
       float r = length(ecl);
-      vec3 p = vec3(ecl.x, ecl.z, -ecl.y) * (orbitScale * pow(r, orbitPower) / r);
+      vec3 real = vec3(ecl.x, ecl.z, -ecl.y);
+      vec3 p = real * (orbitScale * pow(r, orbitPower) / r);
+      if (toSky > 0.5 || fromSky > 0.5) {
+        // Same layout as pov.js: real direction from the observer, distance 30 * (1 + sqrt(AU)).
+        vec3 a = p;
+        vec3 b = p;
+        if (fromSky > 0.5) {
+          vec3 rel = real - fromReal;
+          float d = length(rel);
+          a = fromShown + rel / d * 30.0 * (1.0 + sqrt(d));
+        }
+        if (toSky > 0.5) {
+          vec3 rel = real - observerReal;
+          float d = length(rel);
+          b = observerShown + rel / d * 30.0 * (1.0 + sqrt(d));
+        }
+        p = mix(a, b, povBlend);
+      }
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       gl_Position = projectionMatrix * mv;
       gl_PointSize = clamp(sizeScale / -mv.z, 1.0, 2.6) * pixelRatio;
@@ -355,12 +390,13 @@ export const stars = {
     }
   `,
   fragmentShader: /* glsl */ `
+    uniform float opacity;
     varying vec3 vTint;
     void main() {
       float d = length(gl_PointCoord - 0.5) * 2.0;
       if (d > 1.0) discard;
       float core = smoothstep(1.0, 0.0, d);
-      gl_FragColor = vec4(vTint * core * core, 1.0);
+      gl_FragColor = vec4(vTint * core * core * opacity, 1.0);
       ${outputChunks}
     }
   `,
