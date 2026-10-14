@@ -10,12 +10,13 @@
 // when the real ones do, as seen from somewhere on the observer. Eclipses,
 // transits and occultations then happen on their real dates and only then.
 //
-// Each close pair pulls or pushes its two bodies towards the stretched gap,
-// keeping the side one is on of the other, and small discs give way to big
-// ones (the Sun never moves). A body near several others (a planet near both
-// the Sun and the Moon) gets nudged by each in turn, a few rounds over, until
-// they all agree. Every pull fades in smoothly as two bodies near each other,
-// so nothing jumps.
+// Each close pair pushes its two bodies apart to the stretched gap (and pulls
+// together only discs that really touch), keeping the side one is on of the
+// other, and small discs give way to big ones (the Sun never moves). A body
+// near several others (a planet near both the Sun and the Moon) gets nudged
+// by each in turn, a few rounds over, until they all agree; a last pass makes
+// sure nothing is left touching that doesn't really. Every push fades in
+// smoothly as two bodies near each other, so nothing jumps.
 //
 // Moons of other planets are spread out from their planet, so they cross its
 // disc exactly when they really do. Depth only decides what covers what:
@@ -29,6 +30,7 @@ const BIG = 8 * DEG; // discs grow less as they near this size, and ones already
 const WARP_REACH = 12 * DEG; // stretching near a disc fades out by this far from it
 const ROUNDS = 8; // times every close pair gets nudged
 const SIDE = 0.1; // how strongly a body is drawn round to its real side of another, each round
+const PULL = 1; // pairs stop pulling together once their target gap is this much (times touching) wider than touching
 const MAX_DEPTH = 700; // nearer than the star and Milky Way shells round the camera (850-1000)
 
 const RADIUS_KM = new Map([[SUN.id, SUN.radiusKm], ...PLANETS.map((p) => [p.id, p.radiusKm]), ...MOONS.map((m) => [m.id, m.radiusKm])]);
@@ -158,6 +160,8 @@ export function skyLayout(observerId, real, anchor, out = new Map()) {
         pair.shareC = 0;
         pair.shareR = 1;
         pair.clearOnly = false;
+        pair.pull = 1;
+        pair.touchShown = 0;
         pairs.push(pair);
         continue;
       }
@@ -165,12 +169,17 @@ export function skyLayout(observerId, real, anchor, out = new Map()) {
       const far = reach(touch + parallax, touchShown);
       if (realSep >= far) continue;
       pair.target = stretch(realSep, touch, parallax, touchShown, far);
-      // A pair pulls hardest when its discs are near touching, and lets go
+      pair.touchShown = touchShown;
+      // A pair works hardest when its discs are near touching, and lets go
       // smoothly as they get farther apart: then nothing jumps, and a pair
       // that's about to touch wins over one that isn't.
       const spare = (pair.target - touchShown) / touchShown;
       const weight = (1 - smoothstep((realSep - 0.6 * far) / (0.4 * far))) * (1 - smoothstep((spare - 1) / 2));
       pair.weight = 1 - Math.pow(1 - weight, 1 / ROUNDS); // per round, so the rounds add up to `weight`
+      // Only discs that really touch (or nearly) pull each other in. Pulling
+      // together two that don't can drag one round to the wrong side of a
+      // third, or onto it.
+      pair.pull = 1 - smoothstep(spare / PULL);
       pair.order = c.id === SUN.id ? 2 : 1; // the Sun's pairs go last, so its eclipses come out right
       const give = c.give + r.give;
       pair.shareC = c.give / give;
@@ -192,6 +201,9 @@ export function skyLayout(observerId, real, anchor, out = new Map()) {
   pairs.sort((a, b) => a.order - b.order); // stable, so the order is the same frame to frame
 
   for (let round = 0; round < ROUNDS; round++) for (const pair of pairs) nudge(pair);
+  // Last, make sure no two discs touch that don't really: push any such pair
+  // just clear of each other.
+  for (const pair of pairs) if (pair.touchShown && pair.target >= pair.touchShown) clear(pair);
 
   // Depth: nearer is nearer, at least skyDistance() away. Where a disc
   // overlaps (or nearly) one that's nearer, it's pushed back far enough that
@@ -238,21 +250,45 @@ const _carry = new Quaternion();
 
 /**
  * Moves a pair towards its stretched gap: `r` should sit `target` from `c`.
- * The gap is put right in full (times the pair's weight). The side `r` is
- * on is only leaned towards its real side (carried along with wherever `c`
- * has been moved to), so a body near several others can slide round to
- * where all the gaps work out. A `clearOnly` pair is only ever pushed apart.
+ * The gap is put right in full (times the pair's weight; pulling together
+ * only for discs that really touch). The side `r` is on is only leaned
+ * towards its real side (carried along with wherever `c` has been moved
+ * to), so a body near several others can slide round to where all the gaps
+ * work out; but the closer `r` is drawn to `c`, the more the real side
+ * decides, so a body pushed out from near the middle of a disc doesn't
+ * flip about. A `clearOnly` pair is only ever pushed apart.
  */
 function nudge(pair) {
   const { c, r } = pair;
-  if (pair.clearOnly && c.dir.angleTo(r.dir) >= pair.target) return;
+  const gap = c.dir.angleTo(r.dir);
+  let weight;
+  if (gap < pair.target) weight = pair.clearOnly ? 1 : pair.weight;
+  else {
+    if (pair.clearOnly) return;
+    weight = pair.weight * pair.pull;
+    if (weight <= 0) return;
+  }
+  move(pair, pair.target, gap, pair.clearOnly ? 0 : SIDE, weight);
+}
+
+/** Pushes a pair of discs that don't really touch just clear of each other, if they're drawn touching. */
+function clear(pair) {
+  const goal = Math.min(pair.target, pair.touchShown * 1.02);
+  const gap = pair.c.dir.angleTo(pair.r.dir);
+  if (gap < goal) move(pair, goal, gap, pair.clearOnly ? 0 : SIDE, 1);
+}
+
+/** Moves r (and c, by their shares) so r sits `goal` from c, `weight` of the way. */
+function move(pair, goal, gap, lean, weight) {
+  const { c, r } = pair;
   _side.copy(r.realDir).addScaledVector(c.realDir, -c.realDir.dot(r.realDir));
   _side.applyQuaternion(_carry.setFromUnitVectors(c.realDir, c.dir)).normalize();
   _toward.copy(r.dir).addScaledVector(c.dir, -c.dir.dot(r.dir));
+  lean = Math.max(lean, 1 - smoothstep((2 * gap) / Math.max(goal, 1e-9)));
   if (_toward.lengthSq() < 1e-20) _toward.copy(_side);
-  else if (!pair.clearOnly) _toward.normalize().lerp(_side, SIDE);
-  turn(c.dir, _toward.add(c.dir), pair.target, _want);
-  _move.subVectors(_want, r.dir).multiplyScalar(pair.clearOnly ? 1 : pair.weight);
+  else _toward.normalize().lerp(_side, lean);
+  turn(c.dir, _toward.add(c.dir), goal, _want);
+  _move.subVectors(_want, r.dir).multiplyScalar(weight);
   if (pair.shareR) shift(r, pair.shareR);
   if (pair.shareC) shift(c, -pair.shareC);
 }
