@@ -273,6 +273,8 @@ function inDisc(place, sight) {
 export function createLocalGroup(canvas, pixelRatio) {
   const scene = new Scene();
   const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 1e6);
+  const basis = galacticBasis();
+  camera.up.copy(basis.north); // the controls turn round whatever is up when they're made
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
@@ -293,7 +295,6 @@ export function createLocalGroup(canvas, pixelRatio) {
   });
 
   // Every place you can go: the galaxies, and home.
-  const basis = galacticBasis();
   const centre = basis.center.clone().multiplyScalar(SUN_FROM_CENTRE);
   const places = new Map();
   places.set("milkyway", { id: "milkyway", name: "Milky Way", sub: "Home", position: centre, radius: MILKY_WAY.radius, up: basis.north });

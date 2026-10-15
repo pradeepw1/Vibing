@@ -137,6 +137,7 @@ function jumpToNow() {
 
 /** Leave a galaxy or the view from a body, back to whatever you were looking at before. */
 function goBack() {
+  if (away.stage === "returning" || away.stage === "unturning") return; // on the way back already
   // Only saved if the view we're leaving was (not one reached by a click).
   const remember = savedView === settings.view;
   if (galaxyOf(settings.view)) set("view", away.home, { remember });
@@ -160,6 +161,7 @@ const ui = createUI({
   jumpToNow,
   goBack,
   backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
+  travelling: () => away.stage === "returning" || away.stage === "unturning",
 });
 
 // --- Camera: views, smooth flights and following a planet ---
@@ -303,14 +305,38 @@ function arriveAmongGalaxies(instant) {
 /** Heads back to the solar system, to view `id`. */
 function comeHome(id, instant) {
   away.then = id;
-  if (away.stage === "leaving" || instant) {
+  if (instant) {
     finishHome();
     return;
   }
-  if (away.stage === "returning") return;
+  if (away.stage === "leaving") {
+    // Changed our mind while turning to go: turn back, then carry on from there.
+    away.stage = "unturning";
+    away.start = performance.now();
+    away.fromTurn.copy(camera.quaternion);
+    return;
+  }
+  if (away.stage === "returning" || away.stage === "unturning") return;
   away.stage = "returning";
   lg.flyTo("home");
 }
+
+/** Turning back after changing our mind: from where the turn got to, back to the usual view. */
+function unturnFrame(now) {
+  const t = Math.min(1, (now - away.start) / (TURN_MS * 0.7));
+  turnTo.copy(camera.quaternion); // where the usual camera move just put it
+  camera.quaternion.slerpQuaternions(away.fromTurn, turnTo, ease(t));
+  setFade(Math.min(fadeShown, 1 - t));
+  if (t < 1) return;
+  const id = away.then;
+  away.stage = null;
+  away.then = null;
+  povCam.state.enabled = Boolean(pov.id) && !pov.leaving;
+  controls.enabled = !pov.id && !flight;
+  if (id && id !== away.home) flyTo(id, false);
+  ui.sync();
+}
+const turnTo = new Quaternion();
 
 function finishHome() {
   const id = away.then ?? away.home;
@@ -324,6 +350,7 @@ function finishHome() {
   // Whatever flyTo didn't take over, give back.
   povCam.state.enabled = Boolean(pov.id) && !pov.leaving;
   controls.enabled = !pov.id && !flight;
+  ui.sync();
 }
 
 /** Brings any camera move in the solar system straight to its end. */
@@ -648,7 +675,7 @@ let turnRate = 0;
 let wasSteady = false;
 function fadeStarsWhenSpinning(dt) {
   // Only time turning the view counts: not a camera jump, and not you looking around.
-  const steady = Boolean(pov.id && !tween) && performance.now() - povCam.state.lastInput > 400 && !povCam.state.dragging;
+  const steady = Boolean(pov.id && !tween && !away.stage) && performance.now() - povCam.state.lastInput > 400 && !povCam.state.dragging;
   if (!steady || !wasSteady || dt <= 0) {
     turnRate = 0;
     sky.setStarFade(1);
@@ -913,7 +940,9 @@ function frame(now) {
   }
   updateSkyCentre();
   if (settle) settleSky(now, date, (now - startTime) / 1000);
-  if (away.stage === "leaving") leavingFrame(now); // after the camera's usual move, so the turn wins
+  // After the camera's usual move, so the turn wins.
+  if (away.stage === "leaving") leavingFrame(now);
+  else if (away.stage === "unturning") unturnFrame(now);
   fadeStarsWhenSpinning(dt);
   sky.group.position.copy(camera.position);
   sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
@@ -943,21 +972,25 @@ addEventListener("resize", () => {
 const LOOK_AT = VIEWS.filter((v) => !v.from);
 const LOOK_FROM = VIEWS.filter((v) => v.from);
 let livelyFrom = null;
+let livelyLookAt = null; // what Look from: Nothing goes back to
 window.livelyPropertyListener = (name, value) => {
   if (name === "back") return goBack();
   if (name === "from") {
     const view = typeof value === "number" ? LOOK_FROM[value - 1]?.id : value && value !== "none" ? `from-${value}` : null;
     livelyFrom = viewpoint(view) ? view : null;
     if (livelyFrom) set("view", livelyFrom);
-    else goBack();
+    // Nothing: off the body, back to the Look at view (a galaxy picked there stays put).
+    else if (viewpoint(settings.view)) set("view", livelyLookAt ?? lastLookView);
     return;
   }
   if (name === "view") {
     value = typeof value === "number" ? LOOK_AT[value]?.id : value;
     if (!value) return;
+    livelyLookAt = value;
     if (livelyFrom && viewpoint(settings.view)) {
-      // Look from is set and we're on a body: this is only where Back goes.
-      lastLookView = value;
+      // Look from is set and we're on a body: just remember it. (Back from a
+      // body goes to a solar system view, never a galaxy.)
+      if (!galaxyOf(value)) lastLookView = value;
       ui.sync();
       return;
     }

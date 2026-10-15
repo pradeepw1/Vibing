@@ -5,7 +5,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel }) {
+export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -85,7 +85,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     if (listed || from) viewSel.value = settings.view;
     // The way back shows even in wallpaper mode: a click may have brought you here.
     const galaxy = galaxyOf(settings.view);
-    pill.hidden = !(from || galaxy) || hiddenAll;
+    pill.hidden = !(from || galaxy) || hiddenAll || travelling(); // no second Back while already on the way
     if (from || galaxy) {
       pillName.textContent = galaxy ? VIEWS.find((v) => v.id === settings.view).label : fromName(from);
       $("#pov-back").title = `Back: ${backLabel()}`;
