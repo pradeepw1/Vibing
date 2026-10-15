@@ -11,14 +11,21 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   Group,
+  HalfFloatType,
+  MathUtils,
   Matrix4,
+  Mesh,
+  OrthographicCamera,
   PerspectiveCamera,
+  PlaneGeometry,
   Points,
   Quaternion,
   Ray,
   Scene,
   ShaderMaterial,
+  Vector2,
   Vector3,
+  WebGLRenderTarget,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GALAXIES, skyDirection } from "./galaxies.js";
@@ -31,6 +38,10 @@ const DEG = Math.PI / 180;
 export const KLY = { lmc: 161.7, smc: 203.7, sgr: 86, m31: 2495, m33: 2740, m32: 2485, m110: 2534 };
 const SUN_FROM_CENTRE = 26.7; // kly from the Milky Way's centre
 const BRIGHTNESS = 0.07; // how much light each star adds
+const EXPOSURE = 2.5; // the whole picture, before the brightest parts are rolled off
+const STAR_SIZE = 10; // the most a star is drawn across, in CSS pixels
+const GLOW_SIZE = 6; // the glow fades out past this: it's only there to fill in a galaxy seen from far off
+const ROLL_SPEED = Math.PI / 3; // the fastest a flight turns the picture round (60 degrees a second)
 // Going outwards, Andromeda's arms turn clockwise on our sky, Triangulum's anticlockwise.
 const WIND = { m31: -1, m33: 1 };
 
@@ -53,11 +64,12 @@ export const SHAPES = {
   // Dwarfs: half-lengths across, up, and along their long axis, which points
   // along our line of sight (the deep Small Magellanic Cloud), to galactic
   // north (the Sagittarius Dwarf, stretched out along its orbit), or along
-  // the long axis we see on the sky.
+  // the long axis we see on the sky. side: which way round to look at it
+  // from (see viewpointFor).
   // A cigar 44,000 light-years long, pointing within 20 degrees of us, its near end towards the north-east.
-  smc: { kind: "blob", stars: 30000, axes: [5.5, 5.5, 22], light: 0.6, long: "smc" },
+  smc: { kind: "blob", stars: 30000, axes: [5.5, 5.5, 22], light: 0.6, long: "smc", side: 45 },
   // Stretched along its orbit, nearly at right angles to the Milky Way.
-  sgr: { kind: "blob", stars: 8000, axes: [5.5, 4, 16.5], light: 0.3, long: "sgr" },
+  sgr: { kind: "blob", stars: 8000, axes: [5.5, 4, 16.5], light: 0.3, long: "sgr", side: -30 },
   m32: { kind: "blob", stars: 3000, axes: [2.3, 2.3, 3.1], light: 0.18, core: true },
   m110: { kind: "blob", stars: 5000, axes: [4, 4, 8], light: 0.15 },
 };
@@ -80,7 +92,8 @@ const MILKY_WAY = {
 const gauss = (rand) => Math.sqrt(-2 * Math.log(rand() + 1e-12)) * Math.cos(2 * Math.PI * rand());
 
 function cloud(count) {
-  return { pos: new Float32Array(count * 3), color: new Float32Array(count * 3), size: new Float32Array(count), n: 0 };
+  // glowFrom: where the soft glow starts, after the stars (drawn its own way).
+  return { pos: new Float32Array(count * 3), color: new Float32Array(count * 3), size: new Float32Array(count), n: 0, glowFrom: null };
 }
 function put(c, x, y, z, color, size, light) {
   const i = c.n++;
@@ -160,6 +173,7 @@ function spiral(s, seed) {
     put(c, r * Math.cos(th), height, r * Math.sin(th), color, size, shine);
   }
   // A soft glow under it all: the light of stars too faint and many to show one by one.
+  c.glowFrom = c.n;
   const glow = c.pos.length / 3 - c.n;
   for (let i = 0; i < glow; i++) {
     const bulge = rand() < 0.3;
@@ -218,12 +232,19 @@ function blob(s, seed) {
   return c;
 }
 
-function pointsOf(c, material) {
+/** materials: [stars, glow]. */
+function pointsOf(c, [material, glowMaterial]) {
   const geo = new BufferGeometry();
   geo.setAttribute("position", new Float32BufferAttribute(c.pos.subarray(0, c.n * 3), 3));
   geo.setAttribute("tint", new Float32BufferAttribute(c.color.subarray(0, c.n * 3), 3));
   geo.setAttribute("size", new Float32BufferAttribute(c.size.subarray(0, c.n), 1));
-  const p = new Points(geo, material);
+  let use = material;
+  if (c.glowFrom !== null) {
+    geo.addGroup(0, c.glowFrom, 0);
+    geo.addGroup(c.glowFrom, c.n - c.glowFrom, 1);
+    use = [material, glowMaterial];
+  }
+  const p = new Points(geo, use);
   p.frustumCulled = false;
   return p;
 }
@@ -285,14 +306,7 @@ export function createLocalGroup(canvas, pixelRatio) {
   controls.enabled = false;
   controls.maxDistance = 9000;
 
-  const material = new ShaderMaterial({
-    ...shaders.galaxyStars,
-    uniforms: { pixelRatio: { value: pixelRatio }, viewHeight: { value: innerHeight }, opacity: { value: 1 } },
-    blending: AdditiveBlending,
-    depthTest: false,
-    depthWrite: false,
-    transparent: true,
-  });
+  const materials = starMaterials(pixelRatio);
 
   // Every place you can go: the galaxies, and home.
   const centre = basis.center.clone().multiplyScalar(SUN_FROM_CENTRE);
@@ -321,7 +335,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     if (built) return;
     built = true;
     // The Milky Way: x out from the centre towards the Sun, y to galactic north, z the way the Sun goes round.
-    const mw = pointsOf(spiral(MILKY_WAY, 101), material);
+    const mw = pointsOf(spiral(MILKY_WAY, 101), materials);
     mw.position.copy(centre);
     mw.quaternion.setFromRotationMatrix(new Matrix4().makeBasis(basis.center.clone().negate(), basis.north, basis.east));
     scene.add(mw);
@@ -338,7 +352,7 @@ export function createLocalGroup(canvas, pixelRatio) {
         s.bar = { ...s.bar, angle: Math.atan2(p.z, p.x) };
       }
       const c = s.kind === "spiral" ? spiral(s, seed++) : s.kind === "cloud" ? barredCloud(s, seed++) : blob(s, seed++);
-      const p = pointsOf(c, material);
+      const p = pointsOf(c, materials);
       p.position.copy(place.position);
       if (s.kind === "blob") {
         const { north, east } = skyAxes(place.dir);
@@ -377,7 +391,15 @@ export function createLocalGroup(canvas, pixelRatio) {
     if (place.id === "milkyway" || place.id === "sun") return { target: centre, position: new Vector3(), up: basis.north };
     const away = place.dir.clone();
     let up = new Vector3(0, 1, 0).applyMatrix4(new Matrix4().extractRotation(place.frame));
-    if (Math.abs(up.dot(away)) > 0.95) up = basis.north.clone().addScaledVector(away, -basis.north.dot(away)).normalize(); // no disc to look down on
+    if (Math.abs(up.dot(away)) > 0.95) {
+      // No disc to look down on: go up towards galactic north, turned to one
+      // side (by `side` degrees) for a good view, and so the way there never
+      // looks straight along north (where the camera can't tell which way up
+      // to be).
+      const north = basis.north.clone().addScaledVector(away, -basis.north.dot(away)).normalize();
+      const side = (SHAPES[place.id]?.side ?? 0) * DEG;
+      up = north.multiplyScalar(Math.cos(side)).addScaledVector(new Vector3().crossVectors(away, north), Math.sin(side));
+    }
     if (up.dot(away) < 0) up.negate();
     const from = away.multiplyScalar(0.75).addScaledVector(up, 0.5).normalize();
     const distance = Math.max(8, place.radius * 2.2);
@@ -409,7 +431,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const d0 = Math.max(startOffset.length(), 1e-3);
     const d1 = end.position.clone().sub(end.target).length();
     flight = {
-      start: performance.now(),
+      start: null, // set on the first frame, so time spent getting ready isn't skipped
       duration: 3200 + 600 * Math.min(4, Math.abs(Math.log(d0 / Math.max(d1, 1)))),
       end,
       fromDir: startOffset.divideScalar(d0),
@@ -417,8 +439,46 @@ export function createLocalGroup(canvas, pixelRatio) {
       d0,
       d1: Math.max(d1, 1e-3),
       fromQuat: camera.quaternion.clone(),
+      up: new Vector3(0, 1, 0).applyQuaternion(camera.quaternion), // carried along frame to frame
+      e: 0,
+      last: null,
+      avoid: leaving(place, end),
       home: id === "home",
     };
+  }
+
+  /**
+   * The galaxy we're setting off from, if the way to the next place would
+   * go through it: we start on its far side, so heading off straight
+   * would. Returns which way to go over it.
+   */
+  function leaving(place, end) {
+    // The one we're nearest to (for its size).
+    let from = null;
+    let nearest = 3; // in its radii: any further and it's nowhere near
+    for (const p of places.values()) {
+      if (p === place || p.small || p.unpickable) continue;
+      const far = camera.position.distanceTo(p.position) / p.radius;
+      if (far < 1 || far > nearest) continue; // inside it (home): just go
+      if (end.position.distanceTo(p.position) < p.radius * 1.3) continue; // going somewhere in or by it
+      [from, nearest] = [p, far];
+    }
+    if (!from) return null;
+    const rel = camera.position.clone().sub(from.position);
+    const ahead = end.position.clone().sub(from.position).normalize();
+    const over = rel.addScaledVector(ahead, -rel.dot(ahead));
+    if (over.lengthSq() < 1e-9) return null;
+    const avoid = { centre: from.position, over: over.normalize(), radius: from.radius };
+    return lift(avoid, camera.position) > 0 ? null : avoid; // already right by it: just go
+  }
+  const rel = new Vector3();
+  /** How far to raise a point on the way to keep it clear of the galaxy we're leaving. */
+  function lift({ centre, over, radius }, at) {
+    rel.subVectors(at, centre);
+    const height = rel.dot(over);
+    const across = rel.addScaledVector(over, -height).length();
+    const near = 1 - MathUtils.smoothstep(across, radius * 1.3, radius * 2.5);
+    return Math.max(0, radius * 1.2 * near - height);
   }
 
   function finish(end) {
@@ -430,9 +490,13 @@ export function createLocalGroup(canvas, pixelRatio) {
   }
 
   const dir = new Vector3();
+  const forward = new Vector3();
+  const up = new Vector3();
+  const want = new Vector3();
+  const cross = new Vector3();
   /** Moves the camera. Returns how far along a flight is (1 when there's none). */
   function update(now, drift) {
-    material.uniforms.viewHeight.value = innerHeight;
+    materials[0].uniforms.viewHeight.value = innerHeight;
     if (far) {
       far.position.copy(camera.position);
       far.children[0].material.uniforms.viewHeight.value = innerHeight;
@@ -443,14 +507,39 @@ export function createLocalGroup(canvas, pixelRatio) {
       return 1;
     }
     const f = flight;
+    f.start ??= now;
+    f.last ??= now;
     const t = Math.min(1, (now - f.start) / f.duration);
     const e = ease(t);
     q.setFromUnitVectors(f.fromDir, f.toDir);
     dir.copy(f.fromDir).applyQuaternion(new Quaternion().slerp(q, e));
     const d = Math.exp(Math.log(f.d0) + (Math.log(f.d1) - Math.log(f.d0)) * e);
     camera.position.copy(f.end.target).addScaledVector(dir, d);
+    // Over the galaxy we're leaving, not through it (all gone by the end).
+    if (f.avoid) camera.position.addScaledVector(f.avoid.over, lift(f.avoid, camera.position) * (1 - MathUtils.smoothstep(e, 0.85, 1)));
     camera.up.copy(f.end.up);
-    look.lookAt(camera.position, f.end.target, f.end.up);
+
+    // Which way is up: the end's up (galactic north), as near as we can.
+    // Looking almost straight along it, that's no help (it swings right round
+    // as we pass), so there up is carried on from the last frame instead,
+    // and turned back gently after (all of it by the end).
+    forward.subVectors(f.end.target, camera.position).normalize();
+    up.copy(f.up).addScaledVector(forward, -forward.dot(f.up));
+    if (up.lengthSq() < 1e-12) up.copy(f.end.up).addScaledVector(forward, -forward.dot(f.end.up));
+    up.normalize();
+    want.copy(f.end.up).addScaledVector(forward, -forward.dot(f.end.up));
+    const clear = want.length();
+    if (clear > 1e-6) {
+      want.divideScalar(clear);
+      const angle = Math.atan2(cross.crossVectors(up, want).dot(forward), up.dot(want));
+      const most = ROLL_SPEED * (Math.max(0, now - f.last) / 1000) * MathUtils.smoothstep(clear, 0.05, 0.3);
+      const share = t >= 1 ? 1 : Math.max(Math.min(1, most / Math.max(Math.abs(angle), 1e-9)), Math.max(0, e - f.e) / (1 - f.e));
+      up.applyAxisAngle(forward, angle * Math.min(1, share));
+    }
+    f.up.copy(up);
+    f.e = e;
+    f.last = now;
+    look.lookAt(camera.position, f.end.target, up);
     camera.quaternion.slerpQuaternions(f.fromQuat, q.setFromRotationMatrix(look), Math.min(1, e * 3));
     if (t >= 1) {
       if (f.home) flight = null;
@@ -478,6 +567,30 @@ export function createLocalGroup(canvas, pixelRatio) {
     return best;
   }
 
+  // Drawing: every star's light is added up first (in a buffer that can go
+  // past white), then the bright parts are rolled off once, like a photo.
+  // Rolled off star by star, the faint ones would round down to nothing.
+  const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
+  const screen = new Scene();
+  const flat = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const show = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({ ...shaders.rollOff, uniforms: { map: { value: target.texture }, exposure: { value: EXPOSURE } }, depthTest: false, depthWrite: false, toneMapped: false }));
+  show.frustumCulled = false;
+  screen.add(show);
+  const bufferSize = new Vector2();
+  function render(renderer) {
+    // Some older graphics chips can't draw into a buffer like that: then straight to the screen.
+    if (!renderer.extensions.has("EXT_color_buffer_float") && !renderer.extensions.has("EXT_color_buffer_half_float")) {
+      renderer.render(scene, camera);
+      return;
+    }
+    renderer.getDrawingBufferSize(bufferSize);
+    if (target.width !== bufferSize.x || target.height !== bufferSize.y) target.setSize(bufferSize.x, bufferSize.y);
+    renderer.setRenderTarget(target);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(screen, flat);
+  }
+
   return {
     scene,
     camera,
@@ -486,12 +599,17 @@ export function createLocalGroup(canvas, pixelRatio) {
     flyTo,
     update,
     pick,
+    render,
+    /** Back home: let go of the drawing buffer until next time. */
+    release() {
+      target.dispose();
+    },
     get flying() {
       return Boolean(flight);
     },
     /** Fades every star (0..1), for the dip between scenes. */
     setOpacity(v) {
-      material.uniforms.opacity.value = v;
+      materials[0].uniforms.opacity.value = v;
     },
     resize() {
       camera.aspect = innerWidth / innerHeight;
@@ -511,15 +629,27 @@ function background(pixelRatio) {
     const tint = rand() < 0.5 ? OLD : YOUNG;
     put(c, r * Math.cos(th), z * 60000, r * Math.sin(th), tint, 60 + rand() * 160, 0.2 + rand() * 0.5);
   }
-  const material = new ShaderMaterial({
-    ...shaders.galaxyStars,
-    uniforms: { pixelRatio: { value: pixelRatio }, viewHeight: { value: innerHeight }, opacity: { value: 1 } },
-    blending: AdditiveBlending,
-    depthTest: false,
-    depthWrite: false,
-    transparent: true,
-  });
   const g = new Group();
-  g.add(pointsOf(c, material));
+  g.add(pointsOf(c, starMaterials(pixelRatio)));
   return g;
+}
+
+/**
+ * Stars, and the soft glow under a spiral's disc. Close up, both are drawn
+ * no bigger than a few pixels: a star as a sharp point, and the glow (only
+ * there to fill in a disc seen from afar) fades away.
+ */
+function starMaterials(pixelRatio) {
+  const uniforms = { pixelRatio: { value: pixelRatio }, viewHeight: { value: innerHeight }, opacity: { value: 1 } };
+  const make = (maxSize, glow) =>
+    new ShaderMaterial({
+      ...shaders.galaxyStars,
+      uniforms: { ...uniforms, maxSize: { value: maxSize } }, // the rest shared, so setting one sets both
+      defines: glow ? { GLOW: "" } : {},
+      blending: AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+    });
+  return [make(STAR_SIZE, false), make(GLOW_SIZE, true)];
 }

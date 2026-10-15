@@ -487,6 +487,7 @@ export const galaxyStars = {
   vertexShader: /* glsl */ `
     uniform float pixelRatio;
     uniform float viewHeight;
+    uniform float maxSize; // CSS pixels
     attribute float size;
     attribute vec3 tint;
     varying vec3 vTint;
@@ -496,10 +497,20 @@ export const galaxyStars = {
       gl_Position = projectionMatrix * mv;
       float dist = max(-mv.z, 1e-4);
       float px = size * projectionMatrix[1][1] * viewHeight * 0.5 / dist;
-      float shown = clamp(px, 1.0, 28.0);
-      vFade = min(1.0, (px * px) / (shown * shown));
-      vFade *= smoothstep(0.3, 2.5, dist); // stars right by the camera would be big blurs
-      if (mv.z > 0.0) vFade = 0.0;
+      float shown = clamp(px, 1.0, maxSize);
+      vFade = min(1.0, px * px); // smaller than a pixel: a pixel, dimmer to match
+      vFade *= smoothstep(0.3, 2.5, dist); // right by the camera
+      #ifdef GLOW
+        vFade *= 1.0 - smoothstep(maxSize, maxSize * 2.0, px);
+      #endif
+      if (mv.z > 0.0 || vFade < 0.002) {
+        // Nothing to see: off the screen, so it costs nothing to draw.
+        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        gl_PointSize = 1.0;
+        vFade = 0.0;
+        vTint = vec3(0.0);
+        return;
+      }
       vTint = tint;
       gl_PointSize = shown * pixelRatio;
     }
@@ -514,6 +525,38 @@ export const galaxyStars = {
       float a = 1.0 - d * d;
       gl_FragColor = vec4(vTint * a * a * vFade * opacity, 1.0);
       ${outputChunks}
+    }
+  `,
+};
+
+/**
+ * Shows the added-up light of the galaxies. The brightness is rolled off
+ * smoothly (no floor, so faint far-off stars still show), keeping each
+ * colour: a galaxy's middle stays golden instead of going flat white.
+ */
+export const rollOff = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D map;
+    uniform float exposure;
+    varying vec2 vUv;
+    void main() {
+      vec3 c = texture2D(map, vUv).rgb * exposure;
+      float light = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c *= (1.0 - exp(-light)) / max(light, 1e-6);
+      // Past white in one colour: hold the colour, and let a little white in, as film does.
+      float top = max(c.r, max(c.g, c.b));
+      if (top > 1.0) c = mix(c / top, vec3(1.0), min(1.0, (top - 1.0) * 0.5));
+      gl_FragColor = vec4(c, 1.0);
+      #include <colorspace_fragment>
+      // A touch of noise, so faint glows don't show bands.
+      gl_FragColor.rgb += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
     }
   `,
 };

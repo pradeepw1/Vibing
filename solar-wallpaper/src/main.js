@@ -1,5 +1,5 @@
 // Starts everything: the renderer, the scene, the clock and the camera.
-import { ACESFilmicToneMapping, MathUtils, Matrix4, NoToneMapping, PerspectiveCamera, Quaternion, Raycaster, Scene, Sphere, Vector2, Vector3, WebGLRenderer } from "three";
+import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Raycaster, Scene, Sphere, Vector2, Vector3, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as A from "astronomy-engine";
 import { createBelts } from "./belts.js";
@@ -295,7 +295,7 @@ function goToGalaxy(id, instant) {
 /** Switches the screen over to the galaxies, at the Sun's spot looking towards the galaxy. */
 function arriveAmongGalaxies(instant) {
   away.stage = "there";
-  away.arrived = instant ? -Infinity : performance.now();
+  away.arrived = instant ? -Infinity : Infinity; // the fade-in starts once the first picture is drawn
   ui.setAway(lg.places);
   const dir = lg.places.get(away.galaxy).dir;
   const start = { position: new Vector3(), quaternion: new Quaternion().setFromRotationMatrix(lookMatrix.lookAt(new Vector3(), dir, lg.places.get("milkyway").up)) };
@@ -345,6 +345,7 @@ function finishHome() {
   away.then = null;
   if (wasThere) away.arrived = performance.now();
   lg.controls.enabled = false;
+  lg.release();
   ui.setAway(null);
   flyTo(id, true);
   // Whatever flyTo didn't take over, give back.
@@ -390,10 +391,9 @@ function galaxyFrame(now) {
     }
   } else setFade(1 - (now - away.arrived) / DIP_MS);
   renderer.autoClear = true;
-  // Thousands of overlapping stars: let the brightest parts roll off gently, like a photo.
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.render(lg.scene, lg.camera);
-  renderer.toneMapping = NoToneMapping;
+  lg.render(renderer);
+  // Getting ready (making the stars, the first picture) is done in the dark.
+  if (away.arrived === Infinity) away.arrived = performance.now();
   ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, away.stage === "there" ? away.galaxy : null);
   return true;
 }
