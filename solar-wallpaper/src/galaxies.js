@@ -126,7 +126,7 @@ function patch(g, seed) {
     depthWrite: false,
   });
   const mesh = new Mesh(geo, material);
-  mesh.renderOrder = -1;
+  mesh.renderOrder = -0.5; // after the stars, so a star doesn't blot out the glow behind it
   mesh.frustumCulled = false;
   return { mesh, material, center };
 }

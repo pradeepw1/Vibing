@@ -220,7 +220,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   const placed = [];
   const toBody = new Ray();
   const hitGround = new Vector3();
-  function updateLabels(camera, width, height, standingOn = null, ground = null) {
+  function updateLabels(camera, width, height, standingOn = null, ground = null, skyFade = 1) {
     if (!settings.labels || hiddenAll) return;
     camera.getWorldDirection(camDir);
     const scale = (camera.projectionMatrix.elements[5] * height) / 2;
@@ -287,7 +287,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     // wherever the camera is.
     for (const l of galaxyLabels) {
       const { direction, distance } = l.galaxy;
-      let show = direction.dot(camDir) > 0.05;
+      // Not while the sky is faded out because the view is spinning.
+      let show = skyFade > 0.5 && direction.dot(camDir) > 0.05;
       if (show) {
         v.copy(camera.position).addScaledVector(direction, distance).project(camera);
         const px = ((v.x + 1) / 2) * width;

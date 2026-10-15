@@ -742,7 +742,7 @@ function frame(now) {
   const ground = pov.id && bodies.get(pov.id);
   // Label as seen from the ground only once we're down there (or on the way back up).
   const down = ground && (!tween || camera.position.distanceTo(ground.group.position) < 3 * ground.radius * ground.group.scale.x);
-  ui.updateLabels(camera, innerWidth, innerHeight, down ? pov.id : null, down && new Sphere(ground.group.position, ground.radius * ground.group.scale.x));
+  ui.updateLabels(camera, innerWidth, innerHeight, down ? pov.id : null, down && new Sphere(ground.group.position, ground.radius * ground.group.scale.x), sky.fade);
   updateHover(now);
 }
 

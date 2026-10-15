@@ -2,6 +2,7 @@
 // where the real ones sit in the sky. The stars themselves are made up, but
 // they crowd towards the galaxy's plane like real ones do.
 import {
+  AdditiveBlending,
   BackSide,
   LineBasicMaterial,
   LineLoop,
@@ -88,9 +89,11 @@ export function createSky(pixelRatio) {
   milky.renderOrder = -2;
   group.add(milky);
 
+  // Stars add their light to whatever glow is behind them rather than covering it.
   const starMat = new ShaderMaterial({
     ...shaders.stars,
     uniforms: { pixelRatio: { value: pixelRatio }, opacity: { value: 1 } },
+    blending: AdditiveBlending,
     depthWrite: false,
     transparent: true,
   });
@@ -118,9 +121,14 @@ export function createSky(pixelRatio) {
   ecliptic.visible = false;
   group.add(ecliptic);
 
+  let fade = 1;
   return {
     group,
     starMat,
+    /** How much the stars are showing (see setStarFade). */
+    get fade() {
+      return fade;
+    },
     /** The named galaxies, for labels. */
     galaxies: galaxies.named,
     /**
@@ -128,6 +136,7 @@ export function createSky(pixelRatio) {
      * against the stars that they'd only streak.
      */
     setStarFade(amount) {
+      fade = amount;
       starMat.uniforms.opacity.value = amount;
       milkyMat.opacity = amount;
       starPoints.visible = milky.visible = amount > 0.01; // not the ecliptic line: it doesn't streak

@@ -576,11 +576,6 @@ export function* paintMilkyWay(width = 1024) {
   const height = width / 2;
   const n = simplex(9001);
   const img = new ImageData(width, height);
-  const blobs = [
-    [280.5, -32.9, 3.5, 0.5], // Large Magellanic Cloud
-    [302.8, -44.3, 1.8, 0.35], // Small Magellanic Cloud
-    [121.2, -21.6, 0.8, 0.25], // Andromeda
-  ];
   for (let py = 0; py < height; py++) {
     const b = 90 - ((py + 0.5) / height) * 180;
     for (let px = 0; px < width; px++) {
@@ -594,10 +589,7 @@ export function* paintMilkyWay(width = 1024) {
       // The dark dust lane down the middle (the Great Rift).
       const lane = Math.exp(-(((b - 1.2 * fbm(n, x * 3, y * 3, z * 3 + 5, 4) * 3) / 2.2) ** 2));
       v *= 1 - 0.7 * lane * smooth(100, 20, Math.abs(l));
-      for (const [bl, bb, r, s] of blobs) {
-        const dl = ((((l + 360 - bl) % 360) + 540) % 360) - 180;
-        v += s * Math.exp(-((dl * Math.cos(b * DEG)) ** 2 + (b - bb) ** 2) / (r * r));
-      }
+      // (The Magellanic Clouds and Andromeda are drawn on their own: see galaxies.js.)
       const c = mix3([0.75, 0.82, 1.0], [1.0, 0.9, 0.78], toCenter);
       const k = clamp(v) * 0.28 * 255;
       const o = (py * width + px) * 4;
