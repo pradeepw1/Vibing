@@ -30,7 +30,12 @@
       "Saturn",
       "Uranus",
       "Neptune",
-      "Pluto"
+      "Pluto",
+      "Large Magellanic Cloud",
+      "Small Magellanic Cloud",
+      "Sagittarius Dwarf",
+      "Andromeda Galaxy",
+      "Triangulum Galaxy"
     ]
   },
   "from": {

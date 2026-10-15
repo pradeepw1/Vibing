@@ -479,6 +479,45 @@ export const galaxy = {
   `,
 };
 
+// Stars in the galaxies, out in the view among the galaxies (localgroup.js).
+// Each one is as big as its share of the galaxy, so a galaxy looks the same
+// brightness all over however far away it is; smaller than a pixel, it fades
+// by area instead of shrinking, which keeps far galaxies from vanishing.
+export const galaxyStars = {
+  vertexShader: /* glsl */ `
+    uniform float pixelRatio;
+    uniform float viewHeight;
+    attribute float size;
+    attribute vec3 tint;
+    varying vec3 vTint;
+    varying float vFade;
+    void main() {
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float dist = max(-mv.z, 1e-4);
+      float px = size * projectionMatrix[1][1] * viewHeight * 0.5 / dist;
+      float shown = clamp(px, 1.0, 28.0);
+      vFade = min(1.0, (px * px) / (shown * shown));
+      vFade *= smoothstep(0.3, 2.5, dist); // stars right by the camera would be big blurs
+      if (mv.z > 0.0) vFade = 0.0;
+      vTint = tint;
+      gl_PointSize = shown * pixelRatio;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float opacity;
+    varying vec3 vTint;
+    varying float vFade;
+    void main() {
+      float d = length(gl_PointCoord - 0.5) * 2.0;
+      if (d > 1.0) discard;
+      float a = 1.0 - d * d;
+      gl_FragColor = vec4(vTint * a * a * vFade * opacity, 1.0);
+      ${outputChunks}
+    }
+  `,
+};
+
 // Little dots that keep far-away planets visible when they're smaller than a pixel.
 export const markers = {
   vertexShader: /* glsl */ `

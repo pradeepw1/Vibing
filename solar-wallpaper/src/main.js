@@ -1,10 +1,11 @@
 // Starts everything: the renderer, the scene, the clock and the camera.
-import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Raycaster, Scene, Sphere, Vector2, Vector3, WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, MathUtils, Matrix4, NoToneMapping, PerspectiveCamera, Quaternion, Raycaster, Scene, Sphere, Vector2, Vector3, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as A from "astronomy-engine";
 import { createBelts } from "./belts.js";
 import { createPovCamera, povFov } from "./povcam.js";
-import { loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
+import { createLocalGroup } from "./localgroup.js";
+import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { createSystem, texture } from "./system.js";
 import { startPainting } from "./painter.js";
@@ -45,6 +46,7 @@ const system = createSystem(scene, pixelRatio);
 const belts = createBelts(pixelRatio);
 scene.add(...belts.parts);
 const { bodies } = system;
+const lg = createLocalGroup(renderer.domElement, pixelRatio); // out among the galaxies
 
 // --- The clock ---
 // `synced` means "showing right now": the clock just follows the computer's clock.
@@ -77,6 +79,21 @@ function tickClock(dt) {
 let savedView = settings.view;
 // The last "look at" view, which Back returns to.
 let lastLookView = viewpoint(settings.view) ? "middle" : settings.view;
+
+// --- Out among the galaxies ---
+// away.stage: null in the solar system; "leaving" while the camera turns to
+// face the galaxy and the screen dips to black; "there" in among the galaxies
+// (flying, or looking round); "returning" while flying home.
+const away = {
+  stage: null,
+  galaxy: null,
+  home: viewpoint(settings.view) || !galaxyOf(settings.view) ? settings.view : "middle", // the solar system view to come back to
+  then: null, // a different view asked for on the way home
+  start: 0,
+  arrived: -Infinity, // when we last switched between the solar system and the galaxies
+  fromTurn: new Quaternion(),
+  toTurn: new Quaternion(),
+};
 
 function store() {
   save({ ...settings, view: savedView });
@@ -118,13 +135,32 @@ function jumpToNow() {
   ui.sync();
 }
 
-/** Leave the view from a body, back to whatever you were looking at before. */
+/** Leave a galaxy or the view from a body, back to whatever you were looking at before. */
 function goBack() {
   // Only saved if the view we're leaving was (not one reached by a click).
-  if (viewpoint(settings.view)) set("view", lastLookView, { remember: savedView === settings.view });
+  const remember = savedView === settings.view;
+  if (galaxyOf(settings.view)) set("view", away.home, { remember });
+  else if (viewpoint(settings.view)) set("view", lastLookView, { remember });
 }
 
-const ui = createUI({ settings, bodies, galaxies: sky.galaxies, set, goLive, jumpToNow, goBack, backLabel: () => VIEWS.find((v) => v.id === lastLookView)?.label ?? "the overview" });
+/** What a view is called, for the Back button. */
+function labelOf(id) {
+  const listed = VIEWS.find((v) => v.id === id);
+  if (listed) return listed.label;
+  const body = bodies.get(viewpoint(id));
+  return body ? `From ${body.def.name}` : "the overview";
+}
+
+const ui = createUI({
+  settings,
+  bodies,
+  galaxies: sky.galaxies,
+  set,
+  goLive,
+  jumpToNow,
+  goBack,
+  backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
+});
 
 // --- Camera: views, smooth flights and following a planet ---
 function viewFor(id) {
@@ -196,6 +232,10 @@ function blocked(view, offset) {
 }
 
 function flyTo(id, instant = false) {
+  const galaxy = galaxyOf(id);
+  if (galaxy) return goToGalaxy(galaxy, instant);
+  if (away.stage) return comeHome(id, instant);
+  away.home = id; // where Back goes from a galaxy
   const from = viewpoint(id);
   if (from) return enterPov(from, instant);
   lastLookView = id;
@@ -220,6 +260,125 @@ function flyTo(id, instant = false) {
   };
   controls.enabled = false;
 }
+
+// --- Going out to the galaxies and back ---
+const TURN_MS = 1100;
+const DIP_MS = 400;
+
+function goToGalaxy(id, instant) {
+  if (away.stage === "there" || away.stage === "returning") {
+    // Already out here: fly across.
+    away.stage = "there";
+    away.galaxy = id;
+    away.then = null;
+    lg.flyTo(id, { instant });
+    return;
+  }
+  settleMoves();
+  away.galaxy = id;
+  controls.enabled = false;
+  povCam.state.enabled = false;
+  if (instant) {
+    arriveAmongGalaxies(true);
+    return;
+  }
+  // Turn to face it first.
+  away.stage = "leaving";
+  away.start = performance.now();
+  away.fromTurn.copy(camera.quaternion);
+  const dir = lg.places.get(id).dir;
+  away.toTurn.setFromRotationMatrix(lookMatrix.lookAt(camera.position, camera.position.clone().add(dir), camera.up));
+}
+
+/** Switches the screen over to the galaxies, at the Sun's spot looking towards the galaxy. */
+function arriveAmongGalaxies(instant) {
+  away.stage = "there";
+  away.arrived = instant ? -Infinity : performance.now();
+  ui.setAway(lg.places);
+  const dir = lg.places.get(away.galaxy).dir;
+  const start = { position: new Vector3(), quaternion: new Quaternion().setFromRotationMatrix(lookMatrix.lookAt(new Vector3(), dir, lg.places.get("milkyway").up)) };
+  lg.flyTo(away.galaxy, instant ? { instant: true } : { from: start });
+}
+
+/** Heads back to the solar system, to view `id`. */
+function comeHome(id, instant) {
+  away.then = id;
+  if (away.stage === "leaving" || instant) {
+    finishHome();
+    return;
+  }
+  if (away.stage === "returning") return;
+  away.stage = "returning";
+  lg.flyTo("home");
+}
+
+function finishHome() {
+  const id = away.then ?? away.home;
+  const wasThere = away.stage !== "leaving";
+  away.stage = null;
+  away.then = null;
+  if (wasThere) away.arrived = performance.now();
+  lg.controls.enabled = false;
+  ui.setAway(null);
+  flyTo(id, true);
+  // Whatever flyTo didn't take over, give back.
+  povCam.state.enabled = Boolean(pov.id) && !pov.leaving;
+  controls.enabled = !pov.id && !flight;
+}
+
+/** Brings any camera move in the solar system straight to its end. */
+function settleMoves() {
+  if (tween) {
+    if (tween.kind === "out") finishLeaving(tween.view, tween.offset);
+    else {
+      tween = null;
+      pov.from = null;
+      pov.blend = 1;
+      system.setGround(pov.id);
+    }
+  }
+  if (flight) {
+    controls.target.copy(focus.body.group.position);
+    camera.position.copy(controls.target).add(flight.toOffset);
+    flight = null;
+  }
+}
+
+/** Turning to leave: the solar system carries on while the camera turns to face the galaxy, then the screen dips to black. */
+function leavingFrame(now) {
+  const t = Math.min(1, (now - away.start) / TURN_MS);
+  camera.quaternion.slerpQuaternions(away.fromTurn, away.toTurn, ease(t));
+  setFade((now - away.start - TURN_MS) / DIP_MS);
+  if (now - away.start >= TURN_MS + DIP_MS) arriveAmongGalaxies(false);
+}
+
+/** One frame out among the galaxies. Returns false if that's just ended (home again). */
+function galaxyFrame(now) {
+  const t = lg.update(now, settings.drift && !reducedMotion);
+  if (away.stage === "returning") {
+    setFade((t - 0.8) / 0.2);
+    if (t >= 1) {
+      finishHome();
+      return false;
+    }
+  } else setFade(1 - (now - away.arrived) / DIP_MS);
+  renderer.autoClear = true;
+  // Thousands of overlapping stars: let the brightest parts roll off gently, like a photo.
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.render(lg.scene, lg.camera);
+  renderer.toneMapping = NoToneMapping;
+  ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, away.stage === "there" ? away.galaxy : null);
+  return true;
+}
+
+let fadeShown = 0;
+function setFade(v) {
+  v = Math.min(1, Math.max(0, v));
+  if (v === fadeShown) return;
+  fadeShown = v;
+  fadeEl.style.opacity = String(v);
+}
+const fadeEl = document.getElementById("fade");
 
 // --- The view from a body ---
 // pov.id is the body we stand on (or are leaving). A change of view blends
@@ -554,6 +713,15 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   const now = performance.now();
   if (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6 || now - press.t > 700) return;
   press = null;
+  if (away.stage) {
+    // Out among the galaxies: click one to fly to it, or the Milky Way to go home.
+    const place = away.stage === "there" && !lg.flying && now >= quietUntil ? lg.pick(e.clientX, e.clientY) : null;
+    if (!place) return;
+    quietUntil = now + 400;
+    if (place.id === "milkyway") goBack();
+    else if (place.id !== away.galaxy) set("view", `galaxy-${place.id}`, { remember: false });
+    return;
+  }
   if (tween || now < quietUntil) return; // mid-flight, clicks would land on things that are moving
   const hit = pick(e.clientX, e.clientY, e.pointerType === "touch" ? 22 : 9);
   if (!hit) return;
@@ -581,7 +749,14 @@ renderer.domElement.addEventListener("pointerleave", () => (resting = null));
 function updateHover(now) {
   if (now - hoverChecked < 200) return;
   hoverChecked = now;
-  const hit = resting && !tween && !document.body.classList.contains("idle") ? pick(resting.x, resting.y, 9) : null;
+  const awake = resting && !document.body.classList.contains("idle");
+  if (away.stage) {
+    const place = awake && away.stage === "there" && !lg.flying ? lg.pick(resting.x, resting.y) : null;
+    renderer.domElement.classList.toggle("pointing", Boolean(place && place.id !== away.galaxy));
+    ui.hover(null);
+    return;
+  }
+  const hit = awake && !tween ? pick(resting.x, resting.y, 9) : null;
   const target = hit && hit.kind !== "sun" ? hit : null;
   renderer.domElement.classList.toggle("pointing", Boolean(target));
   ui.hover(target?.id ?? null);
@@ -719,6 +894,12 @@ function frame(now) {
   lastTick = now;
 
   tickClock(dt);
+  ui.updateClock(clock.time, clock.synced && !settings.paused);
+  if ((away.stage === "there" || away.stage === "returning") && galaxyFrame(now)) {
+    updateHover(now);
+    return;
+  }
+  if (!away.stage) setFade(1 - (now - away.arrived) / DIP_MS); // just home: the dip clears
   const date = new Date(clock.time);
   updateBlend(now);
   layOut(date, dt, (now - startTime) / 1000);
@@ -732,13 +913,13 @@ function frame(now) {
   }
   updateSkyCentre();
   if (settle) settleSky(now, date, (now - startTime) / 1000);
+  if (away.stage === "leaving") leavingFrame(now); // after the camera's usual move, so the turn wins
   fadeStarsWhenSpinning(dt);
   sky.group.position.copy(camera.position);
   sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
   system.fitGlow(camera);
 
   render();
-  ui.updateClock(clock.time, clock.synced && !settings.paused);
   const ground = pov.id && bodies.get(pov.id);
   // Label as seen from the ground only once we're down there (or on the way back up).
   const down = ground && (!tween || camera.position.distanceTo(ground.group.position) < 3 * ground.radius * ground.group.scale.x);
@@ -749,6 +930,7 @@ function frame(now) {
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  lg.resize();
   renderer.setSize(innerWidth, innerHeight);
 });
 
@@ -792,10 +974,11 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, away, ui };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
+if (galaxyOf(settings.view)) flyTo(away.home, true); // set up the solar system to come back to
 flyTo(settings.view, true);
 if (settle) settleSky(performance.now(), new Date(clock.time), 0);
 startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);

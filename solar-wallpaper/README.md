@@ -42,6 +42,12 @@ Jupiter's moons are shown where they were when their light left (about 40 minute
 
 The nearest galaxies are out there too, in the same places from every planet because they're so far away. Andromeda and Triangulum are in the northern autumn sky; the two Magellanic Clouds sit near the south pole of the sky, so they show up behind the planets when you look down on the solar system.
 
+## Out to the galaxies
+
+Click a galaxy's name and you leave the solar system: the view turns towards it, then flies out across the gap (2.5 million light-years to Andromeda) and circles it, seen from its far side with the Milky Way in the distance behind it. Every galaxy is a 3D cloud of stars at its real distance and direction from the Sun, tilted the way it really is towards us: Andromeda's tightly wound arms and its ring of new stars, Triangulum's loose arms and the pink NGC 604, the Large Magellanic Cloud's off-centre bar and the Tarantula Nebula, the Small Magellanic Cloud stretched out almost straight towards us, and the Sagittarius Dwarf being pulled apart below the Milky Way. The Milky Way is there too, with its bar and four arms, and the Sun marked on the inner edge of the Orion spur.
+
+Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
+
 ## Use it as your wallpaper
 
 The files you need are all in `dist/`: `index.html`, `solar.js` and `LivelyProperties.json`. Copy that folder anywhere.
@@ -65,7 +71,7 @@ Click the button in the top right, or add them to the address, like `index.html?
 | Setting | Values | Default |
 |---|---|---|
 | `speed` | `live`, `minute`, `hour`, `day`, `week`, `month`, `year` (how much time passes each second) | `live` |
-| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io` | `middle` |
+| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr` | `middle` |
 | `reverse` | `1` to run time backwards | `0` |
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
 | `labels`, `orbits`, `belts`, `clock`, `drift` | `0` or `1` | all `1` |
@@ -104,7 +110,8 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/paint-worker.js`, `src/painter.js` | Do that painting in the background, so the animation never stutters |
 | `src/shaders.js` | Lighting, night-side city lights, ring shadows, the Sun's surface, orbit trails, asteroids |
 | `src/belts.js`, `src/sky.js` | Asteroids and the Kuiper belt; stars and the Milky Way |
-| `src/galaxies.js` | The nearest galaxies: where they are, how big, and how they're painted |
+| `src/galaxies.js` | The nearest galaxies on the sky: where they are, how big, and how they're painted |
+| `src/localgroup.js` | Out among the galaxies: each one (and the Milky Way) as a 3D cloud of stars, and the flights between them |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |

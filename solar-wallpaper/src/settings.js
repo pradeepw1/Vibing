@@ -4,6 +4,7 @@
 //   3. the page address, e.g. index.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
 import { MOONS, PLANETS } from "./bodies.js";
+import { GALAXIES } from "./galaxies.js";
 
 // "live" runs at real speed. If the clock is on today's date, it stays locked to now.
 export const SPEEDS = [
@@ -26,7 +27,14 @@ export const VIEWS = [
   // store the list position keep pointing at the same view.
   ...PLANETS.map((p) => ({ id: `from-${p.id}`, label: `From ${p.name}`, from: p.id })),
   { id: "from-moon", label: "From the Moon", from: "moon" },
+  // Out among the nearest galaxies.
+  ...GALAXIES.filter((g) => g.name).map((g) => ({ id: `galaxy-${g.id}`, label: g.name, galaxy: g.id })),
 ];
+
+/** The galaxy a "galaxy-..." view goes to, or null. */
+export function galaxyOf(viewId) {
+  return VIEWS.find((v) => v.id === viewId)?.galaxy ?? null;
+}
 
 /** The body a "from-..." view stands on (any planet or moon), or null. */
 export function viewpoint(viewId) {
