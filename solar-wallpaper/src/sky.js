@@ -18,7 +18,8 @@ import {
   Vector3,
 } from "three";
 import { eqjToScene } from "./ephemeris.js";
-import { createGalaxies } from "./galaxies.js";
+import { BLACK_HOLES } from "./blackholes.js";
+import { createGalaxies, skyDirection } from "./galaxies.js";
 import { clamp, random } from "./noise.js";
 import * as shaders from "./shaders.js";
 
@@ -129,8 +130,11 @@ export function createSky(pixelRatio) {
     get fade() {
       return fade;
     },
-    /** The named galaxies, for labels. */
-    galaxies: galaxies.named,
+    /** The named galaxies and black holes, for labels (the black holes are too small to see, but they're there). */
+    galaxies: [
+      ...galaxies.named,
+      ...BLACK_HOLES.map((h) => ({ id: h.id, name: h.name, lightYears: h.lightYears, direction: skyDirection(h.ra, h.dec), distance: 950 })),
+    ],
     /**
      * Dims the stars, the Milky Way and the galaxies (1 = full). Used when the view turns so fast
      * against the stars that they'd only streak.

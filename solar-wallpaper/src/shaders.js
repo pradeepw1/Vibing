@@ -502,6 +502,7 @@ export const galaxyStars = {
       float px = size * projectionMatrix[1][1] * viewHeight * 0.5 / dist;
       float shown = clamp(px, 1.0, maxSize);
       float fade = smoothstep(0.3, 2.5, dist); // right by the camera
+      fade *= 1.0 - smoothstep(maxSize * 0.8, maxSize * 3.0, px); // so close it's only a big smudge
       #ifdef GLOW
         fade *= 1.0 - smoothstep(glowSize, glowSize * 2.0, px);
       #endif
@@ -537,9 +538,182 @@ export const galaxyStars = {
 };
 
 /**
+ * Near a black hole: bends the light. Each pixel's ray is followed round the
+ * hole (the real path of light past a non-spinning one), and the picture is
+ * looked up where that ray comes out: stars are bent into rings and arcs,
+ * the middle is black, and a thin glowing disc of gas is seen from the
+ * front, and again bent over the top and under the bottom. The side of the
+ * disc turning towards you is brighter and bluer. All distances in here are
+ * in "rs": the radius of the point of no return.
+ */
+export const holeLens = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D map;
+    uniform float time;
+    // The black hole in view.
+    uniform float holeOn;       // 0 (none) to 1 (fully drawn)
+    uniform vec3 holeRel;       // where it is, from the camera, in rs, along the world axes
+    uniform vec3 holeNormal;    // the way the disc's axis points
+    uniform vec4 holeDisc;      // inner radius, outer radius, brightness, temperature (kelvin)
+    uniform float holeSpin;     // 1 or -1: which way the gas goes round
+    uniform float wide;         // how much wider than the screen the picture in "map" was drawn
+    uniform vec3 camRight;
+    uniform vec3 camUp;
+    uniform vec3 camForward;
+    uniform vec2 tanHalf;       // half the field of view (across, up), as tangents
+    varying vec2 vUv;
+
+    const float PI = 3.14159265;
+
+    // The colour of a glowing thing at a temperature (kelvin), in linear light, brightest channel 1.
+    vec3 blackbody(float kelvin) {
+      float t = clamp(kelvin, 1000.0, 40000.0) / 100.0;
+      float r = t <= 66.0 ? 1.0 : clamp(1.2929362 * pow(t - 60.0, -0.1332048), 0.0, 1.0);
+      float g = t <= 66.0 ? clamp(0.3900816 * log(t) - 0.6318414, 0.0, 1.0) : clamp(1.1298909 * pow(t - 60.0, -0.0755148), 0.0, 1.0);
+      float b = t >= 66.0 ? 1.0 : (t <= 19.0 ? 0.0 : clamp(0.5432068 * log(t - 10.0) - 1.1962541, 0.0, 1.0));
+      return pow(vec3(r, g, b), vec3(2.2));
+    }
+
+    float hash(vec3 p) {
+      p = fract(p * 0.1031);
+      p += dot(p, p.yzx + 33.33);
+      return fract((p.x + p.y) * p.z);
+    }
+    float noise3(vec3 x) {
+      vec3 i = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+        mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+        f.z);
+    }
+
+    // The picture, looked up in the direction a ray finally leaves in.
+    vec3 scene(vec3 dir) {
+      float z = dot(dir, camForward);
+      // Bent round from behind the camera: we have no picture of that, so it's dark.
+      if (z <= 1e-3) return vec3(0.0);
+      vec2 uv = vec2(dot(dir, camRight) / (z * tanHalf.x), dot(dir, camUp) / (z * tanHalf.y)) / wide * 0.5 + 0.5;
+      // Off the edge even of the wider picture: the nearest edge, so there's no black frame.
+      return texture2D(map, clamp(uv, vec2(0.002), vec2(0.998))).rgb;
+    }
+
+    // What the gas of the disc gives off at one crossing: colour and how opaque.
+    // r: distance from the hole; q: direction to the spot; k: the way the traced ray was going there.
+    vec4 disc(float r, vec3 q, vec3 k) {
+      float rin = holeDisc.x;
+      float rout = holeDisc.y;
+      if (r < rin || r > rout) return vec4(0.0);
+      // Cooler further out, and a bright rim just inside the middle of it.
+      float prof = pow(rin / r, 0.75) * pow(max(1.0 - sqrt(rin / r), 0.0), 0.25) * 2.0;
+      // Gas goes round faster close in; the side coming towards us shines brighter and bluer.
+      vec3 along = normalize(cross(holeNormal, q)) * holeSpin;
+      float beta = sqrt(0.5 / r);
+      float gamma = inversesqrt(1.0 - beta * beta);
+      float doppler = 1.0 / (gamma * (1.0 - beta * dot(along, -k)));
+      float shift = doppler * sqrt(max(1.0 - 1.0 / r, 0.02));
+      // Streaks and clumps that shear round with the gas.
+      vec3 across = normalize(cross(holeNormal, abs(holeNormal.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0)));
+      vec3 third = cross(holeNormal, across);
+      float angle = atan(dot(q, third), dot(q, across)) - holeSpin * time * 1.4 * pow(r, -1.5);
+      vec3 spot = vec3(cos(angle), sin(angle), 0.0) * r * 0.9;
+      float streaks = noise3(vec3(spot.xy, log(r) * 5.0)) * 0.6 + noise3(spot * 2.3 + 7.0) * 0.4;
+      float rings = 0.8 + 0.2 * sin(log(r) * 38.0 + streaks * 3.0);
+      float bright = holeDisc.z * pow(prof, 3.0) * pow(shift, 4.6) * (0.35 + 1.2 * streaks) * rings;
+      vec3 colour = blackbody(2200.0 + holeDisc.w * pow(prof, 2.2) * shift) * bright;
+      float edge = smoothstep(rin, rin * 1.06, r) * (1.0 - smoothstep(rout * 0.82, rout, r));
+      float opaque = clamp(1.05 * edge * (0.5 + 0.5 * prof), 0.0, 0.99);
+      return vec4(colour, opaque);
+    }
+
+    // Follows one ray round the hole. Returns the light the disc added (rgb)
+    // and how much of the picture behind still shows (a); dir = where it came out.
+    vec4 follow(vec3 rd, out vec3 dir) {
+      vec3 p0 = -holeRel;
+      float r0 = length(p0);
+      vec3 e1 = p0 / r0;
+      float cosA = dot(rd, e1);
+      vec3 perp = rd - cosA * e1;
+      float sinA = length(perp);
+      dir = rd;
+      if (sinA < 1e-4) return cosA < 0.0 ? vec4(0.0) : vec4(0.0, 0.0, 0.0, 1.0);
+      vec3 e2 = perp / sinA;
+      // The ray stays in one flat plane through the hole. In it, u = 1/r changes
+      // with the turned angle phi as u'' = -u + 1.5 u^2 (light in a Schwarzschild field).
+      float u = 1.0 / r0;
+      float v = -u * sqrt(max(1.0 - u, 0.0)) * cosA / sinA;
+      float phi = 0.0;
+      // The disc is the plane where holeNormal . position = 0.
+      float na = dot(holeNormal, e1);
+      float nb = dot(holeNormal, e2);
+      float next = mod(atan(-na, nb), PI);
+      if (next < 1e-4) next += PI;
+      vec3 light = vec3(0.0);
+      float see = 1.0;
+      bool escaped = false;
+      for (int i = 0; i < 150; i++) {
+        float dphi = mix(0.22, 0.035, smoothstep(0.1, 0.55, u));
+        float a0 = -u + 1.5 * u * u;
+        float vh = v + 0.5 * dphi * a0;
+        float un = u + dphi * vh;
+        float a1 = -un + 1.5 * un * un;
+        float vn = vh + 0.5 * dphi * a1;
+        float phin = phi + dphi;
+        if (un >= 1.0) return vec4(light, 0.0); // into the hole
+        if (phin >= next) {
+          float f = (next - phi) / dphi;
+          float uc = mix(u, un, f);
+          float vc = mix(v, vn, f);
+          if (uc > 0.0) {
+            vec3 q = e1 * cos(next) + e2 * sin(next);
+            vec3 along = -e1 * sin(next) + e2 * cos(next);
+            vec2 kk = normalize(vec2(-vc / uc, 1.0));
+            vec4 g = disc(1.0 / uc, q, q * kk.x + along * kk.y);
+            light += see * g.a * g.rgb;
+            see *= 1.0 - g.a;
+          }
+          next += PI;
+        }
+        if (un <= 0.0) {
+          phi += dphi * u / max(u - un, 1e-6);
+          escaped = true;
+          break;
+        }
+        u = un;
+        v = vn;
+        phi = phin;
+      }
+      if (!escaped && u > 0.25) return vec4(light, 0.0); // still going round the ring of light: dark
+      dir = e1 * cos(phi) + e2 * sin(phi);
+      return vec4(light, see);
+    }
+
+    void main() {
+      vec3 here = texture2D(map, (vUv - 0.5) / wide + 0.5).rgb;
+      vec2 ndc = vUv * 2.0 - 1.0;
+      vec3 rd = normalize(camForward + camRight * (ndc.x * tanHalf.x) + camUp * (ndc.y * tanHalf.y));
+      vec3 dir;
+      vec4 hit = follow(rd, dir);
+      vec3 bent = hit.rgb + hit.a * scene(dir);
+      gl_FragColor = vec4(mix(here, bent, holeOn), 1.0);
+    }
+  `,
+};
+
+/**
  * Shows the added-up light of the galaxies. The brightness is rolled off
  * smoothly (no floor, so faint far-off stars still show), keeping each
  * colour: a galaxy's middle stays golden instead of going flat white.
+ * `bloom` lets a little of the blurred picture glow round the bright parts
+ * (the map then needs its smaller sizes made).
  */
 export const rollOff = {
   vertexShader: /* glsl */ `
@@ -552,9 +726,20 @@ export const rollOff = {
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
     uniform float exposure;
+    uniform float bloom;
+    uniform vec2 texel;   // one pixel of the map, in uv
     varying vec2 vUv;
+    // A soft blur at one smaller size: the size's own blocks, spread over a few nearby looks, so they don't show.
+    vec3 soft(float lod) {
+      vec2 o = exp2(lod) * texel * 0.8;
+      return (textureLod(map, vUv, lod).rgb * 2.0
+        + textureLod(map, vUv + vec2(o.x, o.y), lod).rgb + textureLod(map, vUv + vec2(-o.x, o.y), lod).rgb
+        + textureLod(map, vUv + vec2(o.x, -o.y), lod).rgb + textureLod(map, vUv + vec2(-o.x, -o.y), lod).rgb) / 6.0;
+    }
     void main() {
-      vec3 c = texture2D(map, vUv).rgb * exposure;
+      vec3 c = texture2D(map, vUv).rgb;
+      if (bloom > 0.0) c += bloom * (soft(2.5) * 0.4 + soft(3.5) * 0.35 + soft(4.5) * 0.25);
+      c *= exposure;
       float light = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c *= (1.0 - exp(-light)) / max(light, 1e-6);
       // Past white in one colour: hold the colour, and let a little white in, as film does.

@@ -13,6 +13,7 @@ import {
   Float32BufferAttribute,
   Group,
   HalfFloatType,
+  LinearMipmapLinearFilter,
   MathUtils,
   Matrix4,
   Mesh,
@@ -26,9 +27,11 @@ import {
   ShaderMaterial,
   Vector2,
   Vector3,
+  Vector4,
   WebGLRenderTarget,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { BLACK_HOLES } from "./blackholes.js";
 import { GALAXIES, skyDirection } from "./galaxies.js";
 import { random } from "./noise.js";
 import { galacticBasis } from "./sky.js";
@@ -46,6 +49,11 @@ const GLOW_LIGHT = 0.7; // a spiral's glow gives off this much light for each bi
 const GLOW_SCALE = 5; // and its points are this much bigger
 const ROLL_SPEED = Math.PI / 3; // how fast a flight turns the picture round, unless it must go faster to finish in time (60 degrees a second)
 const CLEAR = 1.2; // how far to keep from a galaxy on the way past, in its radii
+const HOLE_VIEW = 32; // how far from a black hole you arrive, in its radii
+const HOLE_ON = 6000; // the bending of light starts to show this far out (in radii)...
+const HOLE_FULL = 1500; // ...and is all there from here
+const HOLE_GLOW = 0.55; // how much the blurred picture glows round a black hole's bright disc
+const HOLE_WIDE = 1.4; // near one, the stars are drawn this much wider than the screen, so bent light has something to pick up from past the edge
 // Going outwards, Andromeda's arms turn clockwise on our sky, Triangulum's anticlockwise.
 const WIND = { m31: -1, m33: 1 };
 
@@ -236,6 +244,48 @@ function blob(s, seed) {
   return c;
 }
 
+/**
+ * The stars crowded round a black hole (made up), so the bending of light has
+ * something to bend. Positions are in rs, then scaled to the scene's units.
+ * If it has a companion star, that and the gas it pours off are here too.
+ */
+function holeCrowd(h, seed) {
+  const rand = random(seed);
+  const { crowd, rs } = h;
+  const extra = h.companion ? 700 : 0;
+  const c = cloud(crowd.stars + extra);
+  for (let i = 0; i < crowd.stars; i++) {
+    // More towards the middle, none right at the disc.
+    const r = 34 + crowd.radius * Math.pow(rand(), 1.7);
+    const th = rand() * 2 * Math.PI;
+    const ph = Math.acos(2 * rand() - 1);
+    const pick = rand();
+    const colour = crowd.colours[pick < crowd.mix[0] ? 0 : pick < crowd.mix[0] + crowd.mix[1] ? 1 : 2];
+    const big = rand() < 0.04;
+    put(c, r * Math.sin(ph) * Math.cos(th) * rs, r * Math.cos(ph) * rs, r * Math.sin(ph) * Math.sin(th) * rs, colour, rs * (big ? 0.3 : 0.05 + 0.08 * rand()), big ? 1.4 : 0.55 + 0.6 * rand());
+  }
+  if (h.companion) {
+    const { distance, radius, colour, light } = h.companion;
+    // A blue giant in the plane of the disc, and a thin spiral of gas from it down to the disc's edge.
+    const across = new Vector3(1, 0, 0);
+    if (Math.abs(h.normal.x) > 0.9) across.set(0, 0, 1);
+    across.addScaledVector(h.normal, -across.dot(h.normal)).normalize();
+    const third = new Vector3().crossVectors(h.normal, across);
+    const at = (r, a, lift = 0) => [(across.x * Math.cos(a) + third.x * Math.sin(a)) * r + h.normal.x * lift, (across.y * Math.cos(a) + third.y * Math.sin(a)) * r + h.normal.y * lift, (across.z * Math.cos(a) + third.z * Math.sin(a)) * r + h.normal.z * lift];
+    const star = at(distance, 0);
+    put(c, star[0] * rs, star[1] * rs, star[2] * rs, colour, radius * rs, light);
+    put(c, star[0] * rs, star[1] * rs, star[2] * rs, colour, radius * rs * 2.6, light * 0.06);
+    for (let i = 0; i < extra - 2; i++) {
+      const t = rand();
+      const r = distance - (distance - h.disc.outer * 1.05) * Math.pow(t, 0.8);
+      const a = 2.6 * Math.pow(t, 0.8) + gauss(rand) * 0.03;
+      const p = at(r + gauss(rand) * 0.4, a, gauss(rand) * 0.25);
+      put(c, p[0] * rs, p[1] * rs, p[2] * rs, [0.6, 0.72, 1.0], rs * (0.12 + 0.12 * rand()), 0.5 + 0.5 * (1 - t));
+    }
+  }
+  return c;
+}
+
 /** materials: [stars, stars of a spiral, its glow]. */
 function pointsOf(c, [material, spiralMaterial, glowMaterial]) {
   const geo = new BufferGeometry();
@@ -297,7 +347,7 @@ function inDisc(place, sight) {
 
 export function createLocalGroup(canvas, pixelRatio) {
   const scene = new Scene();
-  const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 1e6);
+  const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.0005, 1e6);
   const basis = galacticBasis();
   camera.up.copy(basis.north); // the controls turn round whatever is up when they're made
   const controls = new OrbitControls(camera, canvas);
@@ -331,6 +381,24 @@ export function createLocalGroup(canvas, pixelRatio) {
       frame: tiltFrame(dir, s.tilt?.nodes ?? g.pa, s.tilt),
       small: !g.name, // Andromeda's companions: no name, can't be visited
     });
+  }
+
+  // Black holes. Where they are is real; the disc is turned the way ours is
+  // known to be where that has been measured, and flat to its galaxy where not.
+  const holes = [];
+  for (const h of BLACK_HOLES) {
+    const dir = skyDirection(h.ra, h.dec);
+    let normal;
+    if (h.tilt.flatTo === "galaxy") normal = basis.north.clone();
+    else {
+      const { north, east } = skyAxes(dir);
+      const lean = north.clone().multiplyScalar(Math.cos(h.tilt.pa * DEG)).addScaledVector(east, Math.sin(h.tilt.pa * DEG));
+      normal = dir.clone().multiplyScalar(-Math.cos(h.tilt.towards * DEG)).addScaledVector(lean, Math.sin(h.tilt.towards * DEG));
+    }
+    normal.normalize();
+    const place = { id: h.id, name: h.name, sub: h.lightYears, position: dir.clone().multiplyScalar(h.kly), dir, radius: h.disc.outer * h.rs, hole: { ...h, normal } };
+    places.set(h.id, place);
+    holes.push(place);
   }
 
   let built = false;
@@ -375,6 +443,12 @@ export function createLocalGroup(canvas, pixelRatio) {
       } else p.quaternion.setFromRotationMatrix(place.frame);
       scene.add(p);
     }
+    for (const place of holes) {
+      const crowd = holeCrowd(place.hole, seed++);
+      const p = pointsOf(crowd, materials);
+      p.position.copy(place.position);
+      scene.add(p);
+    }
     far = background(pixelRatio);
     scene.add(far);
   }
@@ -393,6 +467,16 @@ export function createLocalGroup(canvas, pixelRatio) {
    */
   function viewpointFor(place) {
     if (place.id === "milkyway" || place.id === "sun") return { target: centre, position: new Vector3(), up: basis.north };
+    if (place.hole) {
+      // Just above the disc, a little round from the Sun's side, with the disc running across the screen.
+      const { normal, rs } = place.hole;
+      const flat = place.dir.clone().negate();
+      flat.addScaledVector(normal, -flat.dot(normal));
+      if (flat.lengthSq() < 1e-6) flat.copy(skyAxes(place.dir).east);
+      flat.normalize().applyAxisAngle(normal, 0.7);
+      const from = flat.multiplyScalar(Math.cos(0.2)).addScaledVector(normal, Math.sin(0.2));
+      return { target: place.position, position: place.position.clone().addScaledVector(from, HOLE_VIEW * rs), up: normal, minDistance: rs * 3.2 };
+    }
     const away = place.dir.clone();
     let up = new Vector3(0, 1, 0).applyMatrix4(new Matrix4().extractRotation(place.frame));
     if (Math.abs(up.dot(away)) > 0.95) {
@@ -426,7 +510,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     }
     if (instant) {
       camera.position.copy(end.position);
-      camera.up.copy(end.up);
+      setUp(end.up);
       camera.lookAt(end.target);
       finish(end);
       return;
@@ -475,7 +559,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const found = [];
     const SAMPLES = 200;
     for (const p of places.values()) {
-      if (p === place || p.small || p.unpickable) continue;
+      if (p === place || p.small || p.unpickable || p.hole) continue;
       const start = camera.position.distanceTo(p.position) / p.radius;
       if (start < 1 || f.end.position.distanceTo(p.position) < p.radius * 1.3) continue;
       let closest = CLEAR;
@@ -519,10 +603,21 @@ export function createLocalGroup(canvas, pixelRatio) {
     return e < when ? MathUtils.smootherstep(e, 0, when) : 1 - MathUtils.smootherstep(e, when, end);
   }
 
+  /** Sets which way is up for the camera and for the mouse controls (they work it out once, when made). */
+  const Y = new Vector3(0, 1, 0);
+  function setUp(up) {
+    camera.up.copy(up);
+    if (controls._quat) {
+      controls._quat.setFromUnitVectors(up, Y);
+      controls._quatInverse.copy(controls._quat).invert();
+    }
+  }
+
   function finish(end) {
     flight = null;
+    setUp(end.up);
     controls.target.copy(end.target);
-    controls.minDistance = 0.05;
+    controls.minDistance = end.minDistance ?? 0.05;
     controls.enabled = true;
     controls.update();
   }
@@ -534,6 +629,7 @@ export function createLocalGroup(canvas, pixelRatio) {
   const cross = new Vector3();
   /** Moves the camera. Returns how far along a flight is (1 when there's none). */
   function update(now, drift) {
+    clockNow = now;
     materials[0].uniforms.viewHeight.value = innerHeight;
     if (far) {
       far.position.copy(camera.position);
@@ -613,13 +709,44 @@ export function createLocalGroup(canvas, pixelRatio) {
   // past white), then the bright parts are rolled off once, like a photo.
   // Rolled off star by star, the faint ones would round down to nothing.
   const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
+  // Near a black hole the picture goes through a second step that bends it (and
+  // is kept with its smaller sizes made, for the glow).
+  const bent = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false, generateMipmaps: true, minFilter: LinearMipmapLinearFilter });
   const screen = new Scene();
   const flat = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  const show = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({ ...shaders.rollOff, uniforms: { map: { value: target.texture }, exposure: { value: EXPOSURE } }, depthTest: false, depthWrite: false, toneMapped: false }));
-  show.frustumCulled = false;
+  const show = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({ ...shaders.rollOff, uniforms: {
+      map: { value: target.texture },
+      exposure: { value: EXPOSURE },
+      bloom: { value: 0 },
+      texel: { value: new Vector2(1, 1) },
+    }, depthTest: false, depthWrite: false, toneMapped: false }));
+  const lensScreen = new Scene();
+  const lens = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({ ...shaders.holeLens, uniforms: {
+      map: { value: target.texture },
+      time: { value: 0 },
+      holeOn: { value: 0 },
+      wide: { value: 1 },
+      holeRel: { value: new Vector3() },
+      holeNormal: { value: new Vector3(0, 1, 0) },
+      holeDisc: { value: new Vector4(3, 15, 1, 12000) },
+      holeSpin: { value: 1 },
+      camRight: { value: new Vector3(1, 0, 0) },
+      camUp: { value: new Vector3(0, 1, 0) },
+      camForward: { value: new Vector3(0, 0, -1) },
+      tanHalf: { value: new Vector2(1, 1) },
+    }, depthTest: false, depthWrite: false, toneMapped: false }));
+  show.frustumCulled = lens.frustumCulled = false;
   screen.add(show);
+  lensScreen.add(lens);
   const bufferSize = new Vector2();
-  function render(renderer) {
+  const wideCam = new PerspectiveCamera();
+  let wideNow = 1; // 1 normally, HOLE_WIDE near a black hole
+  let lensScale = 1; // how sharp the bending is drawn: lowered if the graphics chip can't keep up
+  let lensLocked = false; // (for testing) keep it at full sharpness
+  let slow = 0;
+  let fast = 0;
+  let lastRender = 0;
+  function render(renderer, budgetMs = 1000 / 60) {
     // Some older graphics chips can't draw into a buffer like that: then
     // straight to the screen, each star's light rolled off on its own.
     if (!renderer.extensions.has("EXT_color_buffer_float") && !renderer.extensions.has("EXT_color_buffer_half_float")) {
@@ -630,12 +757,86 @@ export function createLocalGroup(canvas, pixelRatio) {
       return;
     }
     renderer.getDrawingBufferSize(bufferSize);
-    if (target.width !== bufferSize.x || target.height !== bufferSize.y) target.setSize(bufferSize.x, bufferSize.y);
+    camera.updateMatrixWorld();
+    const near = aimHole();
+    // Wider than the screen while near one (with a little give, so it doesn't flicker on and off at the edge).
+    wideNow = near > (wideNow > 1 ? 0.001 : 0.004) ? HOLE_WIDE : 1;
+    for (const m of [materials[0], far?.children[0].material]) {
+      if (!m) continue;
+      m.uniforms.viewHeight.value = innerHeight * wideNow;
+      m.uniforms.pixelRatio.value = pixelRatio * wideNow;
+    }
+    // If the bending is making it stutter, draw it at lower resolution (and back up when there's room).
+    if (near > 0.5 && lastRender && !lensLocked) {
+      const gap = clockNow - lastRender;
+      if (gap > budgetMs * 1.6) [slow, fast] = [slow + 1, 0];
+      else if (gap < budgetMs * 1.2) [slow, fast] = [Math.max(0, slow - 1), fast + 1];
+      if (slow > 8 && lensScale > 0.4) [lensScale, slow] = [Math.max(0.4, lensScale * 0.8), 0];
+      if (fast > 240 && lensScale < 1) [lensScale, fast] = [Math.min(1, lensScale * 1.25), 0];
+    }
+    lastRender = clockNow;
+    const w = Math.round(bufferSize.x * wideNow);
+    const h = Math.round(bufferSize.y * wideNow);
+    if (target.width !== w || target.height !== h) target.setSize(w, h);
+    const bw = Math.round(bufferSize.x * lensScale);
+    const bh = Math.round(bufferSize.y * lensScale);
+    if (bent.width !== bw || bent.height !== bh) bent.setSize(bw, bh);
+    let seen = camera;
+    if (wideNow > 1) {
+      // The same view, with the field of view stretched.
+      wideCam.position.copy(camera.position);
+      wideCam.quaternion.copy(camera.quaternion);
+      wideCam.near = camera.near;
+      wideCam.far = camera.far;
+      wideCam.aspect = camera.aspect;
+      wideCam.fov = (2 * Math.atan(Math.tan((camera.fov * DEG) / 2) * wideNow)) / DEG;
+      wideCam.updateProjectionMatrix();
+      wideCam.updateMatrixWorld(true);
+      seen = wideCam;
+    }
     renderer.setRenderTarget(target);
-    renderer.render(scene, camera);
+    renderer.render(scene, seen);
+    if (near) {
+      lens.material.uniforms.wide.value = wideNow;
+      renderer.setRenderTarget(bent);
+      renderer.render(lensScreen, flat);
+    }
     renderer.setRenderTarget(null);
+    show.material.uniforms.map.value = near ? bent.texture : target.texture;
+    show.material.uniforms.bloom.value = near ? HOLE_GLOW * near : 0;
+    show.material.uniforms.texel.value.set(1 / bent.width, 1 / bent.height);
     renderer.render(screen, flat);
   }
+
+  // The nearest black hole in front of us, if it's close enough to bend the light.
+  const holeUniforms = lens.material.uniforms;
+  const toHole = new Vector3();
+  /** Points the bending at the nearest hole. Returns how strongly it's on (0 = not at all). */
+  function aimHole() {
+    let best = null;
+    let bestR = HOLE_ON;
+    for (const place of holes) {
+      toHole.subVectors(place.position, camera.position);
+      const r = toHole.length() / place.hole.rs;
+      if (r < bestR && (r < 60 || toHole.dot(camera.getWorldDirection(forwardNow)) > 0)) [best, bestR] = [place, r];
+    }
+    const u = holeUniforms;
+    u.holeOn.value = best ? 1 - MathUtils.smoothstep(bestR, HOLE_FULL, HOLE_ON) : 0;
+    if (!best || u.holeOn.value < 0.001) return 0;
+    const h = best.hole;
+    u.holeRel.value.subVectors(best.position, camera.position).divideScalar(h.rs);
+    u.holeNormal.value.copy(h.normal);
+    u.holeDisc.value.set(h.disc.inner, h.disc.outer, h.disc.bright, h.disc.kelvin);
+    u.holeSpin.value = h.spin;
+    u.time.value = clockNow / 1000;
+    camera.matrixWorld.extractBasis(u.camRight.value, u.camUp.value, forwardNow);
+    u.camForward.value.copy(forwardNow).negate();
+    const tanV = Math.tan((camera.fov * DEG) / 2);
+    u.tanHalf.value.set(tanV * camera.aspect, tanV);
+    return u.holeOn.value;
+  }
+  const forwardNow = new Vector3();
+  let clockNow = 0;
 
   return {
     scene,
@@ -646,9 +847,14 @@ export function createLocalGroup(canvas, pixelRatio) {
     update,
     pick,
     render,
+    set lensLocked(v) {
+      lensLocked = v;
+      if (v) lensScale = 1;
+    },
     /** Back home: let go of the drawing buffer until next time. */
     release() {
       target.dispose();
+      bent.dispose();
     },
     get flying() {
       return Boolean(flight);

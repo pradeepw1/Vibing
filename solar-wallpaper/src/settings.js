@@ -3,6 +3,7 @@
 //   2. whatever you last picked in the settings panel (saved in this browser)
 //   3. the page address, e.g. index.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
+import { BLACK_HOLES } from "./blackholes.js";
 import { MOONS, PLANETS } from "./bodies.js";
 import { GALAXIES } from "./galaxies.js";
 
@@ -27,11 +28,12 @@ export const VIEWS = [
   // store the list position keep pointing at the same view.
   ...PLANETS.map((p) => ({ id: `from-${p.id}`, label: `From ${p.name}`, from: p.id })),
   { id: "from-moon", label: "From the Moon", from: "moon" },
-  // Out among the nearest galaxies.
+  // Out among the nearest galaxies, and to the black holes.
   ...GALAXIES.filter((g) => g.name).map((g) => ({ id: `galaxy-${g.id}`, label: g.name, galaxy: g.id })),
+  ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id })),
 ];
 
-/** The galaxy a "galaxy-..." view goes to, or null. */
+/** The galaxy (or black hole) a "galaxy-..." view goes to, or null. */
 export function galaxyOf(viewId) {
   return VIEWS.find((v) => v.id === viewId)?.galaxy ?? null;
 }

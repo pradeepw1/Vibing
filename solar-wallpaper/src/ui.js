@@ -39,7 +39,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   const lookFrom = document.createElement("optgroup");
   lookFrom.label = "Look from";
   const visit = document.createElement("optgroup");
-  visit.label = "Fly to a galaxy";
+  visit.label = "Fly out to a galaxy or black hole";
   for (const v of VIEWS) (v.from ? lookFrom : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
   const extra = new Option("", ""); // for views from moons that aren't in the list
   extra.hidden = true;
@@ -365,6 +365,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
       // The Sun only once you're close enough to the Milky Way to pick it out,
       // and not the galaxy you're visiting while you're near it (the Back pill names it).
       let show = at.dot(camDir) > 0 && !(place.id === "sun" && distance > 120) && !(place.id === visiting && distance < place.radius * 6);
+      // Not the Milky Way's name over a black hole at its heart, once you're in close.
+      if (place.id === "milkyway" && distance < 3) show = false;
       if (show) {
         at.copy(place.position).project(camera);
         const x = Math.round(((at.x + 1) / 2) * width + 8);

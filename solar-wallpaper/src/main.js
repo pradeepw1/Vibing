@@ -391,7 +391,7 @@ function galaxyFrame(now) {
     }
   } else setFade(1 - (now - away.arrived) / DIP_MS);
   renderer.autoClear = true;
-  lg.render(renderer);
+  lg.render(renderer, 1000 / settings.fps);
   // Getting ready (making the stars, the first picture) is done in the dark.
   if (away.arrived === Infinity) away.arrived = performance.now();
   ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, away.stage === "there" ? away.galaxy : null);
