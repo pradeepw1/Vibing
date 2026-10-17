@@ -488,6 +488,9 @@ export const galaxyStars = {
     uniform float pixelRatio;
     uniform float viewHeight;
     uniform float maxSize; // CSS pixels
+    uniform float glowSize; // a spiral's glow fades out past this (CSS pixels)...
+    uniform float glowScale; // ...its points being this much bigger than its stars...
+    uniform float glowLight; // ...and giving off this much light for each bit from the stars
     attribute float size;
     attribute vec3 tint;
     varying vec3 vTint;
@@ -498,12 +501,15 @@ export const galaxyStars = {
       float dist = max(-mv.z, 1e-4);
       float px = size * projectionMatrix[1][1] * viewHeight * 0.5 / dist;
       float shown = clamp(px, 1.0, maxSize);
-      vFade = min(1.0, px * px); // smaller than a pixel: a pixel, dimmer to match
-      vFade *= smoothstep(0.3, 2.5, dist); // right by the camera
+      float fade = smoothstep(0.3, 2.5, dist); // right by the camera
       #ifdef GLOW
-        vFade *= 1.0 - smoothstep(maxSize, maxSize * 2.0, px);
+        fade *= 1.0 - smoothstep(glowSize, glowSize * 2.0, px);
       #endif
-      if (mv.z > 0.0 || vFade < 0.002) {
+      #ifdef GLOW_BACK
+        // Where the glow has faded, its light goes to the stars.
+        fade *= 1.0 + glowLight * smoothstep(glowSize, glowSize * 2.0, px * glowScale);
+      #endif
+      if (mv.z > 0.0 || fade < 0.002) {
         // Nothing to see: off the screen, so it costs nothing to draw.
         gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
         gl_PointSize = 1.0;
@@ -511,6 +517,7 @@ export const galaxyStars = {
         vTint = vec3(0.0);
         return;
       }
+      vFade = fade * min(1.0, px * px); // smaller than a pixel: a pixel, dimmer to match
       vTint = tint;
       gl_PointSize = shown * pixelRatio;
     }

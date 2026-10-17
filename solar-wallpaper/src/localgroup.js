@@ -7,6 +7,7 @@
 // what's known: how big each one is, how it's tilted towards us, its bar and
 // spiral arms. The stars themselves are invented.
 import {
+  ACESFilmicToneMapping,
   AdditiveBlending,
   BufferGeometry,
   Float32BufferAttribute,
@@ -41,7 +42,10 @@ const BRIGHTNESS = 0.07; // how much light each star adds
 const EXPOSURE = 2.5; // the whole picture, before the brightest parts are rolled off
 const STAR_SIZE = 10; // the most a star is drawn across, in CSS pixels
 const GLOW_SIZE = 6; // the glow fades out past this: it's only there to fill in a galaxy seen from far off
-const ROLL_SPEED = Math.PI / 3; // the fastest a flight turns the picture round (60 degrees a second)
+const GLOW_LIGHT = 0.7; // a spiral's glow gives off this much light for each bit from its stars
+const GLOW_SCALE = 5; // and its points are this much bigger
+const ROLL_SPEED = Math.PI / 3; // how fast a flight turns the picture round, unless it must go faster to finish in time (60 degrees a second)
+const CLEAR = 1.2; // how far to keep from a galaxy on the way past, in its radii
 // Going outwards, Andromeda's arms turn clockwise on our sky, Triangulum's anticlockwise.
 const WIND = { m31: -1, m33: 1 };
 
@@ -179,7 +183,7 @@ function spiral(s, seed) {
     const bulge = rand() < 0.3;
     const r = bulge ? s.bulge * Math.abs(gauss(rand)) * 0.8 : -s.scale * Math.log(rand() * 0.97 + 0.03);
     const th = rand() * 2 * Math.PI;
-    put(c, r * Math.cos(th), gauss(rand) * (bulge ? r * 0.5 : s.scale * 0.03), r * Math.sin(th), bulge ? OLD : WARM, dot * 5, light * 0.1);
+    put(c, r * Math.cos(th), gauss(rand) * (bulge ? r * 0.5 : s.scale * 0.03), r * Math.sin(th), bulge ? OLD : WARM, dot * GLOW_SCALE, light * 0.1);
   }
   return c;
 }
@@ -232,8 +236,8 @@ function blob(s, seed) {
   return c;
 }
 
-/** materials: [stars, glow]. */
-function pointsOf(c, [material, glowMaterial]) {
+/** materials: [stars, stars of a spiral, its glow]. */
+function pointsOf(c, [material, spiralMaterial, glowMaterial]) {
   const geo = new BufferGeometry();
   geo.setAttribute("position", new Float32BufferAttribute(c.pos.subarray(0, c.n * 3), 3));
   geo.setAttribute("tint", new Float32BufferAttribute(c.color.subarray(0, c.n * 3), 3));
@@ -242,7 +246,7 @@ function pointsOf(c, [material, glowMaterial]) {
   if (c.glowFrom !== null) {
     geo.addGroup(0, c.glowFrom, 0);
     geo.addGroup(c.glowFrom, c.n - c.glowFrom, 1);
-    use = [material, glowMaterial];
+    use = [spiralMaterial, glowMaterial];
   }
   const p = new Points(geo, use);
   p.frustumCulled = false;
@@ -440,45 +444,79 @@ export function createLocalGroup(canvas, pixelRatio) {
       d1: Math.max(d1, 1e-3),
       fromQuat: camera.quaternion.clone(),
       up: new Vector3(0, 1, 0).applyQuaternion(camera.quaternion), // carried along frame to frame
-      e: 0,
       last: null,
-      avoid: leaving(place, end),
+      turn: null, // last frame's way of facing the target (to keep turning the same way round)
+      avoid: [],
       home: id === "home",
     };
+    flight.avoid = inTheWay(place, flight);
+  }
+
+  const at = new Vector3();
+  const spin = new Quaternion();
+  const turnTo = new Quaternion();
+  /** Where a flight would put the camera `e` of the way along (going straight, before any lift). */
+  function along(f, e, out) {
+    turnTo.setFromUnitVectors(f.fromDir, f.toDir);
+    spin.identity().slerp(turnTo, e);
+    const d = Math.exp(Math.log(f.d0) + (Math.log(f.d1) - Math.log(f.d0)) * e);
+    return out.copy(f.fromDir).applyQuaternion(spin).multiplyScalar(d).add(f.end.target);
   }
 
   /**
-   * The galaxy we're setting off from, if the way to the next place would
-   * go through it: we start on its far side, so heading off straight
-   * would. Returns which way to go over it.
+   * The galaxies the flight would pass too close to on the way (most often
+   * the one we're leaving: we start on its far side). Not one we start
+   * inside (home) or are going to. For each, a detour planned once up
+   * front: a smooth bump along the flight, to the side the straight way
+   * already passes, just big enough to keep clear. (Worked out from where
+   * the camera is each frame it would feed back on itself and kink.)
    */
-  function leaving(place, end) {
-    // The one we're nearest to (for its size).
-    let from = null;
-    let nearest = 3; // in its radii: any further and it's nowhere near
+  function inTheWay(place, f) {
+    const found = [];
+    const SAMPLES = 200;
     for (const p of places.values()) {
       if (p === place || p.small || p.unpickable) continue;
-      const far = camera.position.distanceTo(p.position) / p.radius;
-      if (far < 1 || far > nearest) continue; // inside it (home): just go
-      if (end.position.distanceTo(p.position) < p.radius * 1.3) continue; // going somewhere in or by it
-      [from, nearest] = [p, far];
+      const start = camera.position.distanceTo(p.position) / p.radius;
+      if (start < 1 || f.end.position.distanceTo(p.position) < p.radius * 1.3) continue;
+      let closest = CLEAR;
+      let when = -1;
+      // Looked at evenly in time, since a flight is slow at the start and the end.
+      for (let i = 1; i < SAMPLES; i++) {
+        const e = ease(i / SAMPLES);
+        const near = along(f, e, at).distanceTo(p.position) / p.radius;
+        // Closer than it should be, and closer than we start (moving off from right by it is fine).
+        if (near < closest && near < start * 0.9) [closest, when] = [near, e];
+      }
+      if (when < 0) continue;
+      // Go round on the side the straight way already passes.
+      const passing = along(f, when, new Vector3());
+      const step = Math.max(1e-5, when * 0.05);
+      const heading = along(f, Math.min(1, when + step), new Vector3()).sub(along(f, Math.max(0, when - step), at)).normalize();
+      const over = passing.sub(p.position);
+      over.addScaledVector(heading, -over.dot(heading));
+      if (over.lengthSq() < 1e-9) over.copy(camera.position).sub(p.position).addScaledVector(heading, -at.copy(camera.position).sub(p.position).dot(heading));
+      if (over.lengthSq() < 1e-9) continue;
+      over.normalize();
+      const avoid = { over, when, end: Math.min(0.97, when + Math.max(0.35, when * 1.5)), amount: 0 };
+      // The least that clears it, all along the way.
+      for (let amount = 0; amount < p.radius * 8; amount += p.radius * 0.02) {
+        avoid.amount = amount;
+        let clear = true;
+        for (let i = 1; i < SAMPLES && clear; i++) {
+          const e = ease(i / SAMPLES);
+          along(f, e, at).addScaledVector(over, amount * detour(avoid, e));
+          clear = at.distanceTo(p.position) / p.radius >= CLEAR || e > avoid.end;
+        }
+        if (clear) break;
+      }
+      found.push(avoid);
     }
-    if (!from) return null;
-    const rel = camera.position.clone().sub(from.position);
-    const ahead = end.position.clone().sub(from.position).normalize();
-    const over = rel.addScaledVector(ahead, -rel.dot(ahead));
-    if (over.lengthSq() < 1e-9) return null;
-    const avoid = { centre: from.position, over: over.normalize(), radius: from.radius };
-    return lift(avoid, camera.position) > 0 ? null : avoid; // already right by it: just go
+    return found;
   }
-  const rel = new Vector3();
-  /** How far to raise a point on the way to keep it clear of the galaxy we're leaving. */
-  function lift({ centre, over, radius }, at) {
-    rel.subVectors(at, centre);
-    const height = rel.dot(over);
-    const across = rel.addScaledVector(over, -height).length();
-    const near = 1 - MathUtils.smoothstep(across, radius * 1.3, radius * 2.5);
-    return Math.max(0, radius * 1.2 * near - height);
+  /** The shape of a detour: 0 at the start, 1 at its middle (closest approach), back to 0 at its end. Smooth all the way. */
+  function detour({ when, end }, e) {
+    if (e <= 0 || e >= end) return 0;
+    return e < when ? MathUtils.smootherstep(e, 0, when) : 1 - MathUtils.smootherstep(e, when, end);
   }
 
   function finish(end) {
@@ -511,18 +549,16 @@ export function createLocalGroup(canvas, pixelRatio) {
     f.last ??= now;
     const t = Math.min(1, (now - f.start) / f.duration);
     const e = ease(t);
-    q.setFromUnitVectors(f.fromDir, f.toDir);
-    dir.copy(f.fromDir).applyQuaternion(new Quaternion().slerp(q, e));
-    const d = Math.exp(Math.log(f.d0) + (Math.log(f.d1) - Math.log(f.d0)) * e);
-    camera.position.copy(f.end.target).addScaledVector(dir, d);
-    // Over the galaxy we're leaving, not through it (all gone by the end).
-    if (f.avoid) camera.position.addScaledVector(f.avoid.over, lift(f.avoid, camera.position) * (1 - MathUtils.smoothstep(e, 0.85, 1)));
+    along(f, e, camera.position);
+    // Round any galaxy in the way, not through it.
+    for (const a of f.avoid) camera.position.addScaledVector(a.over, a.amount * detour(a, e));
     camera.up.copy(f.end.up);
 
     // Which way is up: the end's up (galactic north), as near as we can.
     // Looking almost straight along it, that's no help (it swings right round
     // as we pass), so there up is carried on from the last frame instead,
-    // and turned back gently after (all of it by the end).
+    // and turned back gently after: no faster than ROLL_SPEED, unless that
+    // wouldn't finish by the end.
     forward.subVectors(f.end.target, camera.position).normalize();
     up.copy(f.up).addScaledVector(forward, -forward.dot(f.up));
     if (up.lengthSq() < 1e-12) up.copy(f.end.up).addScaledVector(forward, -forward.dot(f.end.up));
@@ -532,15 +568,21 @@ export function createLocalGroup(canvas, pixelRatio) {
     if (clear > 1e-6) {
       want.divideScalar(clear);
       const angle = Math.atan2(cross.crossVectors(up, want).dot(forward), up.dot(want));
-      const most = ROLL_SPEED * (Math.max(0, now - f.last) / 1000) * MathUtils.smoothstep(clear, 0.05, 0.3);
-      const share = t >= 1 ? 1 : Math.max(Math.min(1, most / Math.max(Math.abs(angle), 1e-9)), Math.max(0, e - f.e) / (1 - f.e));
+      const left = Math.max(1e-3, ((1 - t) * f.duration) / 1000);
+      const rate = Math.max(ROLL_SPEED, Math.abs(angle) / left) * MathUtils.smoothstep(clear, 0.02, 0.1);
+      const share = t >= 1 ? 1 : (rate * Math.max(0, now - f.last)) / 1000 / Math.max(Math.abs(angle), 1e-9);
       up.applyAxisAngle(forward, angle * Math.min(1, share));
     }
     f.up.copy(up);
-    f.e = e;
     f.last = now;
     look.lookAt(camera.position, f.end.target, up);
-    camera.quaternion.slerpQuaternions(f.fromQuat, q.setFromRotationMatrix(look), Math.min(1, e * 3));
+    // Turn from where we were facing to face it, over the first part of the
+    // flight. It keeps moving, so carry on turning the same way round rather
+    // than always the short way (which would flip once it passes halfway).
+    q.setFromRotationMatrix(look);
+    if (q.dot(f.turn ?? f.fromQuat) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+    f.turn = (f.turn ?? new Quaternion()).copy(q);
+    turnBetween(f.fromQuat, q, 1 - (1 - Math.min(1, e * 3)) ** 2, camera.quaternion);
     if (t >= 1) {
       if (f.home) flight = null;
       else finish(f.end);
@@ -578,9 +620,13 @@ export function createLocalGroup(canvas, pixelRatio) {
   screen.add(show);
   const bufferSize = new Vector2();
   function render(renderer) {
-    // Some older graphics chips can't draw into a buffer like that: then straight to the screen.
+    // Some older graphics chips can't draw into a buffer like that: then
+    // straight to the screen, each star's light rolled off on its own.
     if (!renderer.extensions.has("EXT_color_buffer_float") && !renderer.extensions.has("EXT_color_buffer_half_float")) {
+      const was = renderer.toneMapping;
+      renderer.toneMapping = ACESFilmicToneMapping;
       renderer.render(scene, camera);
+      renderer.toneMapping = was;
       return;
     }
     renderer.getDrawingBufferSize(bufferSize);
@@ -635,21 +681,40 @@ function background(pixelRatio) {
 }
 
 /**
- * Stars, and the soft glow under a spiral's disc. Close up, both are drawn
- * no bigger than a few pixels: a star as a sharp point, and the glow (only
- * there to fill in a disc seen from afar) fades away.
+ * Stars; a spiral's stars; and the soft glow under a spiral's disc. Close
+ * up, a star is drawn as a sharp point no more than a few pixels across, and
+ * the glow (only there to fill in a disc seen from afar) fades away, its
+ * light going to the spiral's stars instead.
  */
 function starMaterials(pixelRatio) {
-  const uniforms = { pixelRatio: { value: pixelRatio }, viewHeight: { value: innerHeight }, opacity: { value: 1 } };
-  const make = (maxSize, glow) =>
+  const uniforms = {
+    pixelRatio: { value: pixelRatio },
+    viewHeight: { value: innerHeight },
+    opacity: { value: 1 },
+    glowSize: { value: GLOW_SIZE },
+    glowScale: { value: GLOW_SCALE },
+    glowLight: { value: GLOW_LIGHT },
+  };
+  const make = (maxSize, defines) =>
     new ShaderMaterial({
       ...shaders.galaxyStars,
-      uniforms: { ...uniforms, maxSize: { value: maxSize } }, // the rest shared, so setting one sets both
-      defines: glow ? { GLOW: "" } : {},
+      uniforms: { ...uniforms, maxSize: { value: maxSize } }, // the rest shared, so setting one sets them all
+      defines,
       blending: AdditiveBlending,
       depthTest: false,
       depthWrite: false,
       transparent: true,
     });
-  return [make(STAR_SIZE, false), make(GLOW_SIZE, true)];
+  return [make(STAR_SIZE, {}), make(STAR_SIZE, { GLOW_BACK: "" }), make(GLOW_SIZE, { GLOW: "" })];
+}
+
+/** Turns from a to b by `w` (0..1), the way b lies (even past halfway round), not always the short way. */
+function turnBetween(a, b, w, out) {
+  const cos = Math.min(1, Math.max(-1, a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w));
+  const angle = Math.acos(cos);
+  const sin = Math.sin(angle);
+  if (sin < 1e-6) return out.copy(w < 0.5 ? a : b);
+  const ka = Math.sin((1 - w) * angle) / sin;
+  const kb = Math.sin(w * angle) / sin;
+  return out.set(a.x * ka + b.x * kb, a.y * ka + b.y * kb, a.z * ka + b.z * kb, a.w * ka + b.w * kb).normalize();
 }
