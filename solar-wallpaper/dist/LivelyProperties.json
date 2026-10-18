@@ -134,6 +134,11 @@
     "value": true,
     "text": "Slow camera drift"
   },
+  "strange": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Strange sightings (made up)"
+  },
   "fps": {
     "type": "slider",
     "value": 30,

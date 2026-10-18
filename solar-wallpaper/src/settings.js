@@ -57,13 +57,14 @@ export const DEFAULTS = {
   belts: true,
   clock: true,
   drift: true,
+  strange: true, // now and then, something made up drifts by (see src/oddities)
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
   date: null, // start at this date instead of now
 };
 
 const KEY = "solar-wallpaper:v1";
-const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "fps"];
+const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "fps"];
 
 function readSaved() {
   try {
@@ -105,6 +106,7 @@ export function parse(key, value) {
     case "belts":
     case "clock":
     case "drift":
+    case "strange":
     case "ui":
       return bool(value);
     default:

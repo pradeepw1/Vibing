@@ -71,6 +71,18 @@ Pick one from the menu ("Fly to a star with planets"), click its name on the sky
 
 Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
 
+## Strange sightings
+
+Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`), or press **Show me one now** in the panel.
+
+**All of them are made up, apart from the two real Voyager probes.** When one ends, a note in the corner says what it was and that it was invented. Each one is drawn from scratch in code (no models or pictures), in `src/oddities/`.
+
+- **Unidentified craft** (`ufo.js`): *The Count*, a black ring far bigger than any ship, seen by the stars it hides, whose seams light one at a time as it turns to face you. *The Assembly*, eighty-nine cold lights in a lattice too exact to be a flock, which stop together and all turn to look at you. *The Needle*, a shaft hundreds of times longer than it is wide, with a pulse of light running along it every few seconds, swinging round until it points at you.
+- **Ships** (`ships.js`): a generation ship turning its drums for a crew asleep for centuries, a line of shuttles flying in perfect order, a torn-open wreck with one beacon still calling, and the real *Voyager 1* and *Voyager 2*, shown as small models (not at their true place in the sky).
+- **Odd sky** (`phenomena.js`): *The Seam*, a crack in the sky with a wrong sky behind it. *The Echo*, a ring of light spreading from a place with no star (a nod to real light echoes, like V838 Monocerotis). *The Primes*, rings of light in groups of 2, 3, 5, 7, 11. *The Curtains*, aurora with no planet under it. *The Dimming*, dark pieces crossing a star and fitting together over it (a nod to Tabby's Star).
+
+They show up in the Sun-and-planets views and from the ground. They're placed a little off the middle of the view, never behind a planet, and never switch on while the camera is moving between views.
+
 ## Use it as your wallpaper
 
 The files you need are all in `dist/`: `index.html`, `solar.js` and `LivelyProperties.json`. Copy that folder anywhere.
@@ -97,7 +109,7 @@ Click the button in the top right, or add them to the address, like `index.html?
 | `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr`, or one of the far ones (`galaxy-m51`, `galaxy-m81`, `galaxy-m82`, `galaxy-cena`, `galaxy-ngc253`, `galaxy-m101`, `galaxy-m104`, `galaxy-m87`, `galaxy-ngc1300`, `galaxy-antennae`, `galaxy-cartwheel`). Fly to a black hole: `galaxy-sgra`, `galaxy-cygx1`, `galaxy-m87bh` | `middle` |
 | `reverse` | `1` to run time backwards | `0` |
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
-| `labels`, `orbits`, `belts`, `clock`, `drift` | `0` or `1` | all `1` |
+| `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
 | `fps` | frames per second, 5 to 240 | 60 |
 | `ui` | `0` hides the settings button | `1` |
 | `wallpaper` | shorthand for `ui=0&fps=30` | |
@@ -139,6 +151,7 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/exosystem.js`, `src/exoshaders.js` | A visit to another star's planets: the star, orbits, habitable zone, and each planet drawn from noise by its kind |
 | `src/exoplanet-data.js` | The planets round other stars, made by `tools/make-exoplanets.mjs` |
 | `src/blackholes.js` | The black holes: where they are, how big they're drawn, how their discs are tilted. The light-bending itself is in `src/shaders.js` |
+| `src/oddities/` | The strange sightings: `stage.js` decides when and where one appears; `ufo.js`, `ships.js` and `phenomena.js` draw them |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |
@@ -151,6 +164,6 @@ Credits: the planets round other stars come from the [Open Exoplanet Catalogue](
 - Real bright stars and constellations, from a star catalogue
 - The Moon's shadow on Earth during a solar eclipse, and Jupiter's moons' shadows on Jupiter
 - Real starting positions for the smaller moons (from JPL's mean orbital elements)
-- Comets, and spacecraft like Voyager and JWST
+- Comets, and real positions for spacecraft like Voyager and JWST
 - Real photo textures as an option
 - An Android live wallpaper version

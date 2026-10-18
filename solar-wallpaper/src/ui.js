@@ -5,7 +5,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false }) {
+export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -64,7 +64,12 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
-  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift" };
+  $("#strange-now").addEventListener("click", () => {
+    showStrange();
+    panel.hidden = true; // out of the way, so it can be seen
+    menuBtn.setAttribute("aria-expanded", "false");
+  });
+  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
   menuBtn.addEventListener("click", (e) => {

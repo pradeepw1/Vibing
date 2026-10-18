@@ -11,6 +11,10 @@ import { createSky } from "./sky.js";
 import { createSystem, texture } from "./system.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
+import { createStage } from "./oddities/stage.js";
+import { SIGHTINGS as UFOS } from "./oddities/ufo.js";
+import { SIGHTINGS as SHIPS } from "./oddities/ships.js";
+import { SIGHTINGS as PHENOMENA } from "./oddities/phenomena.js";
 
 const DEG = Math.PI / 180;
 const MIN_YEAR = 1600; // the moons' and Pluto's models are good for a few centuries either side of now
@@ -116,6 +120,7 @@ function set(key, value, how = {}) {
     if (how.remember !== false) savedView = value;
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
+  if (key === "strange") stage.enabled = value;
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
   store();
@@ -156,6 +161,10 @@ function labelOf(id) {
   return body ? `From ${body.def.name}` : "the overview";
 }
 
+// Strange sightings: made-up ships and craft (and two real probes) that drift past now and then.
+const stage = createStage({ scene, builders: [...UFOS, ...SHIPS, ...PHENOMENA], pixelRatio });
+stage.enabled = settings.strange;
+
 const ui = createUI({
   settings,
   bodies,
@@ -166,6 +175,7 @@ const ui = createUI({
   goBack,
   backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
   travelling: () => away.stage === "returning" || away.stage === "unturning",
+  showStrange: () => stage.showOne(),
 });
 
 // --- Camera: views, smooth flights and following a planet ---
@@ -324,7 +334,7 @@ function enterSystem() {
   ui.setAway(ex.places, true);
   const info = ex.info;
   const ly = info.ly < 100 ? info.ly.toFixed(1) : Math.round(info.ly).toLocaleString("en-US");
-  ui.setCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", `Sizes, years and heat are real (Open Exoplanet Catalogue); how the planets look is made up. ${ly} light-years away.`]);
+  showCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", `Sizes, years and heat are real (Open Exoplanet Catalogue); how the planets look is made up. ${ly} light-years away.`]);
   away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
 }
 /** Back up from a system to the galaxy view, where the star is. */
@@ -333,7 +343,7 @@ function leaveSystem() {
   away.dive = null;
   ex.controls.enabled = false;
   ui.setAway(lg.places);
-  ui.setCaption(null);
+  showCaption(null);
   lg.controls.enabled = !lg.flying;
 }
 
@@ -385,7 +395,7 @@ function finishHome() {
   lg.release();
   if (away.scene === "system") leaveSystem();
   ui.setAway(null);
-  ui.setCaption(null);
+  showCaption(null);
   flyTo(id, true);
   // Whatever flyTo didn't take over, give back.
   povCam.state.enabled = Boolean(pov.id) && !pov.leaving;
@@ -791,6 +801,39 @@ function render() {
   camera.far = 3000;
 }
 
+// --- Strange sightings ---
+// The stage (oddities/stage.js) runs them; this feeds it what it needs to know and
+// says what each one was when it ends.
+const strangeSpheres = [...bodies.values()].map((b) => ({ body: b, center: b.group.position, radius: 0 }));
+const strangeView = { allowed: false, up: null, spheres: strangeSpheres };
+let noteUntil = 0;
+
+/** Shows (or clears) the note in the corner, and stops a sighting's note clearing it later. */
+function showCaption(title, lines) {
+  noteUntil = 0;
+  ui.setCaption(title, lines);
+}
+
+stage.onEnd = (s) => {
+  const lines = s.real ? [s.about] : [s.about.replace(/^An invented sighting: ([a-z])/, (_, c) => c.toUpperCase()), "None of it is real. It was made up for this wallpaper."];
+  ui.setCaption(s.real ? s.name : `Made up: ${s.name}`, lines);
+  noteUntil = performance.now() + 10000;
+};
+
+function strangeFrame(dt, now) {
+  if (noteUntil && now > noteUntil) {
+    noteUntil = 0;
+    ui.setCaption(null);
+  }
+  strangeView.allowed = !away.stage && !tween && !flight && !settle;
+  strangeView.up = pov.id ? camera.up : null;
+  for (const s of strangeSpheres) {
+    s.radius = s.body.radius * s.body.group.scale.x;
+    s.clear = pov.id === s.body.id ? 1.03 : undefined; // standing on it: only the ground itself is in the way
+  }
+  stage.update(dt, camera, strangeView);
+}
+
 // --- Clicking a planet or moon ---
 const raycaster = new Raycaster();
 const pointer = new Vector2();
@@ -1021,6 +1064,7 @@ function frame(now) {
   sky.group.position.copy(camera.position);
   sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
   system.fitGlow(camera);
+  strangeFrame(dt, now);
 
   render();
   const ground = pov.id && bodies.get(pov.id);
@@ -1082,7 +1126,7 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, away, ui };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, away, ui, stage, strangeView };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);

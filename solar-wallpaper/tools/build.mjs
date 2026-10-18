@@ -42,6 +42,7 @@ const lively = {
   belts: { type: "checkbox", value: true, text: "Show asteroids" },
   clock: { type: "checkbox", value: true, text: "Show clock" },
   drift: { type: "checkbox", value: true, text: "Slow camera drift" },
+  strange: { type: "checkbox", value: true, text: "Strange sightings (made up)" },
   fps: { type: "slider", value: 30, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
 };
 const { writeFileSync } = await import("node:fs");
