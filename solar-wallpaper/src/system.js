@@ -14,6 +14,7 @@ import {
   LinearFilter,
   LineLoop,
   Mesh,
+  NoColorSpace,
   Points,
   RingGeometry,
   ShaderMaterial,
@@ -49,18 +50,29 @@ const DAY_MS = 86400e3;
 const GAS_GIANTS = new Set(["jupiter", "saturn", "uranus", "neptune", "venus"]);
 
 const sphere = new SphereGeometry(1, 96, 48);
-const smallSphere = new SphereGeometry(1, 40, 20);
+// Moons are small on screen, but their edge still shows corners if there are too few sides.
+const smallSphere = new SphereGeometry(1, 64, 32);
 // The body you stand on fills half the screen, so it gets a much finer sphere.
 const groundSphere = new SphereGeometry(1, 384, 192);
 
-export function texture(image) {
+let anisotropy = 4;
+/** How well textures hold up when seen at a slant (the edges of a planet): as much as the graphics chip allows. */
+export function setAnisotropy(n) {
+  anisotropy = Math.max(1, Math.min(16, n));
+}
+
+/**
+ * A texture from painted ImageData. Colour maps are sRGB; maps that hold plain
+ * numbers (cloud cover, city lights, water) are `data` and are read as they are.
+ */
+export function texture(image, data = false) {
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
   canvas.getContext("2d").putImageData(image, 0, 0);
   const t = new CanvasTexture(canvas);
-  t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.colorSpace = data ? NoColorSpace : SRGBColorSpace;
+  t.anisotropy = anisotropy;
   return t;
 }
 
@@ -122,7 +134,7 @@ function haloFor(def, radius) {
     depthWrite: false,
     blending: AdditiveBlending,
   });
-  const mesh = new Mesh(smallSphere, mat);
+  const mesh = new Mesh(sphere, mat); // the glow ends at this shell's edge, so it needs a round one
   mesh.scale.setScalar(radius * scale);
   mesh.userData = { strength: strength * 0.9, scale };
   return mesh;
@@ -570,13 +582,13 @@ export function createSystem(scene, pixelRatio) {
 
   /** Puts a freshly painted surface on its body. `images` holds ImageData. */
   function applySurface(job, images) {
-    const swap = (uniform, image) => {
+    const swap = (uniform, image, data = false) => {
       uniform.value?.dispose(); // free the old one's GPU memory
-      uniform.value = texture(image);
+      uniform.value = texture(image, data);
     };
     if (job === "clouds") {
       const earth = bodies.get("earth");
-      swap(earth.clouds.material.uniforms.map, images.map);
+      swap(earth.clouds.material.uniforms.map, images.map, true);
       earth.clouds.visible = true;
       return;
     }
@@ -584,7 +596,7 @@ export function createSystem(scene, pixelRatio) {
     swap(b.material.uniforms.map, images.map);
     b.material.uniforms.hasMap.value = 1;
     if (images.extra) {
-      swap(b.material.uniforms.extraMap, images.extra);
+      swap(b.material.uniforms.extraMap, images.extra, true);
       b.material.uniforms.hasExtra.value = 1;
     }
   }

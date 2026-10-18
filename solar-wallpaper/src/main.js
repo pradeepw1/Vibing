@@ -7,7 +7,7 @@ import { createPovCamera, povFov } from "./povcam.js";
 import { createLocalGroup } from "./localgroup.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
-import { createSystem, texture } from "./system.js";
+import { createSystem, setAnisotropy, texture } from "./system.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 
@@ -25,6 +25,7 @@ try {
   throw new Error("WebGL is not available");
 }
 const pixelRatio = Math.min(devicePixelRatio || 1, 2);
+setAnisotropy(renderer.capabilities.getMaxAnisotropy());
 renderer.setPixelRatio(pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
