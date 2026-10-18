@@ -928,7 +928,7 @@ function closeTo() {
   if (pov.id) return [pov.id]; // what you stand on; its planet in the sky is small enough for the lite map
   const [id] = inView();
   const b = id && bodies.get(id);
-  return b && !away.stage && camera.position.distanceTo(b.group.position) < 5 * b.radius ? [id] : [];
+  return b && !away.stage && camera.position.distanceTo(b.group.position) < 5 * b.radius * b.group.scale.x ? [id] : [];
 }
 
 /** The body you stand on fills half the screen, so paint it again in more detail. */

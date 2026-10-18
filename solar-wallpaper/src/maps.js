@@ -30,11 +30,11 @@ const layersOf = (id) => UNITS[id] ?? [id];
 const OWNER = { clouds: "earth", "saturn-rings": "saturn" };
 const isData = (layer) => layer === "earth-extra" || layer === "clouds"; // plain numbers, not colours
 
-/** Which sizes exist for a unit. */
-function sizesOf(id) {
+/** Which sizes exist for a unit, and fit on this graphics chip (`limit` is the widest picture it takes). */
+function sizesOf(id, limit) {
   const layers = layersOf(id);
-  if (!layers.every((l) => LISTED[l]?.lite)) return [];
-  return LISTED[layers[0]].sharp ? ["lite", "sharp"] : ["lite"];
+  if (!layers.every((l) => LISTED[l]?.lite && LISTED[l].lite.width <= limit)) return [];
+  return LISTED[layers[0]].sharp?.width <= limit ? ["lite", "sharp"] : ["lite"];
 }
 
 /** Turns the data: address a map script made into a Blob, without decoding it on the page's thread. */
@@ -114,7 +114,7 @@ export function createMaps({ renderer, system, enabled, onSettled, onMissing }) 
   const units = new Map(); // id -> { id, sizes, lite, sharp, wantedAt }
   const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth"), "saturn-rings"];
   for (const id of ids) {
-    const sizes = sizesOf(id);
+    const sizes = sizesOf(id, renderer.capabilities.maxTextureSize);
     if (sizes.length) units.set(id, { id, sizes, lite: { state: "idle", look: null }, sharp: { state: "idle", look: null }, wantedAt: -Infinity });
   }
   let on = Boolean(enabled) && units.size > 0;
