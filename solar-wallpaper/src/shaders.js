@@ -59,6 +59,8 @@ export const planet = {
     uniform vec3 center;
     uniform vec2 ringRadii;
     uniform sampler2D ringMap;
+    uniform sampler2D ringMapB;  // a new strip fading in over it
+    uniform float ringMix;
 
     varying vec3 vWorldPos;
     varying vec3 vNormal;
@@ -81,7 +83,11 @@ export const planet = {
           if (t > 0.0) {
             float r = length(vWorldPos + L * t - center);
             float f = (r - ringRadii.x) / (ringRadii.y - ringRadii.x);
-            if (f > 0.0 && f < 1.0) diffuse *= 1.0 - 0.9 * texture2D(ringMap, vec2(f, 0.5)).a;
+            if (f > 0.0 && f < 1.0) {
+              float block = texture2D(ringMap, vec2(f, 0.5)).a;
+              if (ringMix > 0.0) block = mix(block, texture2D(ringMapB, vec2(f, 0.5)).a, ringMix);
+              diffuse *= 1.0 - 0.9 * block;
+            }
           }
         }
       }
@@ -180,6 +186,8 @@ export const rings = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new strip fading in over the one above
+    uniform float mapMix;
     uniform vec2 radii;          // inner and outer edge, in the same units as vLocal
     uniform vec3 center;         // planet centre (world)
     uniform float planetRadius;  // world units
@@ -192,6 +200,7 @@ export const rings = {
       float f = (length(vLocal) - radii.x) / (radii.y - radii.x);
       if (f < 0.0 || f > 1.0) discard;
       vec4 tex = texture2D(map, vec2(f, 0.5));
+      if (mapMix > 0.0) tex = mix(tex, texture2D(mapB, vec2(f, 0.5)), mapMix);
 
       vec3 L = sunDir;
       // In the planet's shadow?

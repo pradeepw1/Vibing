@@ -893,7 +893,7 @@ const photos = createMaps({
     mapsDone = true;
     checkLoaded();
   },
-  onMissing: (id) => paintJobs([id]), // no real map: the painted surface it is
+  onMissing: (id) => SURFACES.includes(id) && paintJobs([id]), // no real map: the painted surface it is
 });
 
 /** Real maps on or off, from the menu. Off, whatever isn't painted yet gets painted. */

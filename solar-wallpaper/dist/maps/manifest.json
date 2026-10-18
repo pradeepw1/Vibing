@@ -215,6 +215,12 @@
    "width": 4096
   }
  },
+ "saturn-rings": {
+  "lite": {
+   "bytes": 7108,
+   "width": 4096
+  }
+ },
  "titan": {
   "lite": {
    "bytes": 12686,

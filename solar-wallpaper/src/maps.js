@@ -11,7 +11,7 @@
 // Loading must never make the animation stutter. A script is fetched and its
 // image decoded off the page's thread, and at most one map goes to the
 // graphics chip per frame, and not while frames are running very late.
-import { LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, Texture } from "three";
+import { ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, Texture } from "three";
 import { getAnisotropy } from "./system.js";
 
 /* global MAP_MANIFEST */
@@ -24,8 +24,10 @@ const MIN_GAP = 400; // ms: even when frames are late, a waiting map is handed o
 
 // Earth's picture and its lights-and-water map are one thing, so the lights
 // never show on the wrong picture. Every other unit is a body, by its id.
-const UNITS = { earth: ["earth", "earth-extra"], clouds: ["clouds"] };
+const UNITS = { earth: ["earth", "earth-extra"] };
 const layersOf = (id) => UNITS[id] ?? [id];
+// Units that belong to a body but aren't its skin: Earth's clouds and Saturn's ring strip.
+const OWNER = { clouds: "earth", "saturn-rings": "saturn" };
 const isData = (layer) => layer === "earth-extra" || layer === "clouds"; // plain numbers, not colours
 
 /** Which sizes exist for a unit. */
@@ -92,10 +94,10 @@ function makeTexture(image, flipped, layer, blob) {
   const t = new Texture(image);
   t.colorSpace = isData(layer) ? NoColorSpace : SRGBColorSpace;
   t.flipY = !flipped;
-  t.wrapS = RepeatWrapping; // longitude goes all the way round
+  t.wrapS = layer === "saturn-rings" ? ClampToEdgeWrapping : RepeatWrapping; // longitude goes all the way round; a ring strip has two ends
   t.magFilter = LinearFilter;
   t.minFilter = LinearMipmapLinearFilter;
-  t.anisotropy = getAnisotropy();
+  t.anisotropy = layer === "saturn-rings" ? 1 : getAnisotropy(); // a one-pixel-high strip gives a false "slanted" signal that makes it shimmer
   t.userData = { layer, blob, width: image.width, height: image.height }; // the blob is small; it rebuilds the texture if the graphics context is lost
   t.needsUpdate = true;
   return t;
@@ -110,7 +112,7 @@ function makeTexture(image, flipped, layer, blob) {
  */
 export function createMaps({ renderer, system, enabled, onSettled, onMissing }) {
   const units = new Map(); // id -> { id, sizes, lite, sharp, wantedAt }
-  const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth")];
+  const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth"), "saturn-rings"];
   for (const id of ids) {
     const sizes = sizesOf(id);
     if (sizes.length) units.set(id, { id, sizes, lite: { state: "idle", look: null }, sharp: { state: "idle", look: null }, wantedAt: -Infinity });
@@ -127,7 +129,7 @@ export function createMaps({ renderer, system, enabled, onSettled, onMissing }) 
 
   /** Bigger on screen first, and whatever you're looking at before everything. */
   function priority(unit, camera) {
-    const body = system.bodies.get(unit.id === "clouds" ? "earth" : unit.id);
+    const body = system.bodies.get(OWNER[unit.id] ?? unit.id);
     if (preferred.includes(body.id)) return -Infinity;
     return -(body.radius * body.group.scale.x) / Math.max(camera.position.distanceTo(body.group.position), 1e-6);
   }

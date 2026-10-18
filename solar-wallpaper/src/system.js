@@ -117,6 +117,8 @@ function planetMaterial(def, isMoon) {
       center: { value: new Vector3() },
       ringRadii: { value: new Vector2() },
       ringMap: { value: null },
+      ringMapB: { value: null }, // a real strip fading in over it
+      ringMix: { value: 0 },
     },
     transparent: isMoon,
   });
@@ -231,6 +233,7 @@ export function createSystem(scene, pixelRatio) {
       body.ring = ring;
       material.uniforms.hasRings.value = 1;
       material.uniforms.ringMap.value = tex;
+      body.ringPainted = tex;
       material.uniforms.ringRadii.value.set(SATURN_RINGS.inner * radius, SATURN_RINGS.outer * radius);
     }
     if (def.id === "earth") {
@@ -589,26 +592,29 @@ export function createSystem(scene, pixelRatio) {
   }
 
   // --- What each surface shows ---
-  // A surface is a body's skin, or Earth's cloud layer. It can have a painted
-  // look (made in code, see surfaces.js) and a photo look (a real map, see
-  // maps.js). The photo is shown when there is one and real maps are on. A new
-  // look fades in over the old one instead of popping in.
+  // A surface is a body's skin, Earth's cloud layer, or Saturn's ring strip. It
+  // can have a painted look (made in code, see surfaces.js) and a photo look (a
+  // real map, see maps.js). The photo is shown when there is one and real maps
+  // are on. A new look fades in over the old one instead of popping in.
   const FADE_SECONDS = 0.8;
   const slots = new Map();
   let photosOn = true;
 
+  const look = (map, extra) => ({ map, extra, textures: [map, extra].filter(Boolean) });
+
   function slotFor(id) {
     let s = slots.get(id);
     if (!s) {
-      const clouds = id === "clouds";
-      const u = (clouds ? bodies.get("earth").clouds : bodies.get(id)).material.uniforms;
-      s = { id, clouds, u, painted: null, photo: null, shown: null, fade: null, afterwards: [] };
+      const kind = id === "clouds" ? "clouds" : id === "saturn-rings" ? "rings" : "body";
+      const owner = bodies.get(kind === "clouds" ? "earth" : kind === "rings" ? "saturn" : id);
+      const part = kind === "clouds" ? owner.clouds : kind === "rings" ? owner.ring : owner;
+      s = { id, kind, u: part.material.uniforms, planet: owner.material.uniforms, painted: null, photo: null, shown: null, fade: null, afterwards: [] };
+      if (kind === "rings") s.painted = s.shown = look(owner.ringPainted); // the strip made in code is on from the start
       slots.set(id, s);
     }
     return s;
   }
 
-  const look = (map, extra) => ({ map, extra, textures: [map, extra].filter(Boolean) });
   const inUse = (s, textures) => textures.some((t) => s.shown?.textures.includes(t) || s.fade?.look.textures.includes(t));
 
   /** Runs the things waiting for some textures to be off the screen (to free them), for those that are. */
@@ -618,19 +624,29 @@ export function createSystem(scene, pixelRatio) {
     for (const w of waiting) if (!s.afterwards.includes(w)) w.fn();
   }
 
-  /** Puts a look on a surface at once. */
-  function setNow(s, l) {
+  /** Sets what a surface draws: `l` is the look on show, `over` one fading in on top of it by `mix` (0..1). */
+  function setLooks(s, l, over, mix) {
     const { u } = s;
     u.map.value = l?.map ?? null;
-    u.mapB.value = null;
-    u.mapMix.value = 0;
-    if (!s.clouds) {
+    u.mapB.value = over?.map ?? null;
+    u.mapMix.value = mix;
+    if (s.kind === "rings") {
+      // the strip is used twice: by the rings, and for their shadow on the planet
+      s.planet.ringMap.value = l?.map ?? null;
+      s.planet.ringMapB.value = over?.map ?? null;
+      s.planet.ringMix.value = mix;
+    } else if (s.kind === "body") {
       u.hasMap.value = l?.map ? 1 : 0;
       u.extraMap.value = l?.extra ?? null;
       u.hasExtra.value = l?.extra ? 1 : 0;
-      u.extraMapB.value = null;
-      u.hasExtraB.value = 0;
-    } else if (l) bodies.get("earth").clouds.visible = true;
+      u.extraMapB.value = over?.extra ?? null;
+      u.hasExtraB.value = over?.extra ? 1 : 0;
+    } else if (l || over) bodies.get("earth").clouds.visible = true;
+  }
+
+  /** Puts a look on a surface at once. */
+  function setNow(s, l) {
+    setLooks(s, l, null, 0);
     s.shown = l;
     s.fade = null;
     runWhenUnused(s);
@@ -643,12 +659,7 @@ export function createSystem(scene, pixelRatio) {
     if (s.fade) setNow(s, s.fade.look); // a fade still going is brought to its end first
     if (want === s.shown) return;
     if (!want) return setNow(s, null);
-    s.u.mapB.value = want.map;
-    s.u.mapMix.value = 0;
-    if (!s.clouds) {
-      s.u.extraMapB.value = want.extra;
-      s.u.hasExtraB.value = want.extra ? 1 : 0;
-    } else bodies.get("earth").clouds.visible = true;
+    setLooks(s, s.shown, want, 0);
     s.fade = { look: want, t: 0 };
   }
 
@@ -658,7 +669,7 @@ export function createSystem(scene, pixelRatio) {
       if (!s.fade) continue;
       s.fade.t += dtReal / FADE_SECONDS;
       if (s.fade.t >= 1) setNow(s, s.fade.look);
-      else s.u.mapMix.value = s.fade.t * s.fade.t * (3 - 2 * s.fade.t);
+      else setLooks(s, s.shown, s.fade.look, s.fade.t * s.fade.t * (3 - 2 * s.fade.t));
     }
   }
 
@@ -676,7 +687,7 @@ export function createSystem(scene, pixelRatio) {
   /** Shows the textures of a real map (see maps.js) on a surface. They are marked with the layer they come from. */
   function applyPhoto(id, textures) {
     const s = slotFor(id);
-    const map = textures.find((t) => t.userData.layer === (s.clouds ? "clouds" : id)) ?? null;
+    const map = textures.find((t) => t.userData.layer === id) ?? null;
     const extra = textures.find((t) => t.userData.layer === "earth-extra") ?? null;
     s.photo = look(map, extra);
     refresh(s);
