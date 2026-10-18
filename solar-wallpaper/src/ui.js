@@ -457,8 +457,23 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     hovered = id;
   }
 
+  // A line beside the settings button for a few seconds once the picture is up.
+  const hintEl = document.createElement("div");
+  hintEl.id = "hint";
+  hintEl.textContent = "Settings are here. Fly to black holes, galaxies and the Gate from the View list.";
+  document.body.append(hintEl);
+  function showHint() {
+    if (!settings.ui || hiddenAll) return;
+    hintEl.classList.add("on");
+    setTimeout(() => hintEl.classList.remove("on"), 9000);
+    menuBtn.addEventListener("click", () => hintEl.classList.remove("on"), { once: true });
+  }
+
   function doneLoading() {
     $("#loading").classList.add("done");
+    // Loading takes longer than the idle wait, so start the wait now: the button is in plain sight when the picture appears.
+    wake();
+    showHint();
   }
 
   sync();

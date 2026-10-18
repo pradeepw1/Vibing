@@ -57,7 +57,12 @@
     background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px);
     transition: opacity .4s; }
   #menu-btn:hover { border-color: rgba(255,255,255,.25); }
-  .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0; pointer-events: none; }
+  /* Faint, not gone, so it can always be found. A touch or a mouse move brings it back. */
+  .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0.3; }
+  /* A line beside the settings button for a few seconds after loading, so people know where the settings are. */
+  #hint { position: fixed; top: calc(24px + var(--safe-top)); right: 70px; max-width: min(260px, calc(100vw - 110px)); text-align: right; font-size: 12px; line-height: 1.4;
+    color: var(--text); text-shadow: 0 1px 6px #000; pointer-events: none; opacity: 0; transition: opacity .6s; }
+  #hint.on { opacity: 0.9; }
   canvas.pointing { cursor: pointer; }
   .idle, .idle canvas, .idle .label { cursor: none; }
 
