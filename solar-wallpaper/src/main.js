@@ -925,7 +925,7 @@ function inView() {
 
 /** Those you're close to, which get the sharp real maps. */
 function closeTo() {
-  if (pov.id) return inView();
+  if (pov.id) return [pov.id]; // what you stand on; its planet in the sky is small enough for the lite map
   const [id] = inView();
   const b = id && bodies.get(id);
   return b && !away.stage && camera.position.distanceTo(b.group.position) < 5 * b.radius ? [id] : [];
