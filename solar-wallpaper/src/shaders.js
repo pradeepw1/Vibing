@@ -101,7 +101,9 @@ export const planet = {
         vec3 extra = hasExtra > 0.5 ? texture2D(extraMap, vUv).rgb : vec3(0.0);
         if (mapMix > 0.0) extra = mix(extra, hasExtraB > 0.5 ? texture2D(extraMapB, vUv).rgb : vec3(0.0), mapMix);
         float night = 1.0 - smoothstep(-0.12, 0.08, ndl);
-        col += vec3(1.0, 0.72, 0.38) * extra.r * night * 0.9;
+        // The lights map has a faint land-shaped glow over deserts and ice as well as the cities: keep only the cities.
+        float lights = clamp((extra.r - 0.18) * 1.22, 0.0, 1.0);
+        col += vec3(1.0, 0.72, 0.38) * lights * night * 0.9;
         vec3 H = normalize(L + V);
         float glint = pow(max(dot(N, H), 0.0), 160.0) * smoothstep(0.0, 0.2, ndl);
         col += vec3(1.0, 0.9, 0.75) * extra.g * glint * 0.3;
@@ -161,7 +163,8 @@ export const halo = {
       vec3 V = normalize(cameraPosition - vWorldPos);
       float g = clamp(-dot(N, V) / edge, 0.0, 1.0);
       float sunny = smoothstep(-0.35, 0.6, dot(normalize(vWorldPos - center), sunDir));
-      gl_FragColor = vec4(color * strength * g * g * sunny, 1.0);
+      // (the smoothstep makes the glow start from nothing at its outer edge, with no thin bright outline)
+      gl_FragColor = vec4(color * strength * g * g * smoothstep(0.0, 0.3, -dot(N, V)) * sunny, 1.0);
       ${outputChunks}
       // Added to the sky behind, so only where there is some glow to break up.
       if (max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b)) > 1.0 / 255.0) {

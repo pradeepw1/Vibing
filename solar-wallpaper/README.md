@@ -95,7 +95,7 @@ They show up in the Sun-and-planets views and from the ground. They're placed a 
 
 The files you need are all in `dist/`: `index.html`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere.
 
-**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. The settings (speed, view, names...) show up in Lively's customise panel.
+**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. The settings (speed, view, names...) show up in Lively's customise panel. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
 
 **Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved.
 
@@ -222,6 +222,7 @@ The Solar System Scope maps: *Textures by [Solar System Scope](https://www.solar
 - The Moon's shadow on Earth during a solar eclipse, and Jupiter's moons' shadows on Jupiter
 - Real starting positions for the smaller moons (from JPL's mean orbital elements)
 - Comets, and real positions for spacecraft like Voyager and JWST
+- Better filling of the parts no probe photographed: on Ganymede, Europa, Callisto and Mercury, orbiting over the poles shows grey patches with straight edges where the map was filled in
 - Bumps and shadows from real heights (the Moon's craters, Mars's volcanoes) so relief changes with the light
 - An 8192-pixel size for the Moon, Earth and Mars when you zoom right in
 - An Android live wallpaper version

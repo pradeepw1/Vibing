@@ -37,6 +37,16 @@ function sizesOf(id, limit) {
   return LISTED[layers[0]].sharp?.width <= limit ? ["lite", "sharp"] : ["lite"];
 }
 
+/**
+ * How near you can come to a body, in its radii, before its map goes soft: a 4096-wide map holds up
+ * to 1.4, a 2048-wide one about 2, a 1440-wide one about 2.4. Bodies with no map keep 1.4.
+ */
+export function nearestFor(id) {
+  const entry = LISTED[layersOf(id)[0]];
+  const w = entry?.sharp?.width ?? entry?.lite?.width ?? 0;
+  return w >= 4096 ? 1.4 : w >= 2048 ? 2.0 : w ? 2.4 : 1.4;
+}
+
 /** Turns the data: address a map script made into a Blob, without decoding it on the page's thread. */
 async function blobOf(uri) {
   try {

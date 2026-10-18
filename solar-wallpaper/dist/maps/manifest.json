@@ -11,11 +11,11 @@
  },
  "callisto": {
   "lite": {
-   "bytes": 61844,
+   "bytes": 61858,
    "width": 1024
   },
   "sharp": {
-   "bytes": 252298,
+   "bytes": 251898,
    "width": 2048
   }
  },
@@ -117,11 +117,11 @@
  },
  "mars": {
   "lite": {
-   "bytes": 149534,
+   "bytes": 155578,
    "width": 2048
   },
   "sharp": {
-   "bytes": 440074,
+   "bytes": 458222,
    "width": 4096
   }
  },
@@ -147,11 +147,11 @@
  },
  "moon": {
   "lite": {
-   "bytes": 494144,
+   "bytes": 502102,
    "width": 2048
   },
   "sharp": {
-   "bytes": 2120834,
+   "bytes": 2152340,
    "width": 4096
   }
  },
@@ -187,11 +187,11 @@
  },
  "pluto": {
   "lite": {
-   "bytes": 69412,
+   "bytes": 69424,
    "width": 1024
   },
   "sharp": {
-   "bytes": 248072,
+   "bytes": 248178,
    "width": 2048
   }
  },

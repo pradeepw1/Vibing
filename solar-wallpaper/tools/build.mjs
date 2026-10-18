@@ -54,6 +54,7 @@ const lively = {
   drift: { type: "checkbox", value: true, text: "Slow camera drift" },
   strange: { type: "checkbox", value: true, text: "Strange sightings (made up)" },
   photos: { type: "checkbox", value: true, text: "Real maps" },
+  ui: { type: "checkbox", value: true, text: "Show settings button" },
   credits: { type: "label", text: "Credits: planet maps from NASA, USGS and Solar System Scope (CC BY 4.0, resized and recoloured), Natural Earth and Celestia. Positions by astronomy-engine, drawing by three.js, planets of other stars from the Open Exoplanet Catalogue. Full list in CREDITS.txt." },
   fps: { type: "slider", value: 30, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
 };

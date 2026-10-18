@@ -51,8 +51,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   viewSel.append(lookAt, lookFrom, visit, stars, made);
   const pill = $("#pov");
   const pillName = $("#pov .name");
-  // While idle the Back pill and the settings button are hidden. A click that
-  // lands on one as it reappears was meant for the sky, not for them.
+  // While idle the Back pill is hidden (the settings button only fades). A click
+  // that lands on the pill as it reappears was meant for the sky, not for it.
   const justWoke = (e) => e.detail > 0 && performance.now() - wokeAt < 400; // detail is 0 for Space and Enter
   $("#pov-back").addEventListener("click", (e) => justWoke(e) || goBack());
   // Whether the last focus change came from Tab (rather than a click).
@@ -81,8 +81,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
-  menuBtn.addEventListener("click", (e) => {
-    if (justWoke(e)) return;
+  menuBtn.addEventListener("click", () => {
+    // (no justWoke check: the button is always in sight, so a click on it is meant)
     panel.hidden = !panel.hidden;
     menuBtn.setAttribute("aria-expanded", String(!panel.hidden));
   });
@@ -108,6 +108,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     }
     for (const [id, key] of Object.entries(toggles)) $(`#${id}`).checked = settings[key];
     menuBtn.hidden = !settings.ui || hiddenAll;
+    hintEl.style.visibility = hiddenAll ? "hidden" : ""; // (H hides everything, the hint too)
     if (!settings.ui || hiddenAll) panel.hidden = true;
     clockEl.hidden = !settings.clock || hiddenAll;
     labelsEl.hidden = !settings.labels || hiddenAll;

@@ -266,19 +266,25 @@ def roll_lon(a, turns):
 
 
 def fix_seam(a):
-    """If the left and right edges don't match, spreads the difference over a band so they do."""
+    """If the left and right edges don't match, spreads the difference over a band so they do.
+
+    Looks at both the very edge columns (a thin line) and the average tone of a few columns
+    each side (a step in brightness or colour that runs the whole height, as on Mars)."""
     h, w = a.shape[:2]
+    n = max(4, w // 256)
+    step = a[:, :n].mean(axis=1) - a[:, -n:].mean(axis=1)  # per row, left minus right
+    tone = np.abs(step).mean()
     edge = np.abs(a[:, 0] - a[:, -1]).mean()
     usual = (np.abs(a[:, w // 2] - a[:, w // 2 + 1]).mean() + np.abs(a[:, w // 4] - a[:, w // 4 + 1]).mean()) / 2
-    if edge < 2.0 * usual + 0.004:
+    if edge < 2.0 * usual + 0.004 and tone < 1.5 / 255:
         return a
-    d = blur((a[:, 0] - a[:, -1])[:, None, :], 5, wrap=False)[:, 0] / 2  # per row, smoothed
-    band = max(24, w // 40)
+    d = blur(step[:, None, :], 12, wrap=False)[:, 0] / 2  # per row, smoothed
+    band = max(24, w // 12) if tone >= 1.5 / 255 else max(24, w // 40)  # a tone step needs a wider, gentler ramp
     ramp = (1 - smoothstep(0, band, np.arange(band, dtype="float32")))[None, :, None]
     out = a.copy()
     out[:, :band] -= d[:, None, :] * ramp
     out[:, w - band:] += d[:, None, :] * ramp[:, ::-1]
-    print("    seam: edges differed by %.3f, joined" % edge)
+    print("    seam: edges differed by %.3f (tone step %.1f levels), joined" % (edge, tone * 255))
     return np.clip(out, 0, 1)
 
 
@@ -594,9 +600,9 @@ LAYERS = {
     "earth": (2048, 4096, earth_day, "webp"),
     "earth-extra": (2048, 2048, earth_lights_and_water, "jpeg444"),
     "clouds": (2048, 4096, earth_clouds, "webp-grey"),
-    "moon": (2048, 4096, plain("moon", pole=82.0), "webp"),
+    "moon": (2048, 4096, plain("moon", pole=86.0), "webp"),
     # The Viking colours lean pink and the Solar System Scope Jupiter leans blue: warmed towards what telescopes show.
-    "mars": (2048, 4096, plain("mars", pole=80.0, gain=(1.26, 1.18, 0.9)), "webp"),
+    "mars": (2048, 4096, plain("mars", pole=86.0, gain=(1.26, 1.18, 0.9)), "webp"),
     "jupiter": (2048, 4096, plain("jupiter", pole=80.0, gain=(1.07, 1.0, 0.86)), "webp"),
     "saturn": (2048, 4096, plain("saturn", pole=80.0), "webp"),
     "venus": (1024, 2048, plain("venus", saturation=0.8), "webp"),

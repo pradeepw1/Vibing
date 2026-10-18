@@ -86,7 +86,7 @@ export function createSky(pixelRatio) {
 
   // Transparent from the start, so it can fade with the stars (three.js won't
   // switch an opaque material to see-through without rebuilding it).
-  const milkyMat = new MeshBasicMaterial({ color: 0x000000, side: BackSide, depthWrite: false, transparent: true });
+  const milkyMat = new MeshBasicMaterial({ color: 0x000000, side: BackSide, depthWrite: false, transparent: true, dithering: true }); // (dithered, or the faint gradient shows steps)
   const milky = new Mesh(new SphereGeometry(1000, 64, 32), milkyMat);
   milky.quaternion.setFromRotationMatrix(basis.matrix);
   milky.renderOrder = -2;

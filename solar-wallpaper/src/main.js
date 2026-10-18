@@ -9,7 +9,7 @@ import { createLocalGroup } from "./localgroup.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
-import { createMaps } from "./maps.js";
+import { createMaps, nearestFor } from "./maps.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 import { createElsewhere } from "./elsewhere.js";
@@ -267,7 +267,7 @@ function flyTo(id, instant = false) {
   if (pov.id) return leavePov(id, instant);
   const view = viewFor(id);
   const offset = offsetFor(view, focus?.body.id === "sun" && view.body.id === "sun");
-  controls.minDistance = view.body.radius * 1.4;
+  controls.minDistance = view.body.radius * nearestFor(view.body.id);
   focus = view;
   lastFocus.copy(view.body.group.position);
   if (instant) {
@@ -294,6 +294,7 @@ function goToGalaxy(id, instant) {
   if (away.stage === "there" || away.stage === "returning") {
     // Already out here: fly across.
     leaveInner();
+    carryFade(); // (if we were sinking in, don't snap back to clear)
     away.dive = null;
     away.stage = "there";
     away.galaxy = id;
@@ -348,6 +349,11 @@ function enterSystem() {
   showCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", info.dim, `Years and distances come from the Open Exoplanet Catalogue. How the planets look is made up. ${ly} light-years away.`]);
   away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
 }
+/** Called as a dive is given up: carries the screen's darkness on, so it fades out from where it got to. */
+function carryFade() {
+  if (away.dive !== null) away.arrived = performance.now() - (1 - fadeShown) * DIP_MS;
+}
+
 /** Down into whatever we've flown up to: a star's planets, or the Gate. */
 function enterInner() {
   const place = lg.places.get(away.galaxy);
@@ -417,7 +423,9 @@ function comeHome(id, instant) {
   }
   if (away.stage === "returning" || away.stage === "unturning") return;
   leaveInner();
+  carryFade();
   away.dive = null;
+  showCaption(null); // (the arrival note, if there is one)
   away.stage = "returning";
   lg.flyTo("home");
 }
@@ -675,7 +683,7 @@ function finishLeaving(view, offset) {
   camera.layers.set(0);
   controls.target.copy(view.body.group.position);
   camera.position.copy(controls.target).add(offset);
-  controls.minDistance = view.body.radius * 1.4;
+  controls.minDistance = view.body.radius * nearestFor(view.body.id);
   controls.enabled = true;
   lastFocus.copy(view.body.group.position);
   camera.near = 0.01;

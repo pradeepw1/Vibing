@@ -40,6 +40,8 @@
   .label.galaxy { display: grid; font-size: 10px; color: rgba(205, 200, 235, 0.55); }
   .label.galaxy:hover { color: var(--text); }
   #caption { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); max-width: min(300px, 50vw); text-align: right; pointer-events: none; text-shadow: 0 1px 6px #000; transition: opacity 0.4s; }
+  /* While the planets are still loading, their note sits in the corner: lift the caption clear of it. */
+  #loading:not(.done) ~ #caption { bottom: calc(var(--gutter) + var(--safe-bottom) + 26px); }
   #caption .title { font-size: clamp(15px, 1.6vw, 20px); font-weight: 300; }
   #caption .line { margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--muted); }
   .idle #caption { opacity: 0.55; }
@@ -60,7 +62,7 @@
   /* Faint, not gone, so it can always be found. A touch or a mouse move brings it back. */
   .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0.3; }
   /* A line beside the settings button for a few seconds after loading, so people know where the settings are. */
-  #hint { position: fixed; top: calc(24px + var(--safe-top)); right: 70px; max-width: min(260px, calc(100vw - 110px)); text-align: right; font-size: 12px; line-height: 1.4;
+  #hint { position: fixed; top: calc(68px + var(--safe-top)); right: 18px; max-width: min(260px, calc(100vw - 36px)); text-align: right; font-size: 12px; line-height: 1.4;
     color: var(--text); text-shadow: 0 1px 6px #000; pointer-events: none; opacity: 0; transition: opacity .6s; }
   #hint.on { opacity: 0.9; }
   canvas.pointing { cursor: pointer; }
