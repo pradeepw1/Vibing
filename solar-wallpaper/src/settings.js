@@ -7,6 +7,7 @@ import { BLACK_HOLES } from "./blackholes.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { MOONS, PLANETS } from "./bodies.js";
 import { GALAXIES } from "./galaxies.js";
+import { GATE } from "./gate.js";
 
 // "live" runs at real speed. If the clock is on today's date, it stays locked to now.
 export const SPEEDS = [
@@ -34,6 +35,8 @@ export const VIEWS = [
   ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id })),
   // Other stars and their planets (nearest first).
   ...EXOPLANET_SYSTEMS.map((s) => ({ id: `galaxy-${s.id}`, label: s.name, galaxy: s.id, star: true })),
+  // Made up, and said to be.
+  { id: `galaxy-${GATE.id}`, label: `${GATE.name} (made up)`, galaxy: GATE.id, fiction: true },
 ];
 
 /** The galaxy (or black hole) a "galaxy-..." view goes to, or null. */

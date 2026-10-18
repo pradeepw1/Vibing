@@ -11,6 +11,7 @@ import { createSky } from "./sky.js";
 import { createSystem, texture } from "./system.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
+import { createElsewhere } from "./elsewhere.js";
 import { createStage } from "./oddities/stage.js";
 import { SIGHTINGS as UFOS } from "./oddities/ufo.js";
 import { SIGHTINGS as SHIPS } from "./oddities/ships.js";
@@ -53,6 +54,7 @@ scene.add(...belts.parts);
 const { bodies } = system;
 const lg = createLocalGroup(renderer.domElement, pixelRatio); // out among the galaxies
 const ex = createExoSystem(renderer.domElement, pixelRatio); // round another star
+const beyond = createElsewhere(renderer.domElement); // through the Gate
 
 // --- The clock ---
 // `synced` means "showing right now": the clock just follows the computer's clock.
@@ -96,7 +98,7 @@ const away = {
   home: viewpoint(settings.view) || !galaxyOf(settings.view) ? settings.view : "middle", // the solar system view to come back to
   then: null, // a different view asked for on the way home
   start: 0,
-  scene: "galaxies", // or "system": down among the planets of another star
+  scene: "galaxies", // or "system" (down among the planets of another star), or "elsewhere" (through the Gate)
   dive: null, // when we began to dive into a system
   arrived: -Infinity, // when we last switched between the solar system and the galaxies
   fromTurn: new Quaternion(),
@@ -284,13 +286,13 @@ const DIP_MS = 400;
 function goToGalaxy(id, instant) {
   if (away.stage === "there" || away.stage === "returning") {
     // Already out here: fly across.
-    if (away.scene === "system") leaveSystem();
+    leaveInner();
     away.dive = null;
     away.stage = "there";
     away.galaxy = id;
     away.then = null;
     lg.flyTo(id, { instant });
-    if (instant && lg.places.get(id).system) enterSystem();
+    if (instant) enterInner();
     return;
   }
   settleMoves();
@@ -317,7 +319,7 @@ function arriveAmongGalaxies(instant) {
   const dir = lg.places.get(away.galaxy).dir;
   const start = { position: new Vector3(), quaternion: new Quaternion().setFromRotationMatrix(lookMatrix.lookAt(new Vector3(), dir, lg.places.get("milkyway").up)) };
   lg.flyTo(away.galaxy, instant ? { instant: true } : { from: start });
-  if (instant && lg.places.get(away.galaxy).system) enterSystem();
+  if (instant) enterInner();
 }
 
 // --- Diving into a star's own system ---
@@ -336,6 +338,40 @@ function enterSystem() {
   const ly = info.ly < 100 ? info.ly.toFixed(1) : Math.round(info.ly).toLocaleString("en-US");
   showCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", `Sizes, years and heat are real (Open Exoplanet Catalogue); how the planets look is made up. ${ly} light-years away.`]);
   away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
+}
+/** Down into whatever we've flown up to: a star's planets, or the Gate. */
+function enterInner() {
+  const place = lg.places.get(away.galaxy);
+  if (place?.system) enterSystem();
+  else if (place?.gate) enterGate();
+}
+/** Back up out of a system, or back through the Gate. */
+function leaveInner() {
+  if (away.scene === "system") leaveSystem();
+  else if (away.scene === "elsewhere") leaveGate();
+}
+
+// --- Through the Gate ---
+const noPlaces = new Map();
+function enterGate() {
+  away.scene = "elsewhere";
+  away.dive = null;
+  beyond.show();
+  lg.controls.enabled = false;
+  beyond.controls.enabled = true;
+  ui.setAway(noPlaces);
+  const note = (n) => showCaption(beyond.info.name, [beyond.info.about, n ? `Doorways passed: ${n}` : "Made up. Nothing here exists."]);
+  note(0);
+  beyond.onDimension = note;
+  away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
+}
+function leaveGate() {
+  away.scene = "galaxies";
+  away.dive = null;
+  beyond.controls.enabled = false;
+  ui.setAway(lg.places);
+  showCaption(null);
+  lg.controls.enabled = !lg.flying;
 }
 /** Back up from a system to the galaxy view, where the star is. */
 function leaveSystem() {
@@ -362,7 +398,7 @@ function comeHome(id, instant) {
     return;
   }
   if (away.stage === "returning" || away.stage === "unturning") return;
-  if (away.scene === "system") leaveSystem();
+  leaveInner();
   away.dive = null;
   away.stage = "returning";
   lg.flyTo("home");
@@ -393,7 +429,7 @@ function finishHome() {
   if (wasThere) away.arrived = performance.now();
   lg.controls.enabled = false;
   lg.release();
-  if (away.scene === "system") leaveSystem();
+  leaveInner();
   ui.setAway(null);
   showCaption(null);
   flyTo(id, true);
@@ -432,13 +468,14 @@ function leavingFrame(now) {
 /** One frame out among the galaxies. Returns false if that's just ended (home again). */
 function galaxyFrame(now) {
   if (away.scene === "system") return systemFrame(now);
+  if (away.scene === "elsewhere") return elsewhereFrame(now);
   const t = lg.update(now, settings.drift && !reducedMotion);
   // Arrived at a star with planets: sink into it.
-  if (away.stage === "there" && t >= 1 && !lg.flying && lg.places.get(away.galaxy)?.system) {
+  if (away.stage === "there" && t >= 1 && !lg.flying && (lg.places.get(away.galaxy)?.system || lg.places.get(away.galaxy)?.gate)) {
     away.dive ??= now;
     setFade((now - away.dive) / DIVE_MS);
     if (now - away.dive >= DIVE_MS) {
-      enterSystem();
+      enterInner();
       away.arrived = Infinity;
     }
   }
@@ -454,6 +491,19 @@ function galaxyFrame(now) {
   // Getting ready (making the stars, the first picture) is done in the dark.
   if (away.arrived === Infinity) away.arrived = performance.now();
   ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, away.stage === "there" ? away.galaxy : null);
+  return true;
+}
+
+/** One frame on the other side of the Gate. */
+let lastBeyondFrame = 0;
+function elsewhereFrame(now) {
+  const dt = Math.min(0.1, Math.max(0, (now - (lastBeyondFrame || now)) / 1000));
+  lastBeyondFrame = now;
+  beyond.update(dt, now, settings.drift && !reducedMotion);
+  setFade(1 - (now - away.arrived) / DIP_MS);
+  renderer.autoClear = true;
+  beyond.render(renderer, 1000 / settings.fps);
+  if (away.arrived === Infinity) away.arrived = performance.now();
   return true;
 }
 
@@ -848,6 +898,7 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   press = null;
   if (away.stage) {
     // Out among the galaxies: click one to fly to it, or the Milky Way to go home.
+    if (away.scene === "elsewhere") return; // dragging is for looking round
     if (away.scene === "system") {
       // Down among the planets: click one to go to it, or the star (or space) to see them all.
       if (away.stage === "there" && now >= quietUntil) {
@@ -892,7 +943,7 @@ function updateHover(now) {
   hoverChecked = now;
   const awake = resting && !document.body.classList.contains("idle");
   if (away.stage) {
-    const place = awake && away.stage === "there" ? (away.scene === "system" ? ex.pick(resting.x, resting.y) : !lg.flying ? lg.pick(resting.x, resting.y) : null) : null;
+    const place = awake && away.stage === "there" && away.scene !== "elsewhere" ? (away.scene === "system" ? ex.pick(resting.x, resting.y) : !lg.flying ? lg.pick(resting.x, resting.y) : null) : null;
     renderer.domElement.classList.toggle("pointing", Boolean(place && (away.scene === "system" || place.id !== away.galaxy)));
     ui.hover(null);
     return;
@@ -1079,6 +1130,7 @@ addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   lg.resize();
   ex.resize();
+  beyond.resize();
   renderer.setSize(innerWidth, innerHeight);
 });
 
@@ -1126,7 +1178,7 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, away, ui, stage, strangeView };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);

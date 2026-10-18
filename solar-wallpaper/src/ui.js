@@ -42,11 +42,13 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   visit.label = "Fly out to a galaxy or black hole";
   const stars = document.createElement("optgroup");
   stars.label = "Fly to a star with planets";
-  for (const v of VIEWS) (v.from ? lookFrom : v.star ? stars : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
+  const made = document.createElement("optgroup");
+  made.label = "A made-up place";
+  for (const v of VIEWS) (v.from ? lookFrom : v.fiction ? made : v.star ? stars : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
   const extra = new Option("", ""); // for views from moons that aren't in the list
   extra.hidden = true;
   lookFrom.append(extra);
-  viewSel.append(lookAt, lookFrom, visit, stars);
+  viewSel.append(lookAt, lookFrom, visit, stars, made);
   const pill = $("#pov");
   const pillName = $("#pov .name");
   // While idle the Back pill and the settings button are hidden. A click that

@@ -20,6 +20,7 @@ import {
 import { eqjToScene } from "./ephemeris.js";
 import { BLACK_HOLES } from "./blackholes.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
+import { GATE } from "./gate.js";
 import { createGalaxies, skyDirection } from "./galaxies.js";
 import { clamp, random } from "./noise.js";
 import * as shaders from "./shaders.js";
@@ -135,6 +136,8 @@ export function createSky(pixelRatio) {
     galaxies: [
       ...galaxies.named,
       ...BLACK_HOLES.map((h) => ({ id: h.id, name: h.name, lightYears: h.lightYears, direction: skyDirection(h.ra, h.dec), distance: 950 })),
+      // Made up, and the label says so.
+      { id: GATE.id, name: GATE.name, lightYears: "Made up", direction: skyDirection(GATE.ra, GATE.dec), distance: 960 },
       // A few of the best-known stars with planets (all of them are in the menu).
       ...EXOPLANET_SYSTEMS.filter((s) => s.famous).map((s) => ({
         id: s.id,

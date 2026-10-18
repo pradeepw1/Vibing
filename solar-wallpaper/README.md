@@ -71,6 +71,14 @@ Pick one from the menu ("Fly to a star with planets"), click its name on the sky
 
 Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
 
+### The Gate
+
+A made-up doorway, and the strangest place here. It's in the menu under "A made-up place" (or `?view=galaxy-gate`, or click its name on the sky). It sits in the direction the 1977 "Wow!" radio signal came from, because that's the best-known thing nobody has explained; how far away it is, is only a guess, and its label says "Made up".
+
+Fly up to it and you sink through: a long round hall of light that never ends. Every so often a doorway rises out of the dark; go through and the whole place changes (its colours, its number of sides, and what kind of light it gives off: rushing streaks, a neon lattice with pulses running down it, or a slow turn). Drag to look round, scroll to go faster or slower, <kbd>Esc</kbd> to go home. With slow camera drift off it goes at a calm walking pace.
+
+None of it is real; the picture is drawn by the computer from a few formulas (`src/gate.js`, `src/elsewhere.js`).
+
 ## Strange sightings
 
 Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`), or press **Show me one now** in the panel.
@@ -106,7 +114,7 @@ Click the button in the top right, or add them to the address, like `index.html?
 | Setting | Values | Default |
 |---|---|---|
 | `speed` | `live`, `minute`, `hour`, `day`, `week`, `month`, `year` (how much time passes each second) | `live` |
-| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr`, or one of the far ones (`galaxy-m51`, `galaxy-m81`, `galaxy-m82`, `galaxy-cena`, `galaxy-ngc253`, `galaxy-m101`, `galaxy-m104`, `galaxy-m87`, `galaxy-ngc1300`, `galaxy-antennae`, `galaxy-cartwheel`). Fly to a black hole: `galaxy-sgra`, `galaxy-cygx1`, `galaxy-m87bh` | `middle` |
+| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr`, or one of the far ones (`galaxy-m51`, `galaxy-m81`, `galaxy-m82`, `galaxy-cena`, `galaxy-ngc253`, `galaxy-m101`, `galaxy-m104`, `galaxy-m87`, `galaxy-ngc1300`, `galaxy-antennae`, `galaxy-cartwheel`). Fly to a black hole: `galaxy-sgra`, `galaxy-cygx1`, `galaxy-m87bh`. The made-up Gate: `galaxy-gate` | `middle` |
 | `reverse` | `1` to run time backwards | `0` |
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
 | `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
@@ -152,6 +160,7 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/exoplanet-data.js` | The planets round other stars, made by `tools/make-exoplanets.mjs` |
 | `src/blackholes.js` | The black holes: where they are, how big they're drawn, how their discs are tilted. The light-bending itself is in `src/shaders.js` |
 | `src/oddities/` | The strange sightings: `stage.js` decides when and where one appears; `ufo.js`, `ships.js` and `phenomena.js` draw them |
+| `src/gate.js`, `src/elsewhere.js` | The Gate (made up) and the endless hall beyond it, with its doorways and changing places |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |

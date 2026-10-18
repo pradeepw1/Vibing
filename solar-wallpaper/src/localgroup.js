@@ -35,6 +35,7 @@ import { BLACK_HOLES } from "./blackholes.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { GALAXIES, skyDirection } from "./galaxies.js";
 import { blackbody } from "./exosystem.js";
+import { createGateMesh, GATE } from "./gate.js";
 import { barredCloud, blob, BRIGHTNESS, cloud, colliding, elliptical, GLOW_SCALE, holeCrowd, OLD, put, ring, spiral, YOUNG } from "./clouds.js";
 import { random } from "./noise.js";
 import { galacticBasis } from "./sky.js";
@@ -61,6 +62,8 @@ const HOLE_FULL = 1500; // ...and is all there from here
 const HOLE_GLOW = 0.55; // how much the blurred picture glows round a black hole's bright disc
 const SYSTEM_VIEW = 0.00045; // how far from a star with planets you arrive: just under half a light-year
 const SYSTEM_STAR_PX = 7; // how big its glow looks there, in pixels
+const GATE_VIEW = 0.0007; // how far from the Gate you arrive, in thousands of light-years (about 0.7 of one)
+const GATE_RING = 0.17; // the ring's radius, as a share of that: it fills about half the screen height on arrival
 const HOLE_WIDE = 1.4; // near one, the stars are drawn this much wider than the screen, so bent light has something to pick up from past the edge
 // Going outwards, Andromeda's arms turn clockwise on our sky, Triangulum's anticlockwise.
 const WIND = { m31: -1, m33: 1 };
@@ -266,6 +269,23 @@ export function createLocalGroup(canvas, pixelRatio) {
     systems.push(place);
   }
 
+  // The Gate: made up, at the place the "Wow!" signal came from, to fly up to and go through.
+  {
+    const dir = skyDirection(GATE.ra, GATE.dec);
+    places.set(GATE.id, {
+      id: GATE.id,
+      name: GATE.name,
+      sub: GATE.sub,
+      fixedSub: true, // its distance isn't known, so the label doesn't pretend
+      position: dir.clone().multiplyScalar(GATE.kly),
+      dir,
+      radius: GATE_VIEW * GATE_RING,
+      gate: GATE,
+    });
+  }
+
+  const gateMesh = createGateMesh({ billboard: true, size: GATE_VIEW * GATE_RING, minPx: 8, viewHeight: innerHeight * pixelRatio });
+
   /** The stars of one galaxy: built when first needed (the far ones are only a dot until then). */
   const clouds = new Map();
   const standIns = new Map();
@@ -360,6 +380,8 @@ export function createLocalGroup(canvas, pixelRatio) {
     }
     const starPoints = pointsOf(c, [nearStars, nearStars]);
     scene.add(starPoints);
+    gateMesh.position.copy(places.get(GATE.id).position);
+    scene.add(gateMesh);
     far = background(pixelRatio);
     scene.add(far);
   }
@@ -378,6 +400,11 @@ export function createLocalGroup(canvas, pixelRatio) {
    */
   function viewpointFor(place) {
     if (place.id === "milkyway" || place.id === "sun") return { target: centre, position: new Vector3(), up: basis.north };
+    if (place.gate) {
+      // Between us and the ring, looking at it, a little off to one side so it's seen at a slant.
+      const from = place.dir.clone().negate().multiplyScalar(0.95).addScaledVector(basis.north, 0.2).normalize();
+      return { target: place.position, position: place.position.clone().addScaledVector(from, GATE_VIEW), up: basis.north, minDistance: GATE_VIEW * 0.15 };
+    }
     if (place.system) {
       // Between us and the star, looking at it, a little under half a light-year off.
       const from = place.dir.clone().negate().multiplyScalar(0.9).addScaledVector(basis.north, 0.3).normalize();
@@ -482,7 +509,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const found = [];
     const SAMPLES = 200;
     for (const p of places.values()) {
-      if (p === place || p.small || p.unpickable || p.hole || p.system) continue;
+      if (p === place || p.small || p.unpickable || p.hole || p.system || p.gate) continue;
       const start = camera.position.distanceTo(p.position) / p.radius;
       if (start < 1 || f.end.position.distanceTo(p.position) < p.radius * 1.3) continue;
       let closest = CLEAR;
@@ -562,6 +589,7 @@ export function createLocalGroup(canvas, pixelRatio) {
       }
     }
     materials[0].uniforms.viewHeight.value = innerHeight;
+    gateMesh.material.uniforms.uTime.value = now / 1000;
     if (far) {
       far.position.copy(camera.position);
       far.children[0].material.uniforms.viewHeight.value = innerHeight;
@@ -710,6 +738,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const w = Math.round(bufferSize.x * wideNow);
     const h = Math.round(bufferSize.y * wideNow);
     if (target.width !== w || target.height !== h) target.setSize(w, h);
+    gateMesh.material.uniforms.uViewHeight.value = h;
     const bw = Math.round(bufferSize.x * lensScale);
     const bh = Math.round(bufferSize.y * lensScale);
     if (bent.width !== bw || bent.height !== bh) bent.setSize(bw, bh);
