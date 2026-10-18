@@ -50,7 +50,7 @@ const DAY_MS = 86400e3;
 const GAS_GIANTS = new Set(["jupiter", "saturn", "uranus", "neptune", "venus"]);
 
 const sphere = new SphereGeometry(1, 96, 48);
-// Moons are small on screen, but their edge still shows corners if there are too few sides.
+// Moons and glows are small on screen, but their edge still shows corners if there are too few sides.
 const smallSphere = new SphereGeometry(1, 64, 32);
 // The body you stand on fills half the screen, so it gets a much finer sphere.
 const groundSphere = new SphereGeometry(1, 384, 192);
@@ -141,7 +141,7 @@ function haloFor(def, radius) {
     depthWrite: false,
     blending: AdditiveBlending,
   });
-  const mesh = new Mesh(sphere, mat); // the glow ends at this shell's edge, so it needs a round one
+  const mesh = new Mesh(smallSphere, mat); // the glow ends at this shell's edge, so it needs a round one
   mesh.scale.setScalar(radius * scale);
   mesh.userData = { strength: strength * 0.9, scale };
   return mesh;
