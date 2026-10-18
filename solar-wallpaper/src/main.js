@@ -8,6 +8,7 @@ import { createLocalGroup } from "./localgroup.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
+import { createMaps } from "./maps.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 
@@ -113,6 +114,7 @@ function set(key, value, how = {}) {
     if (how.remember !== false) savedView = value;
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
+  if (key === "photos") usePhotos(value);
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
   store();
@@ -859,6 +861,7 @@ const SURFACES = ["earth", "clouds", "milkyway", "moon", "jupiter", "saturn", "m
   "phobos", "deimos", "miranda", "ariel", "umbriel", "titania", "oberon"];
 const painters = []; // each one does a little work per frame if it has no worker
 const sharpness = new Map(); // job -> width of the best map shown so far
+const painting = new Set(); // jobs given to a painter, so none is painted twice
 
 function showSurface(job, images) {
   const name = job.split("@")[0];
@@ -868,16 +871,71 @@ function showSurface(job, images) {
   else system.applySurface(name, images);
 }
 
+function paintJobs(jobs, onDone = () => {}) {
+  const todo = jobs.filter((j) => !painting.has(j));
+  for (const j of todo) painting.add(j);
+  if (todo.length) painters.push(startPainting(todo, showSurface, onDone));
+  else onDone();
+}
+
+// "Loading planets" is done when the painting is and the real maps have arrived (or failed).
+let paintDone = false;
+let mapsDone = false;
+function checkLoaded() {
+  if (paintDone && mapsDone) ui.doneLoading();
+}
+
+const photos = createMaps({
+  renderer,
+  system,
+  enabled: settings.photos,
+  onSettled: () => {
+    mapsDone = true;
+    checkLoaded();
+  },
+  onMissing: (id) => paintJobs([id]), // no real map: the painted surface it is
+});
+
+/** Real maps on or off, from the menu. Off, whatever isn't painted yet gets painted. */
+function usePhotos(on) {
+  photos.setEnabled(on);
+  if (!photos.enabled) paintJobs(SURFACES);
+}
+
 function startPaint(...first) {
   const order = [...SURFACES];
   for (const id of first.filter(Boolean).reverse()) if (order.includes(id)) order.unshift(...order.splice(order.indexOf(id), 1));
-  painters.push(startPainting(order, showSurface, () => ui.doneLoading()));
+  // With real maps, painting only stands in for them: the body in view, and the Milky Way (which has none).
+  const jobs = photos.enabled ? order.filter((j) => j === "milkyway" || first.includes(j)) : order;
+  paintJobs(jobs, () => {
+    paintDone = true;
+    checkLoaded();
+  });
+}
+
+/** The bodies in view: what you stand on (and the planet its moon goes round), or what you're looking at. */
+function inView() {
+  if (pov.id) {
+    const b = bodies.get(pov.id);
+    return b.kind === "moon" ? [b.id, b.parent.id] : [b.id];
+  }
+  const b = focus?.body;
+  return b && b.kind !== "sun" ? [b.id] : [];
+}
+
+/** Those you're close to, which get the sharp real maps. */
+function closeTo() {
+  if (pov.id) return inView();
+  const [id] = inView();
+  const b = id && bodies.get(id);
+  return b && !away.stage && camera.position.distanceTo(b.group.position) < 5 * b.radius ? [id] : [];
 }
 
 /** The body you stand on fills half the screen, so paint it again in more detail. */
 const SHARP = 2048;
 const queued = new Set();
 function sharpen(id) {
+  if (photos.covers(id)) return; // its real map comes in the sharp size instead
   const jobs = [id, ...(id === "earth" ? ["clouds"] : [])]
     .filter((j) => (sharpness.get(j) ?? 0) < SHARP && !queued.has(j))
     .map((j) => `${j}@${SHARP}`);
@@ -955,7 +1013,17 @@ function frame(now) {
   const down = ground && (!tween || camera.position.distanceTo(ground.group.position) < 3 * ground.radius * ground.group.scale.x);
   ui.updateLabels(camera, innerWidth, innerHeight, down ? pov.id : null, down && new Sphere(ground.group.position, ground.radius * ground.group.scale.x), sky.fade);
   updateHover(now);
+
+  // The real maps start loading once the first picture is up.
+  photos.prefer(inView());
+  photos.sharpen(closeTo(), now);
+  photos.update(camera, now, elapsed, gap);
+  if (!photosStarted) {
+    photosStarted = true;
+    photos.start();
+  }
 }
+let photosStarted = false;
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
@@ -1008,7 +1076,7 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, away, ui };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, away, ui, photos, renderer };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);

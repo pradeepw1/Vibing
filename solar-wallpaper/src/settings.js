@@ -54,13 +54,14 @@ export const DEFAULTS = {
   belts: true,
   clock: true,
   drift: true,
+  photos: true, // real maps (NASA and others) instead of painted surfaces
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
   date: null, // start at this date instead of now
 };
 
 const KEY = "solar-wallpaper:v1";
-const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "fps"];
+const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "photos", "fps"];
 
 function readSaved() {
   try {
@@ -102,6 +103,7 @@ export function parse(key, value) {
     case "belts":
     case "clock":
     case "drift":
+    case "photos":
     case "ui":
       return bool(value);
     default:

@@ -60,6 +60,7 @@ let anisotropy = 4;
 export function setAnisotropy(n) {
   anisotropy = Math.max(1, Math.min(16, n));
 }
+export const getAnisotropy = () => anisotropy;
 
 /**
  * A texture from painted ImageData. Colour maps are sRGB; maps that hold plain
@@ -97,6 +98,8 @@ function planetMaterial(def, isMoon) {
     uniforms: {
       map: { value: null },
       hasMap: { value: 0 },
+      mapB: { value: null }, // a new map fading in over `map`
+      mapMix: { value: 0 }, // 0..1: how far it has got
       baseColor: { value: new Color(def.color ?? "#9a958e") },
       sunDir: { value: new Vector3(1, 0, 0) },
       sunlight: { value: 1 }, // 0..1: how much of the Sun isn't hidden by its planet (eclipses)
@@ -107,6 +110,8 @@ function planetMaterial(def, isMoon) {
       opacity: { value: 1 },
       hasExtra: { value: 0 },
       extraMap: { value: null },
+      hasExtraB: { value: 0 },
+      extraMapB: { value: null },
       hasRings: { value: 0 },
       ringNormal: { value: new Vector3() },
       center: { value: new Vector3() },
@@ -207,6 +212,8 @@ export function createSystem(scene, pixelRatio) {
         ...shaders.rings,
         uniforms: {
           map: { value: tex },
+          mapB: { value: null }, // a real strip fading in over the painted one
+          mapMix: { value: 0 },
           radii: { value: new Vector2(SATURN_RINGS.inner, SATURN_RINGS.outer) },
           center: { value: new Vector3() },
           planetRadius: { value: radius },
@@ -229,7 +236,7 @@ export function createSystem(scene, pixelRatio) {
     if (def.id === "earth") {
       const cloudMat = new ShaderMaterial({
         ...shaders.clouds,
-        uniforms: { map: { value: null }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
+        uniforms: { map: { value: null }, mapB: { value: null }, mapMix: { value: 0 }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
         transparent: true,
         depthWrite: false,
       });
@@ -373,6 +380,7 @@ export function createSystem(scene, pixelRatio) {
   function update(date, dtReal, simRate, camera, viewHeight, showOrbits, realSeconds, pov = null) {
     const time = A.MakeTime(date);
     const timeMs = date.getTime();
+    fadeSurfaces(dtReal);
     // The body we stand on, and while moving away the one we're leaving: both
     // are "ground" close to the camera.
     grounds.clear();
@@ -580,24 +588,113 @@ export function createSystem(scene, pixelRatio) {
     ground = { id, parts, ring: b.ring };
   }
 
+  // --- What each surface shows ---
+  // A surface is a body's skin, or Earth's cloud layer. It can have a painted
+  // look (made in code, see surfaces.js) and a photo look (a real map, see
+  // maps.js). The photo is shown when there is one and real maps are on. A new
+  // look fades in over the old one instead of popping in.
+  const FADE_SECONDS = 0.8;
+  const slots = new Map();
+  let photosOn = true;
+
+  function slotFor(id) {
+    let s = slots.get(id);
+    if (!s) {
+      const clouds = id === "clouds";
+      const u = (clouds ? bodies.get("earth").clouds : bodies.get(id)).material.uniforms;
+      s = { id, clouds, u, painted: null, photo: null, shown: null, fade: null, afterwards: [] };
+      slots.set(id, s);
+    }
+    return s;
+  }
+
+  const look = (map, extra) => ({ map, extra, textures: [map, extra].filter(Boolean) });
+  const inUse = (s, textures) => textures.some((t) => s.shown?.textures.includes(t) || s.fade?.look.textures.includes(t));
+
+  /** Runs the things waiting for some textures to be off the screen (to free them), for those that are. */
+  function runWhenUnused(s) {
+    const waiting = s.afterwards;
+    s.afterwards = waiting.filter(({ textures }) => inUse(s, textures));
+    for (const w of waiting) if (!s.afterwards.includes(w)) w.fn();
+  }
+
+  /** Puts a look on a surface at once. */
+  function setNow(s, l) {
+    const { u } = s;
+    u.map.value = l?.map ?? null;
+    u.mapB.value = null;
+    u.mapMix.value = 0;
+    if (!s.clouds) {
+      u.hasMap.value = l?.map ? 1 : 0;
+      u.extraMap.value = l?.extra ?? null;
+      u.hasExtra.value = l?.extra ? 1 : 0;
+      u.extraMapB.value = null;
+      u.hasExtraB.value = 0;
+    } else if (l) bodies.get("earth").clouds.visible = true;
+    s.shown = l;
+    s.fade = null;
+    runWhenUnused(s);
+  }
+
+  /** Makes a surface show what it should: the photo if there is one and they're on, else the painted look. */
+  function refresh(s) {
+    const want = (photosOn && s.photo) || s.painted;
+    if (want === (s.fade ? s.fade.look : s.shown)) return;
+    if (s.fade) setNow(s, s.fade.look); // a fade still going is brought to its end first
+    if (want === s.shown) return;
+    if (!want) return setNow(s, null);
+    s.u.mapB.value = want.map;
+    s.u.mapMix.value = 0;
+    if (!s.clouds) {
+      s.u.extraMapB.value = want.extra;
+      s.u.hasExtraB.value = want.extra ? 1 : 0;
+    } else bodies.get("earth").clouds.visible = true;
+    s.fade = { look: want, t: 0 };
+  }
+
+  /** Moves the fades on. */
+  function fadeSurfaces(dtReal) {
+    for (const s of slots.values()) {
+      if (!s.fade) continue;
+      s.fade.t += dtReal / FADE_SECONDS;
+      if (s.fade.t >= 1) setNow(s, s.fade.look);
+      else s.u.mapMix.value = s.fade.t * s.fade.t * (3 - 2 * s.fade.t);
+    }
+  }
+
   /** Puts a freshly painted surface on its body. `images` holds ImageData. */
   function applySurface(job, images) {
-    const swap = (uniform, image, data = false) => {
-      uniform.value?.dispose(); // free the old one's GPU memory
-      uniform.value = texture(image, data);
-    };
-    if (job === "clouds") {
-      const earth = bodies.get("earth");
-      swap(earth.clouds.material.uniforms.map, images.map, true);
-      earth.clouds.visible = true;
-      return;
-    }
-    const b = bodies.get(job);
-    swap(b.material.uniforms.map, images.map);
-    b.material.uniforms.hasMap.value = 1;
-    if (images.extra) {
-      swap(b.material.uniforms.extraMap, images.extra, true);
-      b.material.uniforms.hasExtra.value = 1;
+    const s = slotFor(job);
+    const old = s.painted;
+    const map = texture(images.map, job === "clouds");
+    s.painted = look(map, images.extra ? texture(images.extra, true) : null);
+    refresh(s);
+    if (old) s.afterwards.push({ textures: old.textures, fn: () => old.textures.forEach((t) => t.dispose()) }); // free the old one's GPU memory
+    runWhenUnused(s);
+  }
+
+  /** Shows the textures of a real map (see maps.js) on a surface. They are marked with the layer they come from. */
+  function applyPhoto(id, textures) {
+    const s = slotFor(id);
+    const map = textures.find((t) => t.userData.layer === (s.clouds ? "clouds" : id)) ?? null;
+    const extra = textures.find((t) => t.userData.layer === "earth-extra") ?? null;
+    s.photo = look(map, extra);
+    refresh(s);
+  }
+
+  /** Calls `fn` once none of `textures` is on screen (at once if they aren't). */
+  function whenUnused(id, textures, fn) {
+    const s = slotFor(id);
+    s.afterwards.push({ textures, fn });
+    runWhenUnused(s);
+  }
+
+  /** Real maps on or off. Off, every surface goes back to its painted look. */
+  function setPhotosEnabled(on) {
+    photosOn = on;
+    for (const s of slots.values()) {
+      if (!on) s.photo = null; // their textures are freed by whoever made them
+      refresh(s);
     }
   }
 
@@ -605,6 +702,9 @@ export function createSystem(scene, pixelRatio) {
     bodies,
     update,
     applySurface,
+    applyPhoto,
+    whenUnused,
+    setPhotosEnabled,
     fitGlow,
     setGround,
     snapshot,

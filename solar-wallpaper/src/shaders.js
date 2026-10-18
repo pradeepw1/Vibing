@@ -37,6 +37,8 @@ export const planet = {
   vertexShader: worldVertex,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new map fading in over the one above
+    uniform float mapMix;        // how far it has got, 0..1
     uniform vec3 baseColor;
     uniform float hasMap;
     uniform vec3 sunDir;         // real direction to the Sun
@@ -49,6 +51,8 @@ export const planet = {
 
     uniform float hasExtra;      // Earth: r = city lights, g = water
     uniform sampler2D extraMap;
+    uniform float hasExtraB;     // the same for the map fading in
+    uniform sampler2D extraMapB;
 
     uniform float hasRings;      // Saturn: shadow of the rings on the planet
     uniform vec3 ringNormal;
@@ -83,11 +87,13 @@ export const planet = {
       }
 
       vec3 albedo = hasMap > 0.5 ? texture2D(map, vUv).rgb : baseColor;
+      if (mapMix > 0.0) albedo = mix(albedo, texture2D(mapB, vUv).rgb, mapMix);
       vec3 col = albedo * (diffuse * sunlight + ambient);
       col += albedo * eclipseTint * (1.0 - sunlight) * smoothstep(-0.1, 0.3, ndl);
 
-      if (hasExtra > 0.5) {
-        vec3 extra = texture2D(extraMap, vUv).rgb;
+      if (hasExtra > 0.5 || hasExtraB > 0.5) {
+        vec3 extra = hasExtra > 0.5 ? texture2D(extraMap, vUv).rgb : vec3(0.0);
+        if (mapMix > 0.0) extra = mix(extra, hasExtraB > 0.5 ? texture2D(extraMapB, vUv).rgb : vec3(0.0), mapMix);
         float night = 1.0 - smoothstep(-0.12, 0.08, ndl);
         col += vec3(1.0, 0.72, 0.38) * extra.r * night * 0.9;
         vec3 H = normalize(L + V);
@@ -111,6 +117,8 @@ export const clouds = {
   vertexShader: worldVertex,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new map fading in over the one above
+    uniform float mapMix;
     uniform vec3 sunDir;
     uniform float ambient;
     varying vec3 vWorldPos;
@@ -120,6 +128,7 @@ export const clouds = {
       vec3 N = normalize(vNormal);
       float ndl = dot(N, sunDir);
       float c = texture2D(map, vUv).r;
+      if (mapMix > 0.0) c = mix(c, texture2D(mapB, vUv).r, mapMix);
       float lit = (ndl + 0.1) / 1.1;
       float light = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0); // same rounded day/night line as the planet
       gl_FragColor = vec4(vec3(0.98) * (light + ambient), c * 0.92);

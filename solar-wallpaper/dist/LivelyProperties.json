@@ -84,6 +84,11 @@
     "value": true,
     "text": "Slow camera drift"
   },
+  "photos": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Real maps (NASA)"
+  },
   "fps": {
     "type": "slider",
     "value": 30,
