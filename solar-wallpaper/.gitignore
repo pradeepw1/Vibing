@@ -3,3 +3,5 @@ node_modules/
 tools/textures.js
 # The repo root ignores dist/ (for Python builds), but this one is the wallpaper itself
 !dist/
+# Big source maps that tools/make-maps.py fetch downloads
+tools/maps-src/

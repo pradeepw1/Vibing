@@ -1,0 +1,278 @@
+{
+ "ariel": {
+  "lite": {
+   "bytes": 65856,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 111624,
+   "width": 1440
+  }
+ },
+ "callisto": {
+  "lite": {
+   "bytes": 53396,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 224872,
+   "width": 2048
+  }
+ },
+ "charon": {
+  "lite": {
+   "bytes": 36664,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 117520,
+   "width": 2048
+  }
+ },
+ "clouds": {
+  "lite": {
+   "bytes": 426796,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 1689652,
+   "width": 4096
+  }
+ },
+ "deimos": {
+  "lite": {
+   "bytes": 18380,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 66372,
+   "width": 2048
+  }
+ },
+ "earth": {
+  "lite": {
+   "bytes": 245324,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 782006,
+   "width": 4096
+  }
+ },
+ "earth-extra": {
+  "lite": {
+   "bytes": 576265,
+   "width": 2048
+  }
+ },
+ "europa": {
+  "lite": {
+   "bytes": 105348,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 409594,
+   "width": 2048
+  }
+ },
+ "ganymede": {
+  "lite": {
+   "bytes": 61840,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 240258,
+   "width": 2048
+  }
+ },
+ "iapetus": {
+  "lite": {
+   "bytes": 136906,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 430214,
+   "width": 2048
+  }
+ },
+ "io": {
+  "lite": {
+   "bytes": 54788,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 151196,
+   "width": 2048
+  }
+ },
+ "jupiter": {
+  "lite": {
+   "bytes": 110576,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 301444,
+   "width": 4096
+  }
+ },
+ "mars": {
+  "lite": {
+   "bytes": 120558,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 356490,
+   "width": 4096
+  }
+ },
+ "mercury": {
+  "lite": {
+   "bytes": 98492,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 375532,
+   "width": 2048
+  }
+ },
+ "miranda": {
+  "lite": {
+   "bytes": 50510,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 87548,
+   "width": 1440
+  }
+ },
+ "moon": {
+  "lite": {
+   "bytes": 494144,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 2120834,
+   "width": 4096
+  }
+ },
+ "neptune": {
+  "lite": {
+   "bytes": 5280,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 15528,
+   "width": 2048
+  }
+ },
+ "oberon": {
+  "lite": {
+   "bytes": 24092,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 38276,
+   "width": 1440
+  }
+ },
+ "phobos": {
+  "lite": {
+   "bytes": 50194,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 149428,
+   "width": 2048
+  }
+ },
+ "pluto": {
+  "lite": {
+   "bytes": 69412,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 248072,
+   "width": 2048
+  }
+ },
+ "rhea": {
+  "lite": {
+   "bytes": 102812,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 326646,
+   "width": 2048
+  }
+ },
+ "saturn": {
+  "lite": {
+   "bytes": 27616,
+   "width": 2048
+  },
+  "sharp": {
+   "bytes": 86574,
+   "width": 4096
+  }
+ },
+ "titan": {
+  "lite": {
+   "bytes": 12686,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 29416,
+   "width": 2048
+  }
+ },
+ "titania": {
+  "lite": {
+   "bytes": 48484,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 85248,
+   "width": 1440
+  }
+ },
+ "triton": {
+  "lite": {
+   "bytes": 34148,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 110150,
+   "width": 2048
+  }
+ },
+ "umbriel": {
+  "lite": {
+   "bytes": 31210,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 48760,
+   "width": 1440
+  }
+ },
+ "uranus": {
+  "lite": {
+   "bytes": 2244,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 8068,
+   "width": 2048
+  }
+ },
+ "venus": {
+  "lite": {
+   "bytes": 12456,
+   "width": 1024
+  },
+  "sharp": {
+   "bytes": 33448,
+   "width": 2048
+  }
+ }
+}
