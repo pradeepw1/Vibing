@@ -4,6 +4,7 @@
 //   3. the page address, e.g. index.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
 import { BLACK_HOLES } from "./blackholes.js";
+import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { MOONS, PLANETS } from "./bodies.js";
 import { GALAXIES } from "./galaxies.js";
 
@@ -31,6 +32,8 @@ export const VIEWS = [
   // Out among the nearest galaxies, and to the black holes.
   ...GALAXIES.filter((g) => g.name).map((g) => ({ id: `galaxy-${g.id}`, label: g.name, galaxy: g.id })),
   ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id })),
+  // Other stars and their planets (nearest first).
+  ...EXOPLANET_SYSTEMS.map((s) => ({ id: `galaxy-${s.id}`, label: s.name, galaxy: s.id, star: true })),
 ];
 
 /** The galaxy (or black hole) a "galaxy-..." view goes to, or null. */

@@ -39,6 +39,10 @@
   .label-set { position: absolute; inset: 0; }
   .label.galaxy { display: grid; font-size: 10px; color: rgba(205, 200, 235, 0.55); }
   .label.galaxy:hover { color: var(--text); }
+  #caption { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); max-width: min(300px, 50vw); text-align: right; pointer-events: none; text-shadow: 0 1px 6px #000; transition: opacity 0.4s; }
+  #caption .title { font-size: clamp(15px, 1.6vw, 20px); font-weight: 300; }
+  #caption .line { margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+  .idle #caption { opacity: 0.55; }
   .label.galaxy .far { font-size: 9px; letter-spacing: 0.04em; text-transform: none; color: rgba(205, 200, 235, 0.38); }
 
   #clock { position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); pointer-events: none; text-shadow: 0 1px 6px #000; }

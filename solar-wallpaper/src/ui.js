@@ -40,11 +40,13 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   lookFrom.label = "Look from";
   const visit = document.createElement("optgroup");
   visit.label = "Fly out to a galaxy or black hole";
-  for (const v of VIEWS) (v.from ? lookFrom : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
+  const stars = document.createElement("optgroup");
+  stars.label = "Fly to a star with planets";
+  for (const v of VIEWS) (v.from ? lookFrom : v.star ? stars : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
   const extra = new Option("", ""); // for views from moons that aren't in the list
   extra.hidden = true;
   lookFrom.append(extra);
-  viewSel.append(lookAt, lookFrom, visit);
+  viewSel.append(lookAt, lookFrom, visit, stars);
   const pill = $("#pov");
   const pillName = $("#pov .name");
   // While idle the Back pill and the settings button are hidden. A click that
@@ -337,27 +339,52 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     }
   }
 
-  // --- Names out among the galaxies ---
+  // --- Names out among the galaxies, and round other stars ---
+  // Each scene has its own set of places, and so its own labels.
+  const awaySets = new Map(); // places -> { box, labels }
   let awayLabels = null;
-  /** Shows the solar system's names, or (away = the places out there) the galaxies'. */
-  function setAway(places) {
+  /**
+   * Shows the solar system's names, or (away = a Map of the places out there)
+   * the names of those. `fresh`: the places have changed, so make the labels again.
+   */
+  function setAway(places, fresh = false) {
     solarEl.hidden = Boolean(places);
-    awayEl.hidden = !places;
-    if (!places || awayLabels) return;
-    awayLabels = [...places.values()]
-      .filter((p) => !p.small)
-      .map((p) => {
-        const home = p.id === "milkyway" || p.id === "sun";
-        const go = home ? goBack : () => set("view", `galaxy-${p.id}`, { remember: false });
-        const el = twoLines(awayEl, p.name, p.sub, go, home ? "Fly home" : `Fly to the ${p.name}`);
-        return { place: p, el, sub: el.lastChild, said: "", shown: null, x: 0, y: 0, width: p.name.length * 7 + 6 };
-      });
+    for (const entry of awaySets.values()) entry.box.hidden = true;
+    awayLabels = null;
+    if (!places) return;
+    if (fresh && awaySets.has(places)) {
+      awaySets.get(places).box.remove();
+      awaySets.delete(places);
+    }
+    let entry = awaySets.get(places);
+    if (!entry) {
+      const box = document.createElement("div");
+      box.className = "label-set";
+      labelsEl.append(box);
+      const labels = [...places.values()]
+        .filter((p) => !p.small)
+        .map((p) => {
+          const home = p.id === "milkyway" || p.id === "sun";
+          const go = p.onClick ?? (home ? goBack : () => set("view", `galaxy-${p.id}`, { remember: false }));
+          const el = twoLines(box, p.name, p.sub, go, home ? "Fly home" : p.onClick ? `Look at ${p.name}` : `Fly to the ${p.name}`);
+          return { place: p, el, sub: el.lastChild, said: "", shown: null, x: 0, y: 0, width: p.name.length * 7 + 6 };
+        });
+      entry = { box, labels };
+      awaySets.set(places, entry);
+    }
+    entry.box.hidden = false;
+    awayLabels = entry.labels;
   }
   const at = new Vector3();
   function updateAwayLabels(camera, width, height, visiting = null) {
     if (!awayLabels || !settings.labels || hiddenAll) return;
     camera.getWorldDirection(camDir);
     placed.length = 0;
+    // Names keep clear of the words in the corner.
+    if (!captionEl.hidden) {
+      const r = captionEl.getBoundingClientRect();
+      placed.push({ x: r.left - 6, y: r.top - 6, w: r.width + 12, h: r.height + 12 });
+    }
     for (const l of awayLabels) {
       const { place } = l;
       at.copy(place.position).sub(camera.position);
@@ -367,6 +394,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
       let show = at.dot(camDir) > 0 && !(place.id === "sun" && distance > 120) && !(place.id === visiting && distance < place.radius * 6);
       // Not the Milky Way's name over a black hole at its heart, once you're in close.
       if (place.id === "milkyway" && distance < 3) show = false;
+      // Stars with planets are only named once you're fairly near them.
+      if (place.labelRange && distance > place.labelRange) show = false;
       if (show) {
         at.copy(place.position).project(camera);
         const x = Math.round(((at.x + 1) / 2) * width + 8);
@@ -378,8 +407,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
           l.x = x;
           l.y = y;
         }
-        // How far it is from here, out here.
-        const say = place.id === "sun" ? "Home" : `${lightYears(distance)} away`;
+        // How far it is from here, out here (or what it is, round another star).
+        const say = place.fixedSub ? place.sub : place.id === "sun" ? "Home" : `${lightYears(distance)} away`;
         if (show && say !== l.said) l.sub.textContent = l.said = say;
       }
       if (show !== l.shown) {
@@ -388,6 +417,20 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
         l.shown = show;
       }
     }
+  }
+
+  // A few words about where you are (round another star), bottom right.
+  const captionEl = document.createElement("div");
+  captionEl.id = "caption";
+  captionEl.hidden = true;
+  document.body.append(captionEl);
+  function setCaption(title, lines = []) {
+    captionEl.hidden = !title;
+    if (!title) return;
+    const head = document.createElement("div");
+    head.className = "title";
+    head.textContent = title;
+    captionEl.replaceChildren(head, ...lines.filter(Boolean).map((text) => Object.assign(document.createElement("div"), { className: "line", textContent: text })));
   }
   /** A distance in thousands of light-years, said the way people say it. */
   function lightYears(kly) {
@@ -412,5 +455,5 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   }
 
   sync();
-  return { sync, updateClock, updateLabels, updateAwayLabels, setAway, doneLoading, hover };
+  return { sync, updateClock, updateLabels, updateAwayLabels, setAway, setCaption, doneLoading, hover };
 }

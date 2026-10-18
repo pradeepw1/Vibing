@@ -190,7 +190,7 @@ export const rings = {
 // --- The Sun ---------------------------------------------------------------------
 
 // Simplex noise by Ian McEwan and Stefan Gustavson (MIT, github.com/stegu/webgl-noise).
-const snoise = /* glsl */ `
+export const snoise = /* glsl */ `
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 permute(vec4 x) { return mod289(((x * 34.0) + 10.0) * x); }
@@ -501,8 +501,11 @@ export const galaxyStars = {
       float dist = max(-mv.z, 1e-4);
       float px = size * projectionMatrix[1][1] * viewHeight * 0.5 / dist;
       float shown = clamp(px, 1.0, maxSize);
-      float fade = smoothstep(0.3, 2.5, dist); // right by the camera
-      fade *= 1.0 - smoothstep(maxSize * 0.8, maxSize * 3.0, px); // so close it's only a big smudge
+      float fade = 1.0;
+      #ifndef NO_NEAR_FADE
+        fade = smoothstep(0.3, 2.5, dist); // right by the camera
+      #endif
+      fade *= 1.0 - smoothstep(maxSize * 0.5, maxSize * 1.8, px); // so close it's only a big smudge
       #ifdef GLOW
         fade *= 1.0 - smoothstep(glowSize, glowSize * 2.0, px);
       #endif

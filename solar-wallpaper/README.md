@@ -25,6 +25,7 @@ It's one web page. It runs in any browser and works as a desktop wallpaper on Wi
 | Nearest galaxies | The Large and Small Magellanic Clouds, the Sagittarius Dwarf, Andromeda (with its two small companions) and Triangulum, at their real places in the sky, real sizes and real tilt, each with its name and distance. Their look is painted in code |
 | Famous galaxies far away | Bode's Galaxy, the Cigar, Centaurus A, the Sculptor, Pinwheel, Whirlpool, Sombrero, M87, NGC 1300, the Antennae and the Cartwheel: 11 to 500 million light-years out, at their real places and real sizes. Their shapes (a ring, a collision, a dust lane, a jet, gas blown out of a starburst) and colours follow the real ones; the individual stars are made up |
 | Black holes | Sagittarius A* (the middle of the Milky Way), Cygnus X-1 and M87*, at their real places and distances. **Drawn millions of times bigger than they are**, or you'd never see them. The bending of light around them follows the real rule for light past a black hole. The disc, its colours and the star crowds round them are made up |
+| Planets round other stars | 39 well-known systems (Proxima Centauri, TRAPPIST-1, 51 Pegasi, HR 8799, Kepler-452...), 107 planets, at their real places in the sky and real distances. Each planet's size, year, distance from its star and temperature come from the Open Exoplanet Catalogue. **What they look like is made up**: nobody has seen them |
 | Sizes and distances | **Squashed** so everything fits on one screen. Directions are never changed, only distances, so line-ups and phases stay true |
 | Planet surfaces | Painted in code. Big features are in the right places (coastlines, the Moon's dark seas, Mars's ice caps, Jupiter's belts, Pluto's heart). Small detail is made up |
 
@@ -59,6 +60,14 @@ Three real black holes are out there too. Click a name (or pick one from the men
 Their places in the sky and their distances are real, and M87\*'s disc is tilted the way the real one is. Everything else is made up or stretched: a real black hole is only a speck, so each is drawn millions of times bigger, and the colours, streaks and clumps of the disc are invented. What's real is the bending of light: every pixel follows its own ray of light round the hole, so stars are stretched into arcs, the middle is black, and the back of the disc is seen bent over the top and underneath. The side of the disc that's turning towards you is brighter and bluer. It's the heaviest drawing in the app, so if your graphics chip can't keep up, the picture near a black hole is drawn a little softer.
 
 Further out are eleven famous galaxies, up to half a billion light-years away: the Whirlpool with its small companion, the Sombrero with its dark dust lane, Centaurus A cut by dust, the Cigar and the Sculptor Galaxy with red gas blown out of their middles, the Pinwheel, Bode's Galaxy, a barred spiral (NGC 1300), the Antennae mid-collision with their long tails, the Cartwheel's huge blue ring, and M87 with its blue jet. They're in the same menu.
+
+### Other stars and their planets
+
+Pick one from the menu ("Fly to a star with planets"), click its name on the sky (the best-known ones are labelled), or use `?view=galaxy-proxima`. You fly out of the solar system to the star, then sink down into its system: the star, its planets going round with their real year-length ratios, and a green band for the habitable zone (where water could stay liquid). Click a planet's name to fly to it and see its lit side; click the star or empty space to see them all again. Esc flies you home.
+
+- **Real:** where each star is and how far; the star's temperature and size; each planet's size, year, distance from its star (the distances are squashed, in the right order) and heat. The data is in `src/exoplanet-data.js`, built by `tools/make-exoplanets.mjs` from the [Open Exoplanet Catalogue](https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue) (MIT licence), which collects what NASA's Exoplanet Archive and the papers report. A few gaps are filled in by hand from the papers (marked in the tool).
+- **Made up:** what each world looks like (the kind is picked from its size and heat: a rocky world with seas, a banded gas giant, a smooth ice giant, a lava world, a frozen rock), and where it is on its orbit.
+- Where a planet's size isn't measured, it's worked out from its weight and shown as an estimate in the data; a few planets that not everyone agrees on are marked "disputed" in their label.
 
 Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
 
@@ -127,13 +136,15 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/galaxies.js` | The nearest galaxies on the sky: where they are, how big, and how they're painted |
 | `src/localgroup.js` | Out among the galaxies: each one (and the Milky Way) as a 3D cloud of stars, and the flights between them |
 | `src/clouds.js` | How each kind of galaxy's stars are laid out: spirals, bars, ellipticals, rings, collisions |
+| `src/exosystem.js`, `src/exoshaders.js` | A visit to another star's planets: the star, orbits, habitable zone, and each planet drawn from noise by its kind |
+| `src/exoplanet-data.js` | The planets round other stars, made by `tools/make-exoplanets.mjs` |
 | `src/blackholes.js` | The black holes: where they are, how big they're drawn, how their discs are tilted. The light-bending itself is in `src/shaders.js` |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |
 | `tools/build.mjs` | Builds `dist/solar.js`, and writes `dist/LivelyProperties.json` from the same lists the page uses |
 
-Credits: [three.js](https://threejs.org) (MIT) draws it. [astronomy-engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT) works out the positions. Coastlines come from [Natural Earth](https://www.naturalearthdata.com) (public domain) via [world-atlas](https://github.com/topojson/world-atlas).
+Credits: the planets round other stars come from the [Open Exoplanet Catalogue](https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue) (Hanno Rein and contributors, MIT licence; [Rein 2012](http://arxiv.org/abs/1211.7121)), which gathers results from NASA's Exoplanet Archive and the published papers. [three.js](https://threejs.org) (MIT) draws it. [astronomy-engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT) works out the positions. Coastlines come from [Natural Earth](https://www.naturalearthdata.com) (public domain) via [world-atlas](https://github.com/topojson/world-atlas).
 
 ## Next
 

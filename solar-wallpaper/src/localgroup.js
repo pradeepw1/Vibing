@@ -32,7 +32,9 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { BLACK_HOLES } from "./blackholes.js";
+import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { GALAXIES, skyDirection } from "./galaxies.js";
+import { blackbody } from "./exosystem.js";
 import { barredCloud, blob, BRIGHTNESS, cloud, colliding, elliptical, GLOW_SCALE, holeCrowd, OLD, put, ring, spiral, YOUNG } from "./clouds.js";
 import { random } from "./noise.js";
 import { galacticBasis } from "./sky.js";
@@ -57,6 +59,8 @@ const HOLE_VIEW = 32; // how far from a black hole you arrive, in its radii
 const HOLE_ON = 6000; // the bending of light starts to show this far out (in radii)...
 const HOLE_FULL = 1500; // ...and is all there from here
 const HOLE_GLOW = 0.55; // how much the blurred picture glows round a black hole's bright disc
+const SYSTEM_VIEW = 0.00045; // how far from a star with planets you arrive: just under half a light-year
+const SYSTEM_STAR_PX = 7; // how big its glow looks there, in pixels
 const HOLE_WIDE = 1.4; // near one, the stars are drawn this much wider than the screen, so bent light has something to pick up from past the edge
 // Going outwards, Andromeda's arms turn clockwise on our sky, Triangulum's anticlockwise.
 const WIND = { m31: -1, m33: 1 };
@@ -189,7 +193,7 @@ function inDisc(place, sight) {
 
 export function createLocalGroup(canvas, pixelRatio) {
   const scene = new Scene();
-  const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.0005, 1e6);
+  const camera = new PerspectiveCamera(50, innerWidth / innerHeight, 0.00001, 1e6);
   const basis = galacticBasis();
   camera.up.copy(basis.north); // the controls turn round whatever is up when they're made
   const controls = new OrbitControls(camera, canvas);
@@ -203,6 +207,7 @@ export function createLocalGroup(canvas, pixelRatio) {
   controls.maxDistance = 9000;
 
   const materials = starMaterials(pixelRatio);
+  const nearStars = materials[3]; // like the others, but not dimmed when close
 
   // Every place you can go: the galaxies, and home.
   const centre = basis.center.clone().multiplyScalar(SUN_FROM_CENTRE);
@@ -241,6 +246,24 @@ export function createLocalGroup(canvas, pixelRatio) {
     const place = { id: h.id, name: h.name, sub: h.lightYears, position: dir.clone().multiplyScalar(h.kly), dir, radius: h.disc.outer * h.rs, hole: { ...h, normal } };
     places.set(h.id, place);
     holes.push(place);
+  }
+
+  // Stars with planets: a glowing point at the real place and distance, to fly up to and dive into.
+  const systems = [];
+  for (const sys of EXOPLANET_SYSTEMS) {
+    const dir = skyDirection(sys.ra, sys.dec);
+    const place = {
+      id: sys.id,
+      name: sys.name,
+      sub: `${sys.ly < 100 ? sys.ly.toFixed(1) : Math.round(sys.ly).toLocaleString("en-US")} light-years`,
+      position: dir.clone().multiplyScalar(sys.ly / 1000),
+      dir,
+      radius: SYSTEM_VIEW * 0.4,
+      system: sys,
+      labelRange: 0.06, // its name shows only once you're within about 60 light-years
+    };
+    places.set(sys.id, place);
+    systems.push(place);
   }
 
   /** The stars of one galaxy: built when first needed (the far ones are only a dot until then). */
@@ -327,6 +350,16 @@ export function createLocalGroup(canvas, pixelRatio) {
       p.position.copy(place.position);
       scene.add(p);
     });
+    // The stars of the systems, each as big as its glow should look when you get there.
+    const c = cloud(systems.length * 2);
+    for (const place of systems) {
+      const tint = blackbody(place.system.star.temp);
+      const size = (SYSTEM_STAR_PX * SYSTEM_VIEW) / 1156; // in kly, so it's about that many pixels across at the arrival spot
+      put(c, place.position.x, place.position.y, place.position.z, tint, size, 3);
+      put(c, place.position.x, place.position.y, place.position.z, tint, size * 6, 0.12);
+    }
+    const starPoints = pointsOf(c, [nearStars, nearStars]);
+    scene.add(starPoints);
     far = background(pixelRatio);
     scene.add(far);
   }
@@ -345,6 +378,11 @@ export function createLocalGroup(canvas, pixelRatio) {
    */
   function viewpointFor(place) {
     if (place.id === "milkyway" || place.id === "sun") return { target: centre, position: new Vector3(), up: basis.north };
+    if (place.system) {
+      // Between us and the star, looking at it, a little under half a light-year off.
+      const from = place.dir.clone().negate().multiplyScalar(0.9).addScaledVector(basis.north, 0.3).normalize();
+      return { target: place.position, position: place.position.clone().addScaledVector(from, SYSTEM_VIEW), up: basis.north, minDistance: SYSTEM_VIEW * 0.2 };
+    }
     if (place.hole) {
       // Just above the disc, a little round from the Sun's side, with the disc running across the screen.
       const { normal, rs } = place.hole;
@@ -405,7 +443,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const d1 = end.position.clone().sub(end.target).length();
     flight = {
       start: null, // set on the first frame, so time spent getting ready isn't skipped
-      duration: 3200 + 600 * Math.min(4, Math.abs(Math.log(d0 / Math.max(d1, 1)))),
+      duration: 3200 + 600 * Math.min(4, Math.abs(Math.log(d0 / Math.max(d1, 0.01)))),
       end,
       fromDir: startOffset.divideScalar(d0),
       toDir: end.position.clone().sub(end.target).normalize(),
@@ -444,7 +482,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     const found = [];
     const SAMPLES = 200;
     for (const p of places.values()) {
-      if (p === place || p.small || p.unpickable || p.hole) continue;
+      if (p === place || p.small || p.unpickable || p.hole || p.system) continue;
       const start = camera.position.distanceTo(p.position) / p.radius;
       if (start < 1 || f.end.position.distanceTo(p.position) < p.radius * 1.3) continue;
       let closest = CLEAR;
@@ -805,7 +843,7 @@ function starMaterials(pixelRatio) {
       depthWrite: false,
       transparent: true,
     });
-  return [make(STAR_SIZE, {}), make(STAR_SIZE, { GLOW_BACK: "" }), make(GLOW_SIZE, { GLOW: "" })];
+  return [make(STAR_SIZE, {}), make(STAR_SIZE, { GLOW_BACK: "" }), make(GLOW_SIZE, { GLOW: "" }), make(STAR_SIZE * 1.5, { NO_NEAR_FADE: "" })];
 }
 
 /** Turns from a to b by `w` (0..1), the way b lies (even past halfway round), not always the short way. */

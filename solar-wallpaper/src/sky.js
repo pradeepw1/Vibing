@@ -19,6 +19,7 @@ import {
 } from "three";
 import { eqjToScene } from "./ephemeris.js";
 import { BLACK_HOLES } from "./blackholes.js";
+import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { createGalaxies, skyDirection } from "./galaxies.js";
 import { clamp, random } from "./noise.js";
 import * as shaders from "./shaders.js";
@@ -134,6 +135,14 @@ export function createSky(pixelRatio) {
     galaxies: [
       ...galaxies.named,
       ...BLACK_HOLES.map((h) => ({ id: h.id, name: h.name, lightYears: h.lightYears, direction: skyDirection(h.ra, h.dec), distance: 950 })),
+      // A few of the best-known stars with planets (all of them are in the menu).
+      ...EXOPLANET_SYSTEMS.filter((s) => s.famous).map((s) => ({
+        id: s.id,
+        name: s.name,
+        lightYears: `${s.ly < 100 ? s.ly.toFixed(1) : Math.round(s.ly).toLocaleString("en-US")} light-years · ${s.planets.length} planet${s.planets.length === 1 ? "" : "s"}`,
+        direction: skyDirection(s.ra, s.dec),
+        distance: 940,
+      })),
     ],
     /**
      * Dims the stars, the Milky Way and the galaxies (1 = full). Used when the view turns so fast
