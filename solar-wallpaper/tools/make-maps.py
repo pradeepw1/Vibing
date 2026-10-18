@@ -396,10 +396,36 @@ def scale_mean(a, mean):
 # One recipe for each map. Each gets the width it should be made at and returns
 # a float array of that width. `rng` makes the grain the same on every run.
 
+def heal_edges(a):
+    """The outermost columns of a mosaic are often darkened, where its picture ran out.
+    Copies in the columns next to them, so no line shows at the 180 degree seam."""
+    h, w = a.shape[:2]
+    n = max(2, w // 1024)
+    col = a[h // 4:3 * h // 4].mean(axis=(0, 2))  # how bright each column is
+    out = a.copy()
+    left = col[n + 1:n + 5].mean()
+    for i in range(n + 1):
+        if col[i] < 0.97 * left:  # only the columns that really are darker
+            out[:, i] = a[:, n + 1]
+    right = col[w - n - 5:w - n - 1].mean()
+    for i in range(w - n - 1, w):
+        if col[i] < 0.97 * right:
+            out[:, i] = a[:, w - n - 2]
+    return out
+
+
+def box_mask(shape, lon0, lon1, lat0, lat1):
+    """True inside a box of longitudes and latitudes, in degrees."""
+    h, w = shape[:2]
+    x = (np.arange(w) + 0.5) / w * 360 - 180
+    y = 90 - (np.arange(h) + 0.5) / h * 180
+    return ((y >= lat0) & (y <= lat1))[:, None] & ((x >= lon0) & (x <= lon1))[None, :]
+
+
 def load(src, name, width, mode="RGB"):
     im = read(src, name, mode)
     width = min(width, im.size[0])
-    arr = to_arr(resize(im, width))
+    arr = heal_edges(to_arr(resize(im, width)))
     return arr if mode == "RGB" else arr[..., None].repeat(3, axis=2)
 
 
@@ -408,6 +434,8 @@ def plain(name, **opts):
     def make(src, width, rng):
         a = fix_seam(load(src, name, width))
         a = fix_poles(a, opts.get("pole", 78.0))
+        if "gain" in opts:  # a warmer or cooler cast: one multiplier each for red, green and blue
+            a = np.clip(a * np.array(opts["gain"], "float32"), 0, 1)
         if "saturation" in opts:
             a = saturate(a, opts["saturation"])
         if "mean" in opts:
@@ -416,13 +444,16 @@ def plain(name, **opts):
     return make
 
 
-def grey_moon(name, stops, roll=0.0, mean=None, lo=1.0, hi=99.0, gamma=1.0, fill=True, borrow=True, blur_px=0.0, contrast=None, grow=1 / 300):
-    """A grey map made into a coloured one, with the unmapped parts filled."""
+def grey_moon(name, stops, roll=0.0, mean=None, lo=1.0, hi=99.0, gamma=1.0, fill=True, borrow=True, blur_px=0.0, contrast=None, grow=1 / 300, boxes=()):
+    """A grey map made into a coloured one, with the unmapped parts filled.
+    `boxes` are (lon0, lon1, lat0, lat1) patches of bad data (burnt-out pictures) to fill as well."""
     def make(src, width, rng):
         a = load(src, name, width)
         if roll:
             a = roll_lon(a, roll)
         bad = find_gaps(a, grow=grow) if fill else np.zeros(a.shape[:2], bool)
+        for box in boxes:
+            bad |= box_mask(a.shape, *box)
         a = fill_gaps(a, bad, rng, borrow=borrow)
         g = luma(a)
         if blur_px:
@@ -434,13 +465,15 @@ def grey_moon(name, stops, roll=0.0, mean=None, lo=1.0, hi=99.0, gamma=1.0, fill
     return make
 
 
-def colour_moon(name, roll=0.0, borrow=True, mean=None, saturation=None, fill=True):
+def colour_moon(name, roll=0.0, borrow=True, mean=None, saturation=None, fill=True, gain=None):
     def make(src, width, rng):
         a = load(src, name, width)
         if roll:
             a = roll_lon(a, roll)
         bad = find_gaps(a) if fill else np.zeros(a.shape[:2], bool)
         a = fill_gaps(a, bad, rng, borrow=borrow)
+        if gain is not None:
+            a = np.clip(a * np.array(gain, "float32"), 0, 1)
         if saturation is not None:
             a = saturate(a, saturation)
         if mean is not None:
@@ -474,10 +507,13 @@ def triton(src, width, rng):
     """The colours in the original map are stretched to show different ices; the real Triton is a pale pinkish cream."""
     a = load(src, "triton", width)
     bad = find_gaps(a, grow=1 / 120)
-    a = fill_gaps(a, bad, rng, borrow=False)
+    a = fill_gaps(a, bad, rng, borrow=True, gain=0.8)
     l = luma(a)
+    # The map's fine colour is noise from joining many pictures: keep only its broad shades, with no overall cast.
+    chroma = blur(a - l[..., None], max(2.0, width / 120))
+    chroma -= chroma.reshape(-1, 3).mean(0)
     cream = tint(l, [(0.0, "#5e514c"), (0.5, "#b4a49a"), (1.0, "#f1e6dc")], lo=1, hi=99.5)
-    out = np.clip(cream + (a - l[..., None]) * 0.3, 0, 1)
+    out = np.clip(cream + chroma * 0.7, 0, 1)
     return fix_poles(fix_seam(scale_mean(out, 0.55)))
 
 
@@ -557,8 +593,9 @@ LAYERS = {
     "earth-extra": (2048, 2048, earth_lights_and_water, "jpeg444"),
     "clouds": (2048, 4096, earth_clouds, "webp-grey"),
     "moon": (2048, 4096, plain("moon", pole=82.0), "webp"),
-    "mars": (2048, 4096, plain("mars", pole=80.0), "webp"),
-    "jupiter": (2048, 4096, plain("jupiter", pole=80.0, saturation=0.9), "webp"),
+    # The Viking colours lean pink and the Solar System Scope Jupiter leans blue: warmed towards what telescopes show.
+    "mars": (2048, 4096, plain("mars", pole=80.0, gain=(1.26, 1.18, 0.9)), "webp"),
+    "jupiter": (2048, 4096, plain("jupiter", pole=80.0, gain=(1.07, 1.0, 0.86)), "webp"),
     "saturn": (2048, 4096, plain("saturn", pole=80.0), "webp"),
     "venus": (1024, 2048, plain("venus", saturation=0.8), "webp"),
     "mercury": (1024, 2048, mercury, "webp"),
@@ -566,10 +603,11 @@ LAYERS = {
     "neptune": (1024, 2048, plain("neptune", pole=70.0), "webp"),
     "pluto": (1024, 2048, grey_moon("pluto", GREY["pluto"], roll=0.5, mean=0.43), "webp"),
     "charon": (1024, 2048, grey_moon("charon", GREY["charon"], roll=0.5, mean=0.36), "webp"),
-    "io": (1024, 2048, colour_moon("io"), "webp"),
+    "io": (1024, 2048, colour_moon("io", gain=(1.06, 1.04, 0.92), saturation=1.1), "webp"),
     "europa": (1024, 2048, grey_moon("europa", GREY["europa"], mean=0.62), "webp"),
     "ganymede": (1024, 2048, colour_moon("ganymede"), "webp"),
-    "callisto": (1024, 2048, grey_moon("callisto", GREY["callisto"], mean=0.26, lo=0.5, hi=99.8), "webp"),
+    # (the box is a burnt-out patch in the original, near the 180 degree seam in the south)
+    "callisto": (1024, 2048, grey_moon("callisto", GREY["callisto"], mean=0.26, lo=0.5, hi=99.8, boxes=[(-180, -154, -70, -55), (172, 180, -70, -55)]), "webp"),
     "titan": (1024, 2048, titan, "webp"),
     "triton": (1024, 2048, triton, "webp"),
     "phobos": (1024, 2048, grey_moon("phobos", GREY["phobos"], mean=0.26), "webp"),

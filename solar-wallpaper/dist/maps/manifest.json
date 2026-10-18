@@ -11,21 +11,21 @@
  },
  "callisto": {
   "lite": {
-   "bytes": 53396,
+   "bytes": 61844,
    "width": 1024
   },
   "sharp": {
-   "bytes": 224872,
+   "bytes": 252298,
    "width": 2048
   }
  },
  "charon": {
   "lite": {
-   "bytes": 36664,
+   "bytes": 36722,
    "width": 1024
   },
   "sharp": {
-   "bytes": 117520,
+   "bytes": 117910,
    "width": 2048
   }
  },
@@ -51,11 +51,11 @@
  },
  "earth": {
   "lite": {
-   "bytes": 245324,
+   "bytes": 246354,
    "width": 2048
   },
   "sharp": {
-   "bytes": 782006,
+   "bytes": 781942,
    "width": 4096
   }
  },
@@ -67,61 +67,61 @@
  },
  "europa": {
   "lite": {
-   "bytes": 105348,
+   "bytes": 105228,
    "width": 1024
   },
   "sharp": {
-   "bytes": 409594,
+   "bytes": 409318,
    "width": 2048
   }
  },
  "ganymede": {
   "lite": {
-   "bytes": 61840,
+   "bytes": 61750,
    "width": 1024
   },
   "sharp": {
-   "bytes": 240258,
+   "bytes": 240582,
    "width": 2048
   }
  },
  "iapetus": {
   "lite": {
-   "bytes": 136906,
+   "bytes": 136776,
    "width": 1024
   },
   "sharp": {
-   "bytes": 430214,
+   "bytes": 430014,
    "width": 2048
   }
  },
  "io": {
   "lite": {
-   "bytes": 54788,
+   "bytes": 57876,
    "width": 1024
   },
   "sharp": {
-   "bytes": 151196,
+   "bytes": 160406,
    "width": 2048
   }
  },
  "jupiter": {
   "lite": {
-   "bytes": 110576,
+   "bytes": 112770,
    "width": 2048
   },
   "sharp": {
-   "bytes": 301444,
+   "bytes": 310764,
    "width": 4096
   }
  },
  "mars": {
   "lite": {
-   "bytes": 120558,
+   "bytes": 149454,
    "width": 2048
   },
   "sharp": {
-   "bytes": 356490,
+   "bytes": 440402,
    "width": 4096
   }
  },
@@ -137,11 +137,11 @@
  },
  "miranda": {
   "lite": {
-   "bytes": 50510,
+   "bytes": 50432,
    "width": 1024
   },
   "sharp": {
-   "bytes": 87548,
+   "bytes": 87570,
    "width": 1440
   }
  },
@@ -187,11 +187,11 @@
  },
  "pluto": {
   "lite": {
-   "bytes": 69412,
+   "bytes": 69478,
    "width": 1024
   },
   "sharp": {
-   "bytes": 248072,
+   "bytes": 248284,
    "width": 2048
   }
  },
@@ -233,31 +233,31 @@
  },
  "titania": {
   "lite": {
-   "bytes": 48484,
+   "bytes": 48314,
    "width": 1024
   },
   "sharp": {
-   "bytes": 85248,
+   "bytes": 84162,
    "width": 1440
   }
  },
  "triton": {
   "lite": {
-   "bytes": 34148,
+   "bytes": 44802,
    "width": 1024
   },
   "sharp": {
-   "bytes": 110150,
+   "bytes": 144548,
    "width": 2048
   }
  },
  "umbriel": {
   "lite": {
-   "bytes": 31210,
+   "bytes": 30738,
    "width": 1024
   },
   "sharp": {
-   "bytes": 48760,
+   "bytes": 49132,
    "width": 1440
   }
  },
