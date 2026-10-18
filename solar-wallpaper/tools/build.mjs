@@ -1,5 +1,6 @@
 // Bundles src/ into dist/solar.js: one plain script, so dist/index.html works
 // straight from disk (file://) and inside wallpaper apps, with no server.
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
 // The painter runs in a background worker. Wallpaper apps load the page from
@@ -15,6 +16,15 @@ const worker = await build({
   legalComments: "none",
 });
 
+// The real maps in dist/maps/ (made by tools/make-maps.py) are separate files the page loads
+// after its first picture. Which ones exist is baked in, so the page never asks for a missing one.
+let maps = {};
+try {
+  maps = JSON.parse(readFileSync(new URL("../dist/maps/manifest.json", import.meta.url), "utf8"));
+} catch {
+  // none built: the painted surfaces are used
+}
+
 await build({
   entryPoints: ["src/main.js"],
   bundle: true,
@@ -23,7 +33,7 @@ await build({
   target: "es2020",
   outfile: "dist/solar.js",
   legalComments: "eof",
-  define: { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text) },
+  define: { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text), MAP_MANIFEST: JSON.stringify(maps) },
   banner: {
     js: "/* Solar System Live. Bundles three.js (MIT, three.js authors) and astronomy-engine (MIT, Don Cross). */",
   },
@@ -43,6 +53,7 @@ const lively = {
   clock: { type: "checkbox", value: true, text: "Show clock" },
   drift: { type: "checkbox", value: true, text: "Slow camera drift" },
   strange: { type: "checkbox", value: true, text: "Strange sightings (made up)" },
+  photos: { type: "checkbox", value: true, text: "Real maps (NASA)" },
   fps: { type: "slider", value: 30, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
 };
 const { writeFileSync } = await import("node:fs");

@@ -14,6 +14,7 @@ import {
   LinearFilter,
   LineLoop,
   Mesh,
+  NoColorSpace,
   Points,
   RingGeometry,
   ShaderMaterial,
@@ -49,18 +50,30 @@ const DAY_MS = 86400e3;
 const GAS_GIANTS = new Set(["jupiter", "saturn", "uranus", "neptune", "venus"]);
 
 const sphere = new SphereGeometry(1, 96, 48);
-const smallSphere = new SphereGeometry(1, 40, 20);
+// Moons and glows are small on screen, but their edge still shows corners if there are too few sides.
+const smallSphere = new SphereGeometry(1, 64, 32);
 // The body you stand on fills half the screen, so it gets a much finer sphere.
 const groundSphere = new SphereGeometry(1, 384, 192);
 
-export function texture(image) {
+let anisotropy = 4;
+/** How well textures hold up when seen at a slant (the edges of a planet): as much as the graphics chip allows. */
+export function setAnisotropy(n) {
+  anisotropy = Math.max(1, Math.min(16, n));
+}
+export const getAnisotropy = () => anisotropy;
+
+/**
+ * A texture from painted ImageData. Colour maps are sRGB; maps that hold plain
+ * numbers (cloud cover, city lights, water) are `data` and are read as they are.
+ */
+export function texture(image, data = false) {
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
   canvas.getContext("2d").putImageData(image, 0, 0);
   const t = new CanvasTexture(canvas);
-  t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
+  t.colorSpace = data ? NoColorSpace : SRGBColorSpace;
+  t.anisotropy = anisotropy;
   return t;
 }
 
@@ -85,6 +98,8 @@ function planetMaterial(def, isMoon) {
     uniforms: {
       map: { value: null },
       hasMap: { value: 0 },
+      mapB: { value: null }, // a new map fading in over `map`
+      mapMix: { value: 0 }, // 0..1: how far it has got
       baseColor: { value: new Color(def.color ?? "#9a958e") },
       sunDir: { value: new Vector3(1, 0, 0) },
       sunlight: { value: 1 }, // 0..1: how much of the Sun isn't hidden by its planet (eclipses)
@@ -95,11 +110,15 @@ function planetMaterial(def, isMoon) {
       opacity: { value: 1 },
       hasExtra: { value: 0 },
       extraMap: { value: null },
+      hasExtraB: { value: 0 },
+      extraMapB: { value: null },
       hasRings: { value: 0 },
       ringNormal: { value: new Vector3() },
       center: { value: new Vector3() },
       ringRadii: { value: new Vector2() },
       ringMap: { value: null },
+      ringMapB: { value: null }, // a real strip fading in over it
+      ringMix: { value: 0 },
     },
     transparent: isMoon,
   });
@@ -122,7 +141,7 @@ function haloFor(def, radius) {
     depthWrite: false,
     blending: AdditiveBlending,
   });
-  const mesh = new Mesh(smallSphere, mat);
+  const mesh = new Mesh(smallSphere, mat); // the glow ends at this shell's edge, so it needs a round one
   mesh.scale.setScalar(radius * scale);
   mesh.userData = { strength: strength * 0.9, scale };
   return mesh;
@@ -195,6 +214,8 @@ export function createSystem(scene, pixelRatio) {
         ...shaders.rings,
         uniforms: {
           map: { value: tex },
+          mapB: { value: null }, // a real strip fading in over the painted one
+          mapMix: { value: 0 },
           radii: { value: new Vector2(SATURN_RINGS.inner, SATURN_RINGS.outer) },
           center: { value: new Vector3() },
           planetRadius: { value: radius },
@@ -212,12 +233,13 @@ export function createSystem(scene, pixelRatio) {
       body.ring = ring;
       material.uniforms.hasRings.value = 1;
       material.uniforms.ringMap.value = tex;
+      body.ringPainted = tex;
       material.uniforms.ringRadii.value.set(SATURN_RINGS.inner * radius, SATURN_RINGS.outer * radius);
     }
     if (def.id === "earth") {
       const cloudMat = new ShaderMaterial({
         ...shaders.clouds,
-        uniforms: { map: { value: null }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
+        uniforms: { map: { value: null }, mapB: { value: null }, mapMix: { value: 0 }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
         transparent: true,
         depthWrite: false,
       });
@@ -361,6 +383,7 @@ export function createSystem(scene, pixelRatio) {
   function update(date, dtReal, simRate, camera, viewHeight, showOrbits, realSeconds, pov = null) {
     const time = A.MakeTime(date);
     const timeMs = date.getTime();
+    fadeSurfaces(dtReal);
     // The body we stand on, and while moving away the one we're leaving: both
     // are "ground" close to the camera.
     grounds.clear();
@@ -568,24 +591,121 @@ export function createSystem(scene, pixelRatio) {
     ground = { id, parts, ring: b.ring };
   }
 
+  // --- What each surface shows ---
+  // A surface is a body's skin, Earth's cloud layer, or Saturn's ring strip. It
+  // can have a painted look (made in code, see surfaces.js) and a photo look (a
+  // real map, see maps.js). The photo is shown when there is one and real maps
+  // are on. A new look fades in over the old one instead of popping in.
+  const FADE_SECONDS = 0.8;
+  const slots = new Map();
+  let photosOn = true;
+
+  const look = (map, extra) => ({ map, extra, textures: [map, extra].filter(Boolean) });
+
+  function slotFor(id) {
+    let s = slots.get(id);
+    if (!s) {
+      const kind = id === "clouds" ? "clouds" : id === "saturn-rings" ? "rings" : "body";
+      const owner = bodies.get(kind === "clouds" ? "earth" : kind === "rings" ? "saturn" : id);
+      const part = kind === "clouds" ? owner.clouds : kind === "rings" ? owner.ring : owner;
+      s = { id, kind, u: part.material.uniforms, planet: owner.material.uniforms, painted: null, photo: null, shown: null, fade: null, afterwards: [] };
+      if (kind === "rings") s.painted = s.shown = look(owner.ringPainted); // the strip made in code is on from the start
+      slots.set(id, s);
+    }
+    return s;
+  }
+
+  const inUse = (s, textures) => textures.some((t) => s.shown?.textures.includes(t) || s.fade?.look.textures.includes(t));
+
+  /** Runs the things waiting for some textures to be off the screen (to free them), for those that are. */
+  function runWhenUnused(s) {
+    const waiting = s.afterwards;
+    s.afterwards = waiting.filter(({ textures }) => inUse(s, textures));
+    for (const w of waiting) if (!s.afterwards.includes(w)) w.fn();
+  }
+
+  /** Sets what a surface draws: `l` is the look on show, `over` one fading in on top of it by `mix` (0..1). */
+  function setLooks(s, l, over, mix) {
+    const { u } = s;
+    u.map.value = l?.map ?? null;
+    u.mapB.value = over?.map ?? null;
+    u.mapMix.value = mix;
+    if (s.kind === "rings") {
+      // the strip is used twice: by the rings, and for their shadow on the planet
+      s.planet.ringMap.value = l?.map ?? null;
+      s.planet.ringMapB.value = over?.map ?? null;
+      s.planet.ringMix.value = mix;
+    } else if (s.kind === "body") {
+      u.hasMap.value = l?.map ? 1 : 0;
+      u.extraMap.value = l?.extra ?? null;
+      u.hasExtra.value = l?.extra ? 1 : 0;
+      u.extraMapB.value = over?.extra ?? null;
+      u.hasExtraB.value = over?.extra ? 1 : 0;
+    } else if (l || over) bodies.get("earth").clouds.visible = true;
+  }
+
+  /** Puts a look on a surface at once. */
+  function setNow(s, l) {
+    setLooks(s, l, null, 0);
+    s.shown = l;
+    s.fade = null;
+    runWhenUnused(s);
+  }
+
+  /** Makes a surface show what it should: the photo if there is one and they're on, else the painted look. */
+  function refresh(s) {
+    const want = (photosOn && s.photo) || s.painted;
+    if (want === (s.fade ? s.fade.look : s.shown)) return;
+    if (s.fade) setNow(s, s.fade.look); // a fade still going is brought to its end first
+    if (want === s.shown) return;
+    if (!want) return setNow(s, null);
+    setLooks(s, s.shown, want, 0);
+    s.fade = { look: want, t: 0 };
+  }
+
+  /** Moves the fades on. */
+  function fadeSurfaces(dtReal) {
+    for (const s of slots.values()) {
+      if (!s.fade) continue;
+      s.fade.t += dtReal / FADE_SECONDS;
+      if (s.fade.t >= 1) setNow(s, s.fade.look);
+      else setLooks(s, s.shown, s.fade.look, s.fade.t * s.fade.t * (3 - 2 * s.fade.t));
+    }
+  }
+
   /** Puts a freshly painted surface on its body. `images` holds ImageData. */
   function applySurface(job, images) {
-    const swap = (uniform, image) => {
-      uniform.value?.dispose(); // free the old one's GPU memory
-      uniform.value = texture(image);
-    };
-    if (job === "clouds") {
-      const earth = bodies.get("earth");
-      swap(earth.clouds.material.uniforms.map, images.map);
-      earth.clouds.visible = true;
-      return;
-    }
-    const b = bodies.get(job);
-    swap(b.material.uniforms.map, images.map);
-    b.material.uniforms.hasMap.value = 1;
-    if (images.extra) {
-      swap(b.material.uniforms.extraMap, images.extra);
-      b.material.uniforms.hasExtra.value = 1;
+    const s = slotFor(job);
+    const old = s.painted;
+    const map = texture(images.map, job === "clouds");
+    s.painted = look(map, images.extra ? texture(images.extra, true) : null);
+    refresh(s);
+    if (old) s.afterwards.push({ textures: old.textures, fn: () => old.textures.forEach((t) => t.dispose()) }); // free the old one's GPU memory
+    runWhenUnused(s);
+  }
+
+  /** Shows the textures of a real map (see maps.js) on a surface. They are marked with the layer they come from. */
+  function applyPhoto(id, textures) {
+    const s = slotFor(id);
+    const map = textures.find((t) => t.userData.layer === id) ?? null;
+    const extra = textures.find((t) => t.userData.layer === "earth-extra") ?? null;
+    s.photo = look(map, extra);
+    refresh(s);
+  }
+
+  /** Calls `fn` once none of `textures` is on screen (at once if they aren't). */
+  function whenUnused(id, textures, fn) {
+    const s = slotFor(id);
+    s.afterwards.push({ textures, fn });
+    runWhenUnused(s);
+  }
+
+  /** Real maps on or off. Off, every surface goes back to its painted look. */
+  function setPhotosEnabled(on) {
+    photosOn = on;
+    for (const s of slots.values()) {
+      if (!on) s.photo = null; // their textures are freed by whoever made them
+      refresh(s);
     }
   }
 
@@ -593,6 +713,9 @@ export function createSystem(scene, pixelRatio) {
     bodies,
     update,
     applySurface,
+    applyPhoto,
+    whenUnused,
+    setPhotosEnabled,
     fitGlow,
     setGround,
     snapshot,

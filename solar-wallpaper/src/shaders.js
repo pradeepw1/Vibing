@@ -22,12 +22,23 @@ const outputChunks = /* glsl */ `
   #include <colorspace_fragment>
 `;
 
+// Noise of less than one step of 8-bit colour. Smooth gradients (a planet's
+// shading, the glow round it) show bands without it.
+const ditherFunction = /* glsl */ `
+  float gradientNoise(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+`;
+const ditherOutput = /* glsl */ `
+  gl_FragColor.rgb += (gradientNoise(gl_FragCoord.xy) + gradientNoise(gl_FragCoord.yx + 17.0) - 1.0) / 255.0;
+`;
+
 // --- Planets and moons ----------------------------------------------------------
 
 export const planet = {
   vertexShader: worldVertex,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new map fading in over the one above
+    uniform float mapMix;        // how far it has got, 0..1
     uniform vec3 baseColor;
     uniform float hasMap;
     uniform vec3 sunDir;         // real direction to the Sun
@@ -40,23 +51,30 @@ export const planet = {
 
     uniform float hasExtra;      // Earth: r = city lights, g = water
     uniform sampler2D extraMap;
+    uniform float hasExtraB;     // the same for the map fading in
+    uniform sampler2D extraMapB;
 
     uniform float hasRings;      // Saturn: shadow of the rings on the planet
     uniform vec3 ringNormal;
     uniform vec3 center;
     uniform vec2 ringRadii;
     uniform sampler2D ringMap;
+    uniform sampler2D ringMapB;  // a new strip fading in over it
+    uniform float ringMix;
 
     varying vec3 vWorldPos;
     varying vec3 vNormal;
     varying vec2 vUv;
+    ${ditherFunction}
 
     void main() {
       vec3 N = normalize(vNormal);
       vec3 L = sunDir;
       vec3 V = normalize(cameraPosition - vWorldPos);
       float ndl = dot(N, L);
-      float diffuse = clamp((ndl + wrap) / (1.0 + wrap), 0.0, 1.0);
+      // Straight Lambert light, with the sharp corner at the day/night line rounded off.
+      float lit = (ndl + wrap) / (1.0 + wrap);
+      float diffuse = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0);
 
       if (hasRings > 0.5) {
         float facing = dot(L, ringNormal);
@@ -65,17 +83,23 @@ export const planet = {
           if (t > 0.0) {
             float r = length(vWorldPos + L * t - center);
             float f = (r - ringRadii.x) / (ringRadii.y - ringRadii.x);
-            if (f > 0.0 && f < 1.0) diffuse *= 1.0 - 0.9 * texture2D(ringMap, vec2(f, 0.5)).a;
+            if (f > 0.0 && f < 1.0) {
+              float block = texture2D(ringMap, vec2(f, 0.5)).a;
+              if (ringMix > 0.0) block = mix(block, texture2D(ringMapB, vec2(f, 0.5)).a, ringMix);
+              diffuse *= 1.0 - 0.9 * block;
+            }
           }
         }
       }
 
       vec3 albedo = hasMap > 0.5 ? texture2D(map, vUv).rgb : baseColor;
+      if (mapMix > 0.0) albedo = mix(albedo, texture2D(mapB, vUv).rgb, mapMix);
       vec3 col = albedo * (diffuse * sunlight + ambient);
       col += albedo * eclipseTint * (1.0 - sunlight) * smoothstep(-0.1, 0.3, ndl);
 
-      if (hasExtra > 0.5) {
-        vec3 extra = texture2D(extraMap, vUv).rgb;
+      if (hasExtra > 0.5 || hasExtraB > 0.5) {
+        vec3 extra = hasExtra > 0.5 ? texture2D(extraMap, vUv).rgb : vec3(0.0);
+        if (mapMix > 0.0) extra = mix(extra, hasExtraB > 0.5 ? texture2D(extraMapB, vUv).rgb : vec3(0.0), mapMix);
         float night = 1.0 - smoothstep(-0.12, 0.08, ndl);
         col += vec3(1.0, 0.72, 0.38) * extra.r * night * 0.9;
         vec3 H = normalize(L + V);
@@ -89,6 +113,7 @@ export const planet = {
 
       gl_FragColor = vec4(col, opacity);
       ${outputChunks}
+      ${ditherOutput}
     }
   `,
 };
@@ -98,6 +123,8 @@ export const clouds = {
   vertexShader: worldVertex,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new map fading in over the one above
+    uniform float mapMix;
     uniform vec3 sunDir;
     uniform float ambient;
     varying vec3 vWorldPos;
@@ -107,7 +134,9 @@ export const clouds = {
       vec3 N = normalize(vNormal);
       float ndl = dot(N, sunDir);
       float c = texture2D(map, vUv).r;
-      float light = clamp((ndl + 0.1) / 1.1, 0.0, 1.0);
+      if (mapMix > 0.0) c = mix(c, texture2D(mapB, vUv).r, mapMix);
+      float lit = (ndl + 0.1) / 1.1;
+      float light = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0); // same rounded day/night line as the planet
       gl_FragColor = vec4(vec3(0.98) * (light + ambient), c * 0.92);
       ${outputChunks}
     }
@@ -126,6 +155,7 @@ export const halo = {
     uniform float edge;    // how far in the planet's edge sits, as a dot product
     varying vec3 vWorldPos;
     varying vec3 vNormal;
+    ${ditherFunction}
     void main() {
       vec3 N = normalize(vNormal);
       vec3 V = normalize(cameraPosition - vWorldPos);
@@ -133,6 +163,10 @@ export const halo = {
       float sunny = smoothstep(-0.35, 0.6, dot(normalize(vWorldPos - center), sunDir));
       gl_FragColor = vec4(color * strength * g * g * sunny, 1.0);
       ${outputChunks}
+      // Added to the sky behind, so only where there is some glow to break up.
+      if (max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b)) > 1.0 / 255.0) {
+        ${ditherOutput}
+      }
     }
   `,
 };
@@ -152,6 +186,8 @@ export const rings = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform sampler2D mapB;      // a new strip fading in over the one above
+    uniform float mapMix;
     uniform vec2 radii;          // inner and outer edge, in the same units as vLocal
     uniform vec3 center;         // planet centre (world)
     uniform float planetRadius;  // world units
@@ -164,6 +200,7 @@ export const rings = {
       float f = (length(vLocal) - radii.x) / (radii.y - radii.x);
       if (f < 0.0 || f > 1.0) discard;
       vec4 tex = texture2D(map, vec2(f, 0.5));
+      if (mapMix > 0.0) tex = mix(tex, texture2D(mapB, vec2(f, 0.5)), mapMix);
 
       vec3 L = sunDir;
       // In the planet's shadow?

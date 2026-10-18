@@ -140,6 +140,11 @@
     "value": true,
     "text": "Strange sightings (made up)"
   },
+  "photos": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Real maps (NASA)"
+  },
   "fps": {
     "type": "slider",
     "value": 30,

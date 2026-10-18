@@ -24,6 +24,14 @@ function spot(lat, lon) {
 
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
 
+// Cloud cover, city lights and water are plain numbers, and the page reads them
+// as they are. These painters were tuned back when they were read as colours
+// (which darkens them), so store what that gave and keep the same look.
+const asNumber = (v) => {
+  const c = clamp(v);
+  return 255 * (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+};
+
 // ---------------------------------------------------------------------------------
 // Painters. Each gets (x, y, z, lat, lon) for one pixel and returns [r, g, b] (0..1).
 // Earth also fills extra layers.
@@ -141,15 +149,15 @@ const JUPITER_BANDS = [
   [64, "#a39784"], [90, "#8c8478"],
 ].map(([lat, c]) => [lat, rgb(c)]);
 
+/** The colour at a latitude: each band edge is a soft step, five degrees wide, centred on the edge. */
 function bandColor(bands, lat) {
-  for (let i = 0; i < bands.length; i++) {
-    if (lat <= bands[i][0]) {
-      const prev = i > 0 ? bands[i - 1] : bands[0];
-      const t = smooth(-2.5, 2.5, lat - prev[0]); // soft edge with the band below
-      return mix3(prev[1], bands[i][1], i > 0 ? t : 1);
-    }
+  const c = bands[0][1].slice();
+  for (let i = 0; i < bands.length - 1; i++) {
+    const t = smooth(-2.5, 2.5, lat - bands[i][0]);
+    if (t === 0) break; // below this edge, so below all the higher ones too
+    for (let k = 0; k < 3; k++) c[k] += (bands[i + 1][1][k] - bands[i][1][k]) * t;
   }
-  return bands[bands.length - 1][1];
+  return c;
 }
 
 function jupiter() {
@@ -536,8 +544,8 @@ export function* paint(id, width = SIZES[id] ?? 256) {
       map.data[o + 2] = c[2] * 255;
       map.data[o + 3] = 255;
       if (extraImg) {
-        extraImg.data[o] = extra[0] * 255;
-        extraImg.data[o + 1] = extra[1] * 255;
+        extraImg.data[o] = asNumber(extra[0]);
+        extraImg.data[o + 1] = asNumber(extra[1]);
         extraImg.data[o + 3] = 255;
       }
     }
@@ -563,7 +571,7 @@ function* paintWith(painter, width) {
       const lon = ((px + 0.5) / width) * 360 - 180;
       const c = painter(cl * Math.cos(lon * DEG), y, -cl * Math.sin(lon * DEG), lat, lon);
       const o = (py * width + px) * 4;
-      img.data[o] = img.data[o + 1] = img.data[o + 2] = c[0] * 255;
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = asNumber(c[0]);
       img.data[o + 3] = 255;
     }
     yield;
