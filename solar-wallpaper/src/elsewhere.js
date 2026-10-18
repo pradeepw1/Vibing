@@ -36,7 +36,18 @@ const DEG = Math.PI / 180;
 const DOOR_GAP = 28; // between doorways, along the way
 const SPEED = 1.7; // how fast you drift, units a second
 const CALM = 0.35; // and this share of that when slow drift is off
-const MORPH = 6; // seconds for a new place to settle in after a door
+const MORPH = 6; // seconds for a new place to settle in after a door (twice that when calm)
+const CALM_CLOCK = 0.25; // when calm, the streaks and pulses move at this share of their speed
+const CALM_SPEED_CAP = 1.5; // and scrolling can't take you faster than this
+const FLASH_CALM = 0.3; // and the doorway flash is this much of its size
+const FLASH_ATTACK = 8; // the flash rises over about an eighth of a second...
+const FLASH_FADE = 1.0; // ...and fades over about a second
+const EARLY = 0.15; // the flash starts this far before the doorway, so it covers the last frames of it
+// Far along the hall the numbers get too big for the graphics chip to keep the picture sharp, so now
+// and then (under a flash) the start of the way is moved up. The path itself keeps counting exactly.
+const WRAP_AT = 30000;
+const WRAP_BY = DOOR_GAP * 500;
+const CLOCK_WRAP = 2048;
 const DOOR_RING = 1.7; // radius of a doorway
 const EXPOSURE = 1.0;
 const FOV = 78;
@@ -73,6 +84,10 @@ export function dimensionOf(k) {
 }
 
 const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
 /** The same palette the shader uses, for colouring the doorways to match. */
 export function palette(t, hue) {
@@ -101,6 +116,7 @@ const fragment = /* glsl */ `
   uniform vec2 uTw;   // how much the streaks turn along the hall, in each
   uniform float uGlow;
   uniform float uFlash;
+  uniform float uByte;   // 1 when the picture is kept in 8 bits: squeeze it so bright parts don't clip
   varying vec2 vUv;
   ${shaders.snoise}
 
@@ -168,7 +184,8 @@ const fragment = /* glsl */ `
     vec3 ro = uCam;
     vec3 col = scene(ro, rd, uB0, uB1, uTw.y);
     if (uMorph < 0.999) col = mix(scene(ro, rd, uA0, uA1, uTw.x), col, uMorph);
-    col = pow(max(col, 0.0), vec3(1.12)) * uGlow * (1.0 + uFlash * 2.5);
+    col = pow(max(col, 0.0), vec3(1.12)) * uGlow * (1.0 + uFlash * 1.4);
+    if (uByte > 0.5) col = 1.0 - exp(-col);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -178,7 +195,7 @@ const fragment = /* glsl */ `
  */
 export function createElsewhere(canvas) {
   const scene = new Scene();
-  const camera = new PerspectiveCamera(FOV, innerWidth / innerHeight, 0.05, 400);
+  const camera = new PerspectiveCamera(FOV, innerWidth / innerHeight, 0.002, 400); // (no depth buffer, so a close near plane costs nothing)
   const controls = { enabled: false };
 
   const backdrop = new Mesh(
@@ -199,6 +216,7 @@ export function createElsewhere(canvas) {
         uTw: { value: new Vector2() },
         uGlow: { value: 1 },
         uFlash: { value: 0 },
+        uByte: { value: 0 },
       },
       depthTest: false,
       depthWrite: false,
@@ -219,15 +237,21 @@ export function createElsewhere(canvas) {
 
   // --- Where we are ---
   const u = backdrop.material.uniforms;
-  let z = 0; // how far along
+  let z = 0; // how far along the way, counted exactly
+  let zOrigin = 0; // where the picture's own numbers start from (see WRAP_AT)
   let dimension = 0; // how many doorways passed
   let since = MORPH; // seconds since the last one
   let speedScale = 1;
   let flash = 0;
+  let flashWant = 0; // what the flash is rising to (0 when not rising)
+  let flashPeak = 1;
+  let morphLength = MORPH;
+  let shaderTime = 0; // the picture's own clock, which runs slower when calm
   const look = { yaw: 0, pitch: 0, vyaw: 0, vpitch: 0 };
   let onDimension = null;
 
-  const pathAt = (zz, out) => out.set(Math.sin(zz * 0.07) * 0.55, Math.cos(zz * 0.05) * 0.45, -zz);
+  // Sideways sway comes from the exact distance; the way along is counted from zOrigin.
+  const pathAt = (zz, out) => out.set(Math.sin(zz * 0.07) * 0.55, Math.cos(zz * 0.05) * 0.45, -(zz - zOrigin));
   const here = new Vector3();
   const ahead = new Vector3();
   const rot = new Matrix4();
@@ -254,11 +278,14 @@ export function createElsewhere(canvas) {
   /** Starts a fresh visit: at the beginning of the way, looking down it. */
   function show() {
     z = 0;
+    zOrigin = 0;
     dimension = 0;
     since = MORPH;
-    flash = 0;
+    flash = flashWant = 0;
+    shaderTime = 0;
     look.yaw = look.pitch = look.vyaw = look.vpitch = 0;
     speedScale = 1;
+    drag = null;
     doors.forEach((_, i) => placeDoor(i, i));
     u.uTime.value = 0;
     applyDimension();
@@ -267,7 +294,7 @@ export function createElsewhere(canvas) {
   function applyDimension() {
     const to = dimensionOf(dimension);
     const from = dimensionOf(dimension - 1);
-    const m = since >= MORPH ? 1 : 1 - Math.pow(1 - since / MORPH, 3);
+    const m = since >= morphLength ? 1 : 1 - Math.pow(1 - since / morphLength, 3);
     u.uA0.value.set(from.hue, from.sides, from.freq, from.rings);
     u.uA1.value.set(...from.mix);
     u.uB0.value.set(to.hue, to.sides, to.freq, to.rings);
@@ -278,65 +305,105 @@ export function createElsewhere(canvas) {
   }
 
   // --- Looking round ---
+  // One finger or the mouse button at a time. Letting go while still moving carries the view on a little.
+  const LOOK_PER_PX = 0.0042;
+  const MAX_FLING = 2.5; // radians a second (it then eases off over about a quarter of a second, so at most about 35 degrees)
+const MIN_FLING = 150; // a swipe slower than this (pixels a second) just stops when you let go
   let drag = null;
+  const endDrag = (e, fling = true) => {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    const idle = e ? e.timeStamp - drag.t : Infinity;
+    if (fling && idle < 80 && Math.hypot(drag.vx, drag.vy) > MIN_FLING) {
+      look.vyaw = Math.max(-MAX_FLING, Math.min(MAX_FLING, -drag.vx * LOOK_PER_PX));
+      look.vpitch = Math.max(-MAX_FLING, Math.min(MAX_FLING, -drag.vy * LOOK_PER_PX));
+    } else look.vyaw = look.vpitch = 0;
+    drag = null;
+  };
   canvas.addEventListener("pointerdown", (e) => {
-    if (!controls.enabled || e.button !== 0) return;
-    drag = { x: e.clientX, y: e.clientY };
+    if (!controls.enabled || e.button !== 0 || drag) return; // a second finger does nothing
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, vx: 0, vy: 0 };
     look.vyaw = look.vpitch = 0;
+    try {
+      canvas.setPointerCapture(e.pointerId); // keep hearing from it outside the window
+    } catch {
+      // (some synthetic or old pointers can't be captured; dragging still works inside the page)
+    }
   });
-  addEventListener("pointermove", (e) => {
-    if (!drag) return;
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (e.pointerType === "mouse" && !(e.buttons & 1)) return endDrag(e, false); // the button went up out of our sight
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
+    const secs = Math.max(e.timeStamp - drag.t, 8) / 1000; // (pointers report at most about 125 times a second)
     drag.x = e.clientX;
     drag.y = e.clientY;
-    look.yaw -= dx * 0.0042;
-    look.pitch = Math.max(-1.35, Math.min(1.35, look.pitch - dy * 0.0042));
-    look.vyaw = -dx * 0.0042 * 60;
-    look.vpitch = -dy * 0.0042 * 60;
+    drag.t = e.timeStamp;
+    drag.vx = 0.6 * drag.vx + 0.4 * (dx / secs);
+    drag.vy = 0.6 * drag.vy + 0.4 * (dy / secs);
+    look.yaw -= dx * LOOK_PER_PX;
+    look.pitch = Math.max(-1.35, Math.min(1.35, look.pitch - dy * LOOK_PER_PX));
   });
-  addEventListener("pointerup", () => (drag = null));
-  addEventListener("pointercancel", () => (drag = null));
+  canvas.addEventListener("pointerup", (e) => endDrag(e));
+  canvas.addEventListener("pointercancel", (e) => endDrag(e, false));
+  canvas.addEventListener("lostpointercapture", (e) => endDrag(e, false));
+  addEventListener("blur", () => (drag = null));
   canvas.addEventListener(
     "wheel",
     (e) => {
       if (!controls.enabled) return;
-      speedScale = Math.max(0.25, Math.min(4, speedScale * Math.exp(-e.deltaY * 0.0012)));
+      // Browsers count a notch in pixels, lines or pages.
+      const px = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      speedScale = Math.max(0.25, Math.min(4, speedScale * Math.exp(-px * 0.0012)));
       e.preventDefault();
     },
     { passive: false },
   );
 
-  /** Moves things on. `dt` seconds; `drift` lets the view sway a little by itself. */
+  /** Moves things on. `dt` seconds; `drift` lets the view sway and the light run at full speed (off: calm). */
   function update(dt, now, drift) {
     clockNow = now;
     dt = Math.min(dt, 0.1);
     const before = z;
-    // With the slow drift switched off (or the system asking for less motion), keep it calm.
-    z += SPEED * speedScale * (drift ? 1 : CALM) * dt;
+    // With the slow drift switched off (or the system asking for less motion), keep everything calm:
+    // slower along the way, slower light, a gentler flash and a slower change between places.
+    z += SPEED * (drift ? speedScale : Math.min(speedScale, CALM_SPEED_CAP) * CALM) * dt;
     since += dt;
-    flash = Math.max(0, flash - dt * 1.4);
+    shaderTime += dt * (drift ? 1 : CALM_CLOCK);
+    flashPeak = drift ? 1 : FLASH_CALM;
+    morphLength = drift ? MORPH : MORPH * 2;
+    if (flashWant > 0) {
+      flash = Math.min(flashWant, flash + dt * FLASH_ATTACK);
+      if (flash >= flashWant) flashWant = 0;
+    } else flash = Math.max(0, flash - dt * FLASH_FADE);
     // The look keeps turning a little after you let go, then eases to rest.
     if (!drag) {
       look.yaw += look.vyaw * dt;
       look.pitch = Math.max(-1.35, Math.min(1.35, look.pitch + look.vpitch * dt));
-      const k = Math.exp(-3 * dt);
+      const k = Math.exp(-4 * dt);
       look.vyaw *= k;
       look.vpitch *= k;
     }
-    // Through a doorway?
+    // Through a doorway? (The flash starts a little early, to cover the last frames of the door.)
     for (let i = 0; i < doors.length; i++) {
-      const dz = (doorNumber[i] + 1) * DOOR_GAP;
+      const dz = (doorNumber[i] + 1) * DOOR_GAP - EARLY;
       if (before < dz && z >= dz) {
         dimension = doorNumber[i] + 1;
         since = 0;
-        flash = 1;
+        flashWant = flashPeak;
         onDimension?.(dimension);
       }
     }
     // Doors far behind are moved up to the front.
     for (let i = 0; i < doors.length; i++) {
       if ((doorNumber[i] + 1) * DOOR_GAP < z - DOOR_GAP * 0.5) placeDoor(i, Math.max(...doorNumber) + 1);
+    }
+    // Far along: under a flash, start the picture's own numbers again from near zero.
+    if (flash > 0.5 * flashPeak && (z - zOrigin > WRAP_AT || shaderTime > CLOCK_WRAP)) {
+      if (z - zOrigin > WRAP_AT) {
+        while (z - zOrigin > WRAP_AT) zOrigin += WRAP_BY;
+        doors.forEach((_, i) => placeDoor(i, doorNumber[i]));
+      }
+      if (shaderTime > CLOCK_WRAP) shaderTime -= CLOCK_WRAP;
     }
     applyDimension();
 
@@ -350,12 +417,14 @@ export function createElsewhere(canvas) {
     camera.rotateY(look.yaw + sway * Math.sin(now / 6000) * 0.05);
     camera.rotateX(look.pitch + sway * Math.sin(now / 8000 + 1) * 0.03);
     camera.updateMatrixWorld(true);
-    for (const d of doors) {
-      d.material.uniforms.uTime.value = now / 1000;
-      // Brighter as it comes near, so it seems to rise out of the dark.
-      d.material.uniforms.uBright.value = 0.9;
+    for (let i = 0; i < doors.length; i++) {
+      const m = doors[i].material.uniforms;
+      m.uTime.value = shaderTime;
+      // A doorway thins out as you reach it (and thickens again behind you), so passing through isn't a sudden cut.
+      const gap = Math.abs((doorNumber[i] + 1) * DOOR_GAP - z);
+      m.uBright.value = 0.9 * smoothstep(0.1, 2.2, gap);
     }
-    u.uTime.value = now / 1000;
+    u.uTime.value = shaderTime;
     u.uFlash.value = flash * flash;
     u.uCam.value.copy(camera.position);
     u.uRot.value.setFromMatrix4(camera.matrixWorld);
@@ -378,6 +447,7 @@ export function createElsewhere(canvas) {
 
   function build(renderer) {
     const float = hasFloat(renderer);
+    u.uByte.value = float ? 0 : 1;
     target = new WebGLRenderTarget(2, 2, {
       type: float ? HalfFloatType : UnsignedByteType,
       depthBuffer: false,
@@ -385,6 +455,10 @@ export function createElsewhere(canvas) {
       minFilter: LinearMipmapLinearFilter,
       magFilter: LinearFilter,
     });
+    if (screen) {
+      show_.material.uniforms.map.value = target.texture; // (made again after release(): the rest is still there)
+      return;
+    }
     screen = new Scene();
     show_ = new Mesh(
       new PlaneGeometry(2, 2),
@@ -392,7 +466,7 @@ export function createElsewhere(canvas) {
         ...shaders.rollOff,
         uniforms: {
           map: { value: target.texture },
-          exposure: { value: float ? EXPOSURE : 0.8 },
+          exposure: { value: float ? EXPOSURE : 1.3 },
           bloom: { value: 0 },
           saturation: { value: 1.25 },
           texel: { value: new Vector2(1, 1) },
@@ -434,6 +508,13 @@ export function createElsewhere(canvas) {
     camera.updateProjectionMatrix();
   }
 
+  /** Gives the picture buffer back (it is made again next time). Call when leaving. */
+  function release() {
+    target?.dispose();
+    target = null;
+    lastRender = 0;
+  }
+
   return {
     scene,
     camera,
@@ -442,9 +523,15 @@ export function createElsewhere(canvas) {
     update,
     render,
     resize,
+    release,
     info: {
       name: "Elsewhere",
-      about: "A made-up place on the other side of the Gate. Nothing here exists: the light, the halls and the doorways are all drawn by the computer. Drag to look round, scroll to go faster or slower, Esc to go home.",
+      about: "A made-up place on the other side of the Gate. Nothing here exists: the light, the halls and the doorways are all drawn by the computer. Drag to look round, scroll to go faster or slower.",
+      care: "Fast, bright light, with a quick flash at every doorway. Esc takes you home at any time.",
+    },
+    /** (for testing) where the picture's own numbers start from. */
+    get origin() {
+      return zOrigin;
     },
     /** How many doorways you've been through. */
     get dimension() {
@@ -461,6 +548,7 @@ export function createElsewhere(canvas) {
     },
     jumpTo(zz) {
       z = zz;
+      zOrigin = 0;
       dimension = Math.floor(zz / DOOR_GAP);
       since = MORPH;
       doors.forEach((_, i) => placeDoor(i, dimension + i));

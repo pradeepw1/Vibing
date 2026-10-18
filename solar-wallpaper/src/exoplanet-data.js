@@ -1,6 +1,8 @@
-// Planets round other stars, from the Open Exoplanet Catalogue (MIT licence,
-// https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue), which
-// gathers what NASA's Exoplanet Archive, exoplanet.eu and the papers report.
+// Planets round other stars, from the Open Exoplanet Catalogue
+// (https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue),
+// Copyright (C) 2012 Hanno Rein, MIT licence (the full text is in CREDITS.txt
+// next to index.html). It gathers what NASA's Exoplanet Archive,
+// exoplanet.eu and the papers report.
 // Made by tools/make-exoplanets.mjs; don't edit by hand.
 //
 // ra, dec: J2000 degrees. ly: light-years from the Sun.
@@ -8,7 +10,8 @@
 // planets: r (Earth radii), m (Earth masses, or null), a (AU), p (days),
 // e (eccentricity), t (kelvin, rough), how it was found, year; est: the size
 // was worked out from the mass or taken from a paper, not measured in the
-// table; disputed: not everyone agrees it's there.
+// table; tEst: the temperature was worked out from the star and the
+// distance (the table has none); disputed: not everyone agrees it's there.
 export const EXOPLANET_SYSTEMS = [
  {
  "id": "proxima",
@@ -35,7 +38,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 283,
  "how": "RV",
  "year": 2022,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "Proxima Centauri b",
@@ -59,7 +63,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 39,
  "how": "RV",
  "year": 2019,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -89,6 +94,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2000,
  "est": true,
+ "tEst": true,
  "disputed": true
  }
  ]
@@ -118,7 +124,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 445,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "YZ Cet c",
@@ -130,7 +137,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 384,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "YZ Cet d",
@@ -142,7 +150,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 334,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -171,7 +180,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 648,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti g",
@@ -183,7 +193,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 576,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti c",
@@ -195,7 +206,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 475,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti h",
@@ -207,7 +219,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 426,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti d",
@@ -219,7 +232,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 343,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti e",
@@ -231,7 +245,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 286,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "tau Ceti f",
@@ -243,7 +258,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 182,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -272,7 +288,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 264,
  "how": "RV",
  "year": 2019,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "GAT 1370 c",
@@ -284,7 +301,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 199,
  "how": "RV",
  "year": 2019,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -313,7 +331,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 399,
  "how": "RV",
  "year": 2015,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "Wolf 1061 c",
@@ -325,7 +344,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 259,
  "how": "RV",
  "year": 2015,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "Wolf 1061 d",
@@ -337,7 +357,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 167,
  "how": "RV",
  "year": 2015,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -426,7 +447,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 97,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -455,7 +477,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 421,
  "how": "RV",
  "year": 2009,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "Gliese 667 C h",
@@ -468,6 +491,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2013,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -480,7 +504,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 268,
  "how": "RV",
  "year": 2009,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "Gliese 667 C f",
@@ -493,6 +518,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2013,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -506,6 +532,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2013,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -519,6 +546,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2013,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -532,6 +560,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2013,
  "est": true,
+ "tEst": true,
  "disputed": true
  }
  ]
@@ -592,6 +621,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "transit",
  "year": 2012,
  "est": false,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -604,7 +634,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 608,
  "how": "transit",
  "year": 2004,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -799,7 +830,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 1783,
  "how": "transit",
  "year": 2004,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "55 Cancri b",
@@ -811,7 +843,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 658,
  "how": "RV",
  "year": 1996,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "55 Cancri c",
@@ -823,7 +856,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 455,
  "how": "RV",
  "year": 2002,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "55 Cancri f",
@@ -835,7 +869,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 252,
  "how": "RV",
  "year": 2007,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "55 Cancri d",
@@ -847,7 +882,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 91,
  "how": "RV",
  "year": 2002,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -876,7 +912,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 907,
  "how": "RV",
  "year": 2008,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 40307 c",
@@ -888,7 +925,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 694,
  "how": "RV",
  "year": 2008,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 40307 d",
@@ -900,7 +938,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 540,
  "how": "RV",
  "year": 2008,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 40307 e",
@@ -913,6 +952,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2012,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -925,7 +965,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 397,
  "how": "RV",
  "year": 2012,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 40307 g",
@@ -938,6 +979,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2012,
  "est": true,
+ "tEst": true,
  "disputed": true
  }
  ]
@@ -967,7 +1009,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 522,
  "how": "transit",
  "year": 2009,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1124,7 +1167,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 265,
  "how": "RV",
  "year": 2019,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "beta Pic b",
@@ -1247,7 +1291,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 399,
  "how": "RV",
  "year": 2017,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "EPIC 201912552 b",
@@ -1259,7 +1304,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 258,
  "how": "transit",
  "year": 2015,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1289,6 +1335,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2010,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -1301,7 +1348,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 1084,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 10180 i",
@@ -1314,6 +1362,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2012,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -1326,7 +1375,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 766,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 10180 e",
@@ -1338,7 +1388,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 528,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 10180 j",
@@ -1351,6 +1402,7 @@ export const EXOPLANET_SYSTEMS = [
  "how": "RV",
  "year": 2012,
  "est": true,
+ "tEst": true,
  "disputed": true
  },
  {
@@ -1363,7 +1415,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 391,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 10180 g",
@@ -1375,7 +1428,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 230,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "HD 10180 h",
@@ -1387,7 +1441,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 149,
  "how": "RV",
  "year": 2010,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  },
@@ -1510,7 +1565,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 263,
  "how": "transit",
  "year": 2011,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1609,7 +1665,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 620,
  "how": "transit",
  "year": 2014,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "Kepler-186 c",
@@ -1621,7 +1678,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 503,
  "how": "transit",
  "year": 2014,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "Kepler-186 d",
@@ -1633,7 +1691,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 411,
  "how": "transit",
  "year": 2014,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "Kepler-186 e",
@@ -1645,7 +1704,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 346,
  "how": "transit",
  "year": 2014,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "Kepler-186 f",
@@ -1657,7 +1717,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 192,
  "how": "transit",
  "year": 2014,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1698,7 +1759,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 988,
  "how": "RV",
  "year": 2009,
- "est": false
+ "est": false,
+ "tEst": true
  },
  {
  "name": "CoRoT-7 d",
@@ -1710,7 +1772,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 754,
  "how": "RV",
  "year": 2022,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1884,7 +1947,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 235,
  "how": "transit",
  "year": 2015,
- "est": false
+ "est": false,
+ "tEst": true
  }
  ]
  },
@@ -1942,7 +2006,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 150,
  "how": "timing",
  "year": 1992,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "PSR 1257+12 B",
@@ -1954,7 +2019,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 150,
  "how": "timing",
  "year": 1992,
- "est": true
+ "est": true,
+ "tEst": true
  },
  {
  "name": "PSR 1257+12 C",
@@ -1966,7 +2032,8 @@ export const EXOPLANET_SYSTEMS = [
  "t": 150,
  "how": "timing",
  "year": 1992,
- "est": true
+ "est": true,
+ "tEst": true
  }
  ]
  }

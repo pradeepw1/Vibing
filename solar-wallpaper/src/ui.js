@@ -243,7 +243,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   };
   const galaxyLabels = galaxies.map((g) => ({
     galaxy: g,
-    el: twoLines(solarEl, g.name, g.lightYears, () => set("view", `galaxy-${g.id}`, { remember: false }), `Fly to the ${g.name}`),
+    el: twoLines(solarEl, g.name, g.lightYears, () => set("view", `galaxy-${g.id}`, { remember: false }), `Fly to ${g.name}`),
     shown: null,
     x: 0,
     y: 0,
@@ -380,7 +380,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
         .map((p) => {
           const home = p.id === "milkyway" || p.id === "sun";
           const go = p.onClick ?? (home ? goBack : () => set("view", `galaxy-${p.id}`, { remember: false }));
-          const el = twoLines(box, p.name, p.sub, go, home ? "Fly home" : p.onClick ? `Look at ${p.name}` : `Fly to the ${p.name}`);
+          const el = twoLines(box, p.name, p.sub, go, home ? "Fly home" : p.onClick ? `Look at ${p.name}` : `Fly to ${p.name}`);
           return { place: p, el, sub: el.lastChild, said: "", shown: null, x: 0, y: 0, width: p.name.length * 7 + 6 };
         });
       entry = { box, labels };

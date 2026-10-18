@@ -1,11 +1,14 @@
 // A visit to a planetary system round another star.
 //
-// What's real: the star's heat and size, each planet's size, its year, how
-// far out it is (in the right order, with real year-length ratios) and how
-// hot it is, taken from the Open Exoplanet Catalogue. What's made up: how
-// each one looks (nobody has seen them) and exactly where it is on its orbit.
-// Distances are squashed so a whole system fits on screen: the log of the
-// distance, not the distance. The sizes of planets are squashed too.
+// What's real: the star's heat and size, each planet's year and how far out
+// it is (in the right order), from the Open Exoplanet Catalogue; its size and
+// heat too where the catalogue has them, and worked out from its weight, or
+// from its star and its distance, where it doesn't (those say "about").
+// What's made up: how each one looks (nobody has seen them) and exactly where
+// it is on its orbit. Distances are squashed so a whole system fits on screen:
+// the log of the distance, not the distance. The sizes of planets are squashed
+// too, and so are the speeds: inner planets go round faster than outer ones,
+// but not by the real amount, so the far ones still visibly move.
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -63,7 +66,7 @@ export function look(p) {
     return { ...base, kind: "cold gas giant", mode: 1, a: [0.72, 0.78, 0.9], b: [0.5, 0.58, 0.75], c: [0.9, 0.92, 1.0], rim: [0.7, 0.8, 1.0, 0.3] };
   }
   if (p.r >= 3.5) return { ...base, kind: "ice giant", mode: 2, a: [0.16, 0.33, 0.78], b: [0.3, 0.55, 0.92], c: [0.8, 0.92, 1.0], rim: [0.4, 0.65, 1.0, 0.6], glow: p.t > 1000 ? [1.0, 0.4, 0.1] : [0, 0, 0], glowPower: p.t > 1000 ? 0.2 : 0 };
-  if (p.r >= 1.8) return { ...base, kind: "mini-Neptune or water world", mode: 2, a: [0.42, 0.62, 0.7], b: [0.66, 0.8, 0.82], c: [0.92, 0.95, 0.95], rim: [0.6, 0.8, 0.9, 0.6] };
+  if (p.r >= 1.8) return { ...base, kind: "small gas or water world", mode: 2, a: [0.42, 0.62, 0.7], b: [0.66, 0.8, 0.82], c: [0.92, 0.95, 0.95], rim: [0.6, 0.8, 0.9, 0.6] };
   if (p.t >= 1300) return { ...base, kind: "lava world", mode: 3, a: [1.0, 0.33, 0.05], b: [0.06, 0.045, 0.045], c: [1.0, 0.8, 0.3], glow: [1.0, 0.3, 0.05], glowPower: 0.8, rim: [1.0, 0.35, 0.1, 0.25] };
   if (p.t >= 800) return { ...base, kind: "scorched rock", mode: 4, a: [0.22, 0.13, 0.1], b: [0.42, 0.28, 0.2], c: [0.7, 0.18, 0.06], glow: [0.8, 0.15, 0.05], glowPower: 0.25, rim: [0.9, 0.4, 0.2, 0.15] };
   if (p.t >= 330) return { ...base, kind: "hot dry rock", mode: 4, a: [0.68, 0.43, 0.25], b: [0.5, 0.3, 0.2], c: [0.35, 0.22, 0.15], rim: [0.9, 0.55, 0.3, 0.2] };
@@ -214,7 +217,7 @@ export function createExoSystem(canvas, pixelRatio) {
         id,
         onClick: () => flyTo(id),
         name: p.name,
-        sub: `${lk.kind} · ${p.r < 10 ? p.r.toFixed(1) : Math.round(p.r)}× Earth's width · ${yearText(p.p)} · ${p.t} K${p.disputed ? " · disputed" : ""}`,
+        sub: `${lk.kind} · ${p.est ? "about " : ""}${p.r < 10 ? p.r.toFixed(1) : Math.round(p.r)}× Earth's width · ${yearText(p.p)} · ${p.tEst ? "about " : ""}${p.t} K${p.disputed ? " · disputed" : ""}`,
         position: mesh.position,
         radius,
         fixedSub: true,
@@ -237,7 +240,7 @@ export function createExoSystem(canvas, pixelRatio) {
       about: system.about,
       ly: system.ly,
       zone: Boolean(zone),
-      dim: planets.some((p) => p.est) ? "Sizes marked estimated here are worked out from the planet's weight." : "",
+      dim: planets.some((p) => p.est || p.tEst) ? "Where a size or a heat says 'about', it is worked out (from the planet's weight, or from its star and its distance), not measured." : "",
     };
     // Where to see the lot from.
     home = outer * 2.1;

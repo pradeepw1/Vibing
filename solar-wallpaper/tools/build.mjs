@@ -35,7 +35,7 @@ await build({
   legalComments: "eof",
   define: { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text), MAP_MANIFEST: JSON.stringify(maps) },
   banner: {
-    js: "/* Solar System Live. Bundles three.js (MIT, three.js authors) and astronomy-engine (MIT, Don Cross). */",
+    js: "/*! Solar System Live. Bundles three.js (MIT, three.js authors), astronomy-engine (MIT, Don Cross), simplex noise (MIT, Copyright (C) 2011 Ashima Arts, Ian McEwan and Stefan Gustavson), hash functions (MIT, Copyright (c) 2014 David Hoskins) and data from the Open Exoplanet Catalogue (MIT, Copyright (C) 2012 Hanno Rein). Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural Earth, Celestia; see CREDITS.txt. */",
   },
   logLevel: "info",
 });
@@ -53,7 +53,8 @@ const lively = {
   clock: { type: "checkbox", value: true, text: "Show clock" },
   drift: { type: "checkbox", value: true, text: "Slow camera drift" },
   strange: { type: "checkbox", value: true, text: "Strange sightings (made up)" },
-  photos: { type: "checkbox", value: true, text: "Real maps (NASA)" },
+  photos: { type: "checkbox", value: true, text: "Real maps" },
+  credits: { type: "label", text: "Credits: planet maps from NASA, USGS and Solar System Scope (CC BY 4.0, resized and recoloured), Natural Earth and Celestia. Positions by astronomy-engine, drawing by three.js, planets of other stars from the Open Exoplanet Catalogue. Full list in CREDITS.txt." },
   fps: { type: "slider", value: 30, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
 };
 const { writeFileSync } = await import("node:fs");

@@ -143,7 +143,11 @@
   "photos": {
     "type": "checkbox",
     "value": true,
-    "text": "Real maps (NASA)"
+    "text": "Real maps"
+  },
+  "credits": {
+    "type": "label",
+    "text": "Credits: planet maps from NASA, USGS and Solar System Scope (CC BY 4.0, resized and recoloured), Natural Earth and Celestia. Positions by astronomy-engine, drawing by three.js, planets of other stars from the Open Exoplanet Catalogue. Full list in CREDITS.txt."
   },
   "fps": {
     "type": "slider",

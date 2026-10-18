@@ -160,6 +160,7 @@ for (const [id, probe, title, about, famous] of SYSTEMS) {
       const estimated = rE === null || fix.r !== undefined;
       if (rE === null) rE = mE === null ? 2.2 : radiusFromMass(mE);
       let t = fix.t ?? num(p.temperature);
+      const tEstimated = t === null; // not in the table or the papers: worked out (or, for the pulsar, set by hand)
       // Rough temperature from the star's heat at this distance, if the table has none (a quarter of the light bounces away).
       if (t === null && id === "psr1257") t = 150;
       if (t === null) t = temp * Math.sqrt((radius * SUN_RADIUS_AU) / (2 * a)) * Math.pow(0.7, 0.25);
@@ -175,6 +176,7 @@ for (const [id, probe, title, about, famous] of SYSTEMS) {
         how: p.discoverymethod || "",
         year: num(p.discoveryyear),
         est: estimated,
+        ...(tEstimated ? { tEst: true } : {}),
         ...(p.list.includes("Controversial") ? { disputed: true } : {}),
       };
     })
@@ -194,9 +196,11 @@ for (const [id, probe, title, about, famous] of SYSTEMS) {
 }
 out.sort((a, b) => a.ly - b.ly);
 
-const text = `// Planets round other stars, from the Open Exoplanet Catalogue (MIT licence,
-// https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue), which
-// gathers what NASA's Exoplanet Archive, exoplanet.eu and the papers report.
+const text = `// Planets round other stars, from the Open Exoplanet Catalogue
+// (https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue),
+// Copyright (C) 2012 Hanno Rein, MIT licence (the full text is in CREDITS.txt
+// next to index.html). It gathers what NASA's Exoplanet Archive,
+// exoplanet.eu and the papers report.
 // Made by tools/make-exoplanets.mjs; don't edit by hand.
 //
 // ra, dec: J2000 degrees. ly: light-years from the Sun.
@@ -204,7 +208,8 @@ const text = `// Planets round other stars, from the Open Exoplanet Catalogue (M
 // planets: r (Earth radii), m (Earth masses, or null), a (AU), p (days),
 // e (eccentricity), t (kelvin, rough), how it was found, year; est: the size
 // was worked out from the mass or taken from a paper, not measured in the
-// table; disputed: not everyone agrees it's there.
+// table; tEst: the temperature was worked out from the star and the
+// distance (the table has none); disputed: not everyone agrees it's there.
 export const EXOPLANET_SYSTEMS = ${JSON.stringify(out, null, 1).replace(/\n\s+/g, "\n ").replace(/\n \{/g, "\n {")};
 `;
 writeFileSync(new URL("../src/exoplanet-data.js", import.meta.url), text);

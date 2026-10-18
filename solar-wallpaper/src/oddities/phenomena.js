@@ -37,6 +37,7 @@ const cardHead = /* glsl */ `
   varying float vAng;
   varying vec3 vAim;
 
+  // The hash functions are "Hash without Sine" by David Hoskins (MIT, Copyright (c) 2014; text in dist/CREDITS.txt).
   vec3 hash33(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);

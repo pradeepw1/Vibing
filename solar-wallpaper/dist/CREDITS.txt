@@ -1,0 +1,65 @@
+Solar System Live: credits and licences
+
+This file goes with index.html. The README in the project folder has the same
+lists with more about how each picture was made.
+
+PLANET AND MOON MAPS (dist/maps/)
+Every map was made from pictures taken by space probes. They were joined,
+cleaned, resized and, in some cases, tinted or filled in where no probe took a
+picture. NASA and USGS maps are public domain; NASA is thanked as their source,
+and no NASA endorsement is meant or implied.
+
+  Earth (land and sea floor)    NASA Earth Observatory, Blue Marble Next
+                                Generation with topography and bathymetry (public domain)
+  Earth's water mask            Natural Earth land and lake outlines (public domain)
+  Mars, Mercury, Pluto, Charon, USGS Astrogeology Science Center, from NASA
+  Io, Europa, Ganymede,         mission pictures (public domain)
+  Callisto, Titan, Triton,
+  Phobos, Rhea, Iapetus
+  Miranda, Ariel, Umbriel,      NASA 3D Resources, from Voyager 2 pictures (public domain)
+  Titania, Oberon
+  Deimos                        Celestia project, from Philip Stooke's maps in NASA's
+                                Planetary Data System (CC0)
+  Moon, Venus, Jupiter, Saturn  Solar System Scope, based on NASA imagery
+  and its rings, Uranus,        (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).
+  Neptune, Earth's city lights  Changed here: resized, joined at the edges, recoloured a
+  and clouds                    little and packed into other files.
+  (Venus and Uranus are mostly drawn by Solar System Scope, not photographed.)
+
+Textures by Solar System Scope, https://www.solarsystemscope.com/textures/
+
+PLANETS ROUND OTHER STARS (src/exoplanet-data.js)
+Open Exoplanet Catalogue, https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue
+Copyright (C) 2012 Hanno Rein. MIT licence (text below). It gathers results from
+NASA's Exoplanet Archive, exoplanet.eu and the published papers.
+
+CODE
+  three.js                      MIT licence, Copyright (c) 2010-2025 three.js authors
+                                (notice kept at the end of solar.js)
+  astronomy-engine              MIT licence, Copyright (c) Don Cross
+                                (notice kept at the end of solar.js)
+  Simplex noise (GLSL)          MIT licence, Copyright (C) 2011 Ashima Arts, by Ian McEwan
+                                and Stefan Gustavson, https://github.com/stegu/webgl-noise
+  "Hash without Sine"           MIT licence, Copyright (c) 2014 David Hoskins (the hash
+                                functions used for the sky scenes)
+  Blackbody colour curve        A fit by Tanner Helland, published as a formula
+  Coastline outlines            Natural Earth (public domain) via world-atlas
+
+THE MIT LICENCE (applies to the MIT items above, each with its own copyright line)
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of
+  this software and associated documentation files (the "Software"), to deal in the
+  Software without restriction, including without limitation the rights to use, copy,
+  modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+  and to permit persons to whom the Software is furnished to do so, subject to the
+  following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+  CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+  OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

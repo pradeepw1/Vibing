@@ -226,7 +226,8 @@ export const rings = {
 
 // --- The Sun ---------------------------------------------------------------------
 
-// Simplex noise by Ian McEwan and Stefan Gustavson (MIT, github.com/stegu/webgl-noise).
+// Simplex noise by Ian McEwan (Ashima Arts) and Stefan Gustavson: Copyright (C) 2011 Ashima Arts, MIT licence,
+// github.com/stegu/webgl-noise (the licence text is in dist/CREDITS.txt).
 export const snoise = /* glsl */ `
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }

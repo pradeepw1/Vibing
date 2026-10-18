@@ -101,6 +101,7 @@ const away = {
   then: null, // a different view asked for on the way home
   start: 0,
   scene: "galaxies", // or "system" (down among the planets of another star), or "elsewhere" (through the Gate)
+  captioned: null, // the place we've said something about on arrival
   dive: null, // when we began to dive into a system
   arrived: -Infinity, // when we last switched between the solar system and the galaxies
   fromTurn: new Quaternion(),
@@ -296,6 +297,8 @@ function goToGalaxy(id, instant) {
     away.dive = null;
     away.stage = "there";
     away.galaxy = id;
+    away.captioned = null;
+    showCaption(null);
     away.then = null;
     lg.flyTo(id, { instant });
     if (instant) enterInner();
@@ -342,7 +345,7 @@ function enterSystem() {
   ui.setAway(ex.places, true);
   const info = ex.info;
   const ly = info.ly < 100 ? info.ly.toFixed(1) : Math.round(info.ly).toLocaleString("en-US");
-  showCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", `Sizes, years and heat are real (Open Exoplanet Catalogue); how the planets look is made up. ${ly} light-years away.`]);
+  showCaption(info.name, [info.about, info.zone ? "Green band: the habitable zone, where water could stay liquid." : "", info.dim, `Years and distances come from the Open Exoplanet Catalogue. How the planets look is made up. ${ly} light-years away.`]);
   away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
 }
 /** Down into whatever we've flown up to: a star's planets, or the Gate. */
@@ -366,7 +369,7 @@ function enterGate() {
   lg.controls.enabled = false;
   beyond.controls.enabled = true;
   ui.setAway(noPlaces);
-  const note = (n) => showCaption(beyond.info.name, [beyond.info.about, n ? `Doorways passed: ${n}` : "Made up. Nothing here exists."]);
+  const note = (n) => showCaption(beyond.info.name, [beyond.info.about, beyond.info.care, n ? `Doorways passed: ${n}` : ""]);
   note(0);
   beyond.onDimension = note;
   away.arrived = away.arrived === -Infinity ? -Infinity : Infinity; // fade in once the first picture is drawn
@@ -375,9 +378,17 @@ function leaveGate() {
   away.scene = "galaxies";
   away.dive = null;
   beyond.controls.enabled = false;
+  beyond.release();
   ui.setAway(lg.places);
   showCaption(null);
   lg.controls.enabled = !lg.flying;
+  fadeInAfterLeaving();
+}
+/** Back up out of an inner scene (still out among the galaxies): dark for a moment, then the galaxy view fades in. */
+function fadeInAfterLeaving() {
+  if (!away.stage) return;
+  away.arrived = Infinity; // the fade-in starts once the first picture is drawn
+  setFade(1);
 }
 /** Back up from a system to the galaxy view, where the star is. */
 function leaveSystem() {
@@ -387,6 +398,7 @@ function leaveSystem() {
   ui.setAway(lg.places);
   showCaption(null);
   lg.controls.enabled = !lg.flying;
+  fadeInAfterLeaving();
 }
 
 /** Heads back to the solar system, to view `id`. */
@@ -432,6 +444,7 @@ function finishHome() {
   const wasThere = away.stage !== "leaving";
   away.stage = null;
   away.then = null;
+  away.captioned = null;
   if (wasThere) away.arrived = performance.now();
   lg.controls.enabled = false;
   lg.release();
@@ -472,10 +485,23 @@ function leavingFrame(now) {
 }
 
 /** One frame out among the galaxies. Returns false if that's just ended (home again). */
+/** What to say on arriving somewhere out among the galaxies, about what's real and what's made up (or null). */
+function arrivalNote(place) {
+  if (place.hole) return [place.hole.about, "Drawn far bigger than it really is. The bending of light is real; the disc, its colours and the stars round it are made up."];
+  if (place.system || place.gate || place.id === "milkyway" || place.id === "sun") return null; // those say their own
+  return ["Its place, distance, size and tilt come from measurements. Every star drawn here is made up."];
+}
+
 function galaxyFrame(now) {
   if (away.scene === "system") return systemFrame(now);
   if (away.scene === "elsewhere") return elsewhereFrame(now);
   const t = lg.update(now, settings.drift && !reducedMotion);
+  if (away.stage === "there" && t >= 1 && !lg.flying && away.captioned !== away.galaxy) {
+    away.captioned = away.galaxy;
+    const place = lg.places.get(away.galaxy);
+    const lines = place && arrivalNote(place);
+    if (lines) showCaption(place.name, lines);
+  }
   // Arrived at a star with planets: sink into it.
   if (away.stage === "there" && t >= 1 && !lg.flying && (lg.places.get(away.galaxy)?.system || lg.places.get(away.galaxy)?.gate)) {
     away.dive ??= now;
@@ -483,15 +509,17 @@ function galaxyFrame(now) {
     if (now - away.dive >= DIVE_MS) {
       enterInner();
       away.arrived = Infinity;
+      return true; // stay dark: the new scene draws its first picture next frame, and the fade-in starts after that
     }
   }
   if (away.stage === "returning") {
-    setFade((t - 0.8) / 0.2);
+    // Dark at the end of the flight home, and also just after coming back up out of the Gate or a system.
+    setFade(Math.max((t - 0.8) / 0.2, 1 - (now - away.arrived) / DIP_MS));
     if (t >= 1) {
       finishHome();
       return false;
     }
-  } else setFade(1 - (now - away.arrived) / DIP_MS);
+  } else if (away.dive === null) setFade(1 - (now - away.arrived) / DIP_MS); // (not while sinking in: that fade is the dive's)
   renderer.autoClear = true;
   lg.render(renderer, 1000 / settings.fps);
   // Getting ready (making the stars, the first picture) is done in the dark.
