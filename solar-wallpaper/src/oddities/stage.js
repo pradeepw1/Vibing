@@ -16,8 +16,14 @@ const BETWEEN = [240, 540];
 const REACH = [30, 220];
 /** Keep this much clear of any planet or moon, as a share of its size. */
 const CLEAR = 1.6;
-/** How far off the middle of the view the sighting is put, in degrees: enough not to sit right on the Sun. */
+/**
+ * How far off the middle of the view the sighting is put, in degrees: enough not to sit right on the Sun,
+ * but never more than this share of the way to the side of the view (a tall, narrow window is only about 13 degrees wide each way).
+ */
 const OFF_SIDE = [5, 14];
+const OFF_SHARE = 0.4;
+/** A request for one by hand lapses after this long without room for it, in milliseconds. */
+const REQUEST_MS = 4000;
 const OFF_UP = [-4, 6];
 /** The most it tips the line of sight to bring a sighting up over the ground, in steps of degrees. */
 const MAX_TIP = 15;
@@ -31,15 +37,16 @@ const between = (rand, [a, b]) => a + (b - a) * rand();
  * @param {Array<(pixelRatio:number)=>object>} options.builders  Functions that make sightings.
  * @param {number} options.pixelRatio
  * @param {() => number} [options.random]  Anything that gives numbers from 0 up to 1.
+ * @param {() => number} [options.now]  The time in milliseconds (a request for one now lapses after a few seconds).
  */
-export function createStage({ scene, builders, pixelRatio, random = Math.random }) {
+export function createStage({ scene, builders, pixelRatio, random = Math.random, now = () => performance.now() }) {
   const made = new Map(); // builder -> the sighting it made (built the first time it's needed)
   let bag = []; // builders not yet shown in this round, so every one gets a turn
   let current = null; // { sighting, ctx, holder, ended }
   let wait = between(random, FIRST_WAIT);
   let enabled = true;
   let last = null; // the one that just ended, for the note
-  let wanted = false; // "show me one now" is waiting for a good moment (true, or the id asked for)
+  let wanted = null; // "show me one now" waiting for a good moment: { id (true, or the id asked for), until }
   let onEnd = null;
   const ahead = new Vector3();
   const anchor = new Vector3();
@@ -103,7 +110,8 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random 
     eye.copy(camera.position);
     // A little off the middle of the view, so it isn't always in front of whatever is there.
     camera.matrixWorld.extractBasis(right, upAxis, back);
-    ahead.applyAxisAngle(upAxis, (random() < 0.5 ? -1 : 1) * between(random, OFF_SIDE) * DEG);
+    const half = Math.atan(Math.tan((camera.fov * DEG) / 2) * camera.aspect); // from the middle to the side of the view
+    ahead.applyAxisAngle(upAxis, (random() < 0.5 ? -1 : 1) * Math.min(between(random, OFF_SIDE) * DEG, OFF_SHARE * half));
     ahead.applyAxisAngle(right, between(random, OFF_UP) * DEG).normalize();
     const reach = clearReach(view);
     if (reach || !forced || !view.up) return reach;
@@ -154,7 +162,7 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random 
     set enabled(on) {
       enabled = !!on;
       if (!enabled) {
-        wanted = false;
+        wanted = null;
         finish(false);
       }
     },
@@ -169,10 +177,26 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random 
     set onEnd(fn) {
       onEnd = fn;
     },
-    /** Starts the next one (or the one with this id) as soon as there's a good place for it. */
+    /**
+     * Starts the next one (or the one with this id) as soon as there's a good place for it,
+     * if that comes within a few seconds. True if one is, or is about to be, showing.
+     */
     showOne(id) {
-      if (current) return false;
-      wanted = id ?? true;
+      if (current) return true;
+      wanted = { id: id ?? true, until: now() + REQUEST_MS };
+      return true;
+    },
+    /**
+     * Builds one more sighting (and compiles its shaders) ahead of time, so that the first time it
+     * shows doesn't stutter. Call now and then while nothing is happening. False once all are built.
+     */
+    prepare(renderer, camera) {
+      const next = builders.find((b) => !made.has(b));
+      if (!next) return false;
+      const holder = build(next).group;
+      holder.visible = false;
+      if (!holder.parent) scene.add(holder);
+      (renderer.compileAsync ?? renderer.compile).call(renderer, scene, camera);
       return true;
     },
     /** Every sighting made so far (the ones shown), for tests and clean-up. */
@@ -192,10 +216,11 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random 
         if (!alive) finish(true);
         return;
       }
+      if (wanted && now() > wanted.until) wanted = null; // no room came, or we were away
       if (!view.allowed) return;
       if (wanted) {
         // Asked for: go on the first frame there is room for it.
-        if (begin(camera, view, true, wanted)) wanted = false;
+        if (begin(camera, view, true, wanted.id)) wanted = null;
         return;
       }
       if (!enabled) return;

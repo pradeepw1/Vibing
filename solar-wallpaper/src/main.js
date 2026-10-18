@@ -182,7 +182,8 @@ const ui = createUI({
   goBack,
   backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
   travelling: () => away.stage === "returning" || away.stage === "unturning",
-  showStrange: () => stage.showOne(),
+  // Out among the galaxies there is no room for one: say so, rather than closing the panel on nothing.
+  showStrange: () => (away.stage ? false : stage.showOne()),
 });
 
 // --- Camera: views, smooth flights and following a planet ---
@@ -770,7 +771,7 @@ function movePovCamera(now, dt) {
     }
     return;
   }
-  if (settings.drift && !reducedMotion) povCam.drift(dt);
+  if (settings.drift && !reducedMotion && !stage.running) povCam.drift(dt); // (not during a sighting: it would slide out of view)
   const p = povTarget();
   camera.position.copy(p.position);
   camera.quaternion.copy(p.quaternion);
@@ -870,16 +871,21 @@ function showCaption(title, lines) {
 }
 
 stage.onEnd = (s) => {
-  const lines = s.real ? [s.about] : [s.about.replace(/^An invented sighting: ([a-z])/, (_, c) => c.toUpperCase()), "None of it is real. It was made up for this wallpaper."];
+  const lines = s.real ? [s.about] : [s.about, "None of it is real. It was made up for this wallpaper."];
   ui.setCaption(s.real ? s.name : `Made up: ${s.name}`, lines);
   noteUntil = performance.now() + 10000;
 };
 
-function strangeFrame(dt, now) {
+/** Takes down the note about the sighting that just ended, after a while (whichever scene we're in). */
+function noteFrame(now) {
   if (noteUntil && now > noteUntil) {
     noteUntil = 0;
     ui.setCaption(null);
   }
+}
+
+let nextPrepare = 0;
+function strangeFrame(dt, now) {
   strangeView.allowed = !away.stage && !tween && !flight && !settle;
   strangeView.up = pov.id ? camera.up : null;
   for (const s of strangeSpheres) {
@@ -887,6 +893,12 @@ function strangeFrame(dt, now) {
     s.clear = pov.id === s.body.id ? 1.03 : undefined; // standing on it: only the ground itself is in the way
   }
   stage.update(dt, camera, strangeView);
+  // Once the page has settled, build the sightings one at a time while nothing is happening,
+  // so the first one doesn't stutter when it appears.
+  if (loadedShown && stage.enabled && strangeView.allowed && !stage.running && now > nextPrepare) {
+    nextPrepare = now + 2500;
+    stage.prepare(renderer, camera);
+  }
 }
 
 // --- Clicking a planet or moon ---
@@ -1051,8 +1063,13 @@ function paintJobs(jobs, onDone = () => {}) {
 // "Loading planets" is done when the painting is and the real maps have arrived (or failed).
 let paintDone = false;
 let mapsDone = false;
+let loadedShown = false;
 function checkLoaded() {
-  if (paintDone && mapsDone) ui.doneLoading();
+  // Once only: switching the real maps off and on again must not bring the welcome hint back.
+  if (paintDone && mapsDone && !loadedShown) {
+    loadedShown = true;
+    ui.doneLoading();
+  }
 }
 
 const photos = createMaps({
@@ -1069,7 +1086,13 @@ const photos = createMaps({
 /** Real maps on or off, from the menu. Off, whatever isn't painted yet gets painted. */
 function usePhotos(on) {
   photos.setEnabled(on);
-  if (!photos.enabled) paintJobs(SURFACES);
+  if (!photos.enabled) {
+    // Nothing more to wait for from the maps (if loading was still going, it won't finish by itself).
+    paintJobs(SURFACES, () => {
+      mapsDone = true;
+      checkLoaded();
+    });
+  }
 }
 
 function startPaint(...first) {
@@ -1149,9 +1172,11 @@ function frame(now) {
   lastTick = now;
 
   tickClock(dt);
+  noteFrame(now);
   ui.updateClock(clock.time, clock.synced && !settings.paused);
   if ((away.stage === "there" || away.stage === "returning") && galaxyFrame(now)) {
     updateHover(now);
+    loadMaps(now, elapsed, gap); // also when the page starts out among the galaxies
     return;
   }
   if (!away.stage) setFade(1 - (now - away.arrived) / DIP_MS); // just home: the dip clears
@@ -1163,7 +1188,7 @@ function frame(now) {
   if (pov.id) movePovCamera(now, dt);
   else {
     moveCamera(now);
-    controls.autoRotate = settings.drift && !reducedMotion && !flight;
+    controls.autoRotate = settings.drift && !reducedMotion && !flight && !stage.running; // a sighting would drift out of view
     controls.update(dt);
   }
   updateSkyCentre();
@@ -1184,7 +1209,12 @@ function frame(now) {
   ui.updateLabels(camera, innerWidth, innerHeight, down ? pov.id : null, down && new Sphere(ground.group.position, ground.radius * ground.group.scale.x), sky.fade);
   updateHover(now);
 
-  // The real maps start loading once the first picture is up.
+  loadMaps(now, elapsed, gap);
+}
+
+/** The real maps start loading once the first picture is up, wherever that picture is. */
+let photosStarted = false;
+function loadMaps(now, elapsed, gap) {
   photos.prefer(inView());
   photos.sharpen(closeTo(), now);
   photos.update(camera, now, elapsed, gap);
@@ -1193,7 +1223,6 @@ function frame(now) {
     photos.start();
   }
 }
-let photosStarted = false;
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;

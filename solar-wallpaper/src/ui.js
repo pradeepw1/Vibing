@@ -66,8 +66,15 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
-  $("#strange-now").addEventListener("click", () => {
-    showStrange();
+  const strangeBtn = $("#strange-now");
+  const strangeLabel = strangeBtn.textContent;
+  strangeBtn.addEventListener("click", () => {
+    if (showStrange() === false) {
+      // Not possible from here (out among the galaxies): say so, and leave the panel open.
+      strangeBtn.textContent = "Only near the planets";
+      setTimeout(() => (strangeBtn.textContent = strangeLabel), 2500);
+      return;
+    }
     panel.hidden = true; // out of the way, so it can be seen
     menuBtn.setAttribute("aria-expanded", "false");
   });

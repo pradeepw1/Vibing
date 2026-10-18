@@ -259,3 +259,59 @@ test("one can be asked for by name", () => {
   stage.update(0.1, cameraAt(0, 0, 50), open());
   assert.equal(stage.current.id, "c");
 });
+
+test("in a tall, narrow window it still starts well inside the view", () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const sighting = fakeSighting("a");
+    const stage = createStage({ scene: fakeScene(), builders: [() => sighting], pixelRatio: 1, random: seeded(seed) });
+    const camera = cameraAt(0, 0, 50);
+    camera.aspect = 9 / 16;
+    camera.updateProjectionMatrix();
+    stage.showOne();
+    stage.update(0.1, camera, open());
+    const ndc = sighting.log.starts[0].anchor.clone().project(camera);
+    assert.ok(Math.abs(ndc.x) < 0.6 && Math.abs(ndc.y) < 0.45, `seed ${seed}: at ${ndc.x.toFixed(2)}, ${ndc.y.toFixed(2)}`);
+  }
+});
+
+test("a request by hand lapses if no room comes, instead of firing much later", () => {
+  let t = 0;
+  const stage = createStage({ scene: fakeScene(), builders: [() => fakeSighting("a")], pixelRatio: 1, random: seeded(), now: () => t });
+  const camera = cameraAt(0, 0, 50);
+  stage.showOne();
+  t = 10000; // ten seconds go by (say, out among the galaxies, where nothing is updated)
+  stage.update(0.1, camera, open());
+  assert.ok(!stage.running, "lapsed");
+  t = 10100;
+  stage.update(0.1, camera, open());
+  assert.ok(!stage.running, "and does not come back");
+  stage.showOne();
+  stage.update(0.1, camera, open());
+  assert.ok(stage.running, "a fresh request works");
+});
+
+test("sightings can be built ahead of time, one at a time", () => {
+  const scene = fakeScene();
+  const made = [];
+  const builders = ["a", "b", "c"].map((id) => () => {
+    const s = fakeSighting(id);
+    made.push(id);
+    return s;
+  });
+  const stage = createStage({ scene, builders, pixelRatio: 1, random: seeded() });
+  let compiled = 0;
+  const renderer = { compile: () => compiled++ };
+  const camera = cameraAt(0, 0, 50);
+  assert.equal(stage.prepare(renderer, camera), true);
+  assert.deepEqual(made, ["a"]);
+  assert.equal(stage.prepare(renderer, camera), true);
+  assert.equal(stage.prepare(renderer, camera), true);
+  assert.equal(stage.prepare(renderer, camera), false, "all built");
+  assert.deepEqual(made, ["a", "b", "c"]);
+  assert.equal(compiled, 3);
+  assert.ok([...scene.added].every((g) => !g.visible), "none shows by itself");
+  // Showing one later doesn't build it again.
+  stage.showOne("b");
+  stage.update(0.1, camera, open());
+  assert.deepEqual(made, ["a", "b", "c"]);
+});

@@ -220,7 +220,7 @@ function createSeam(pixelRatio) {
   const self = {
     id: "seam",
     name: "The Seam",
-    about: "Invented: a crack opens in the sky and shows a different, wrong-coloured sky behind it, then shuts without a mark.",
+    about: "A crack opens in the sky and shows a different, wrong-coloured sky behind it, then shuts without a mark.",
     group: c.group,
     angle: 22,
     seconds,
@@ -280,7 +280,7 @@ const echoShader = /* glsl */ `
     vec2 w = vec2(fb2(q + 1.7), fb2(q + 9.2)) - 0.5;
     float cloud = fb2(q * 1.6 + w * 2.2 + 4.0);
     float thread = 1.0 - abs(2.0 * fb2(q * 3.2 + w * 3.0 + 8.0) - 1.0);
-    return smoothstep(0.38, 0.72, cloud) * (0.15 + 0.85 * pow(thread, 3.0));
+    return smoothstep(0.38, 0.72, cloud) * (0.15 + 0.85 * pow(max(thread, 0.0), 3.0));
   }
 
   void main() {
@@ -317,7 +317,7 @@ function createEcho(pixelRatio) {
   const self = {
     id: "echo",
     name: "The Echo",
-    about: "Invented, from real light echoes like V838 Monocerotis: a ring of light spreads from a place with no star and lights the dust it crosses.",
+    about: "A ring of light spreads from a place with no star and lights the dust it crosses, like the real light echoes seen round the star V838 Monocerotis.",
     group: c.group,
     angle: 56,
     seconds,
@@ -373,8 +373,10 @@ const countShader = /* glsl */ `
       float age = t - births[i];
       if (births[i] < 0.0 || age < 0.0 || age > 8.0) continue;
       float R = 0.5 * pow(age / 7.0, 0.85);
-      float line = exp(-pow((rr - R) / (px * 0.7), 2.0));
-      float soft = 0.18 * exp(-pow((rr - R) / (0.004 + 0.012 * age / 7.0), 2.0));
+      float d1 = (rr - R) / (px * 0.7);
+      float d2 = (rr - R) / (0.004 + 0.012 * age / 7.0);
+      float line = exp(-d1 * d1);
+      float soft = 0.18 * exp(-d2 * d2);
       float fade = exp(-age / 3.4) * (1.0 - smoothstep(6.0, 8.0, age));
       float lean = 0.8 + 0.2 * sin(2.0 * ang + births[i] * 7.0 + seed);
       vec3 col = mix(vec3(0.82, 0.96, 1.0), vec3(0.42, 0.62, 1.0), age / 7.0);
@@ -400,7 +402,7 @@ function createCount(pixelRatio) {
   const self = {
     id: "primes",
     name: "The Primes",
-    about: "Invented: a point of light sends out rings in groups of 2, 3, 5, 7 and 11 (all prime numbers), like a signal, and stops partway through the last group.",
+    about: "A point of light sends out rings in groups of 2, 3, 5, 7 and 11 (all prime numbers), like a signal, and stops partway through the last group.",
     group: c.group,
     angle: 30,
     seconds,
@@ -506,7 +508,7 @@ function createCurtains(pixelRatio) {
   const self = {
     id: "curtains",
     name: "The Curtains",
-    about: "Invented: glowing sheets of gas hang in empty space like an aurora with no planet under it, and for a moment their rays line up like a comb.",
+    about: "Glowing sheets of gas hang in empty space like an aurora with no planet under it, and for a moment their rays line up like a comb.",
     group: c.group,
     angle: 44,
     seconds,
@@ -689,7 +691,7 @@ function createDimming(pixelRatio) {
   return {
     id: "dimming",
     name: "The Dimming",
-    about: "Invented, from Tabby's Star (KIC 8462852), whose light dips in ways nobody has explained: dark pieces cross a star, fall into step, and fit together over it.",
+    about: "Dark pieces cross a star, fall into step, and fit together over it. A nod to Tabby's Star (KIC 8462852), whose light dips unevenly and where what blocks it is still argued over.",
     group: c.group,
     angle: 34,
     seconds,

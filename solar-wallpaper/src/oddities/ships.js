@@ -851,7 +851,7 @@ export function createGenerationShip(pixelRatio) {
   return {
     id: "generation",
     name: "Generation ship",
-    about: "An invented sighting: a vast, silent ship turning its great drums for a crew that has been asleep for centuries.",
+    about: "A vast, silent ship turning its great drums for a crew that has been asleep for centuries.",
     group,
     angle: 24,
     seconds,
@@ -1035,7 +1035,7 @@ export function createShuttleLane(pixelRatio) {
   return {
     id: "lane",
     name: "Shuttle lane",
-    about: "An invented sighting: a line of small ships, running their lights as aircraft do, going somewhere in perfect order.",
+    about: "A line of small ships, running their lights as aircraft do, going somewhere in perfect order.",
     group,
     angle: 16,
     seconds,
@@ -1389,7 +1389,7 @@ export function createDerelict(pixelRatio) {
   return {
     id: "derelict",
     name: "Derelict",
-    about: "An invented sighting: a dead ship, torn open and tumbling, with one emergency beacon still calling out to nobody.",
+    about: "A dead ship, torn open and tumbling, with one emergency beacon still calling out to nobody.",
     group,
     angle: 12,
     seconds,
@@ -1706,7 +1706,7 @@ export function createVoyager1(pixelRatio) {
     id: "voyager1",
     name: "Voyager 1",
     about:
-      "This one is real: Voyager 1, launched in 1977 and now the farthest thing people have made, shown as a small model with a marker light added so you can find it.",
+      "This one is real: Voyager 1, launched in 1977 and now the farthest thing people have made. It is shown here as a small model with a marker light, and not where it really is: that place is made up.",
     sky: { ra: 258.4, dec: 12.4 }, // towards Ophiuchus
     light: [1.0, 0.86, 0.58],
     speed: 0.012,
@@ -1720,7 +1720,7 @@ export function createVoyager2(pixelRatio) {
     id: "voyager2",
     name: "Voyager 2",
     about:
-      "This one is real: Voyager 2, launched in 1977 and the only craft to have flown past Uranus and Neptune, shown as a small model with a marker light added so you can find it.",
+      "This one is real: Voyager 2, launched in 1977 and the only craft to have flown past Uranus and Neptune. It is shown here as a small model with a marker light, and not where it really is: that place is made up.",
     sky: { ra: 298.0, dec: -58.0 }, // far to the south, towards Telescopium and Pavo
     light: [1.0, 0.9, 0.7],
     speed: 0.01,
