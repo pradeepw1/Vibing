@@ -391,6 +391,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   }
   /** A distance in thousands of light-years, said the way people say it. */
   function lightYears(kly) {
+    if (kly >= 99500) return `${Math.round(kly / 1000)} million light-years`;
     if (kly >= 995) return `${(kly / 1000).toFixed(1)} million light-years`;
     const step = 10 ** (Math.floor(Math.log10(Math.max(kly, 0.01))) - 1); // two significant figures
     const ly = Math.round(Math.round(kly / step) * step * 1000);

@@ -727,6 +727,7 @@ export const rollOff = {
     uniform sampler2D map;
     uniform float exposure;
     uniform float bloom;
+    uniform float saturation; // 1 = as drawn; more makes colours richer (thousands of added stars wash towards white)
     uniform vec2 texel;   // one pixel of the map, in uv
     varying vec2 vUv;
     // A soft blur at one smaller size: the size's own blocks, spread over a few nearby looks, so they don't show.
@@ -741,6 +742,7 @@ export const rollOff = {
       if (bloom > 0.0) c += bloom * (soft(2.5) * 0.4 + soft(3.5) * 0.35 + soft(4.5) * 0.25);
       c *= exposure;
       float light = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = max(mix(vec3(light), c, saturation), 0.0);
       c *= (1.0 - exp(-light)) / max(light, 1e-6);
       // Past white in one colour: hold the colour, and let a little white in, as film does.
       float top = max(c.r, max(c.g, c.b));

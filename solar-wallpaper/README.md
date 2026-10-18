@@ -23,6 +23,7 @@ It's one web page. It runs in any browser and works as a desktop wallpaper on Wi
 | Asteroid belt, Trojans, Kuiper belt | Made-up rocks on real-looking orbits. They follow Kepler's laws, leave the real Kirkwood gaps, and the Trojans stay 60° ahead of and behind Jupiter |
 | Milky Way | Placed where the real one is in the sky. The stars themselves are made up |
 | Nearest galaxies | The Large and Small Magellanic Clouds, the Sagittarius Dwarf, Andromeda (with its two small companions) and Triangulum, at their real places in the sky, real sizes and real tilt, each with its name and distance. Their look is painted in code |
+| Famous galaxies far away | Bode's Galaxy, the Cigar, Centaurus A, the Sculptor, Pinwheel, Whirlpool, Sombrero, M87, NGC 1300, the Antennae and the Cartwheel: 11 to 500 million light-years out, at their real places and real sizes. Their shapes (a ring, a collision, a dust lane, a jet, gas blown out of a starburst) and colours follow the real ones; the individual stars are made up |
 | Black holes | Sagittarius A* (the middle of the Milky Way), Cygnus X-1 and M87*, at their real places and distances. **Drawn millions of times bigger than they are**, or you'd never see them. The bending of light around them follows the real rule for light past a black hole. The disc, its colours and the star crowds round them are made up |
 | Sizes and distances | **Squashed** so everything fits on one screen. Directions are never changed, only distances, so line-ups and phases stay true |
 | Planet surfaces | Painted in code. Big features are in the right places (coastlines, the Moon's dark seas, Mars's ice caps, Jupiter's belts, Pluto's heart). Small detail is made up |
@@ -57,6 +58,8 @@ Three real black holes are out there too. Click a name (or pick one from the men
 
 Their places in the sky and their distances are real, and M87\*'s disc is tilted the way the real one is. Everything else is made up or stretched: a real black hole is only a speck, so each is drawn millions of times bigger, and the colours, streaks and clumps of the disc are invented. What's real is the bending of light: every pixel follows its own ray of light round the hole, so stars are stretched into arcs, the middle is black, and the back of the disc is seen bent over the top and underneath. The side of the disc that's turning towards you is brighter and bluer. It's the heaviest drawing in the app, so if your graphics chip can't keep up, the picture near a black hole is drawn a little softer.
 
+Further out are eleven famous galaxies, up to half a billion light-years away: the Whirlpool with its small companion, the Sombrero with its dark dust lane, Centaurus A cut by dust, the Cigar and the Sculptor Galaxy with red gas blown out of their middles, the Pinwheel, Bode's Galaxy, a barred spiral (NGC 1300), the Antennae mid-collision with their long tails, the Cartwheel's huge blue ring, and M87 with its blue jet. They're in the same menu.
+
 Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
 
 ## Use it as your wallpaper
@@ -82,7 +85,7 @@ Click the button in the top right, or add them to the address, like `index.html?
 | Setting | Values | Default |
 |---|---|---|
 | `speed` | `live`, `minute`, `hour`, `day`, `week`, `month`, `year` (how much time passes each second) | `live` |
-| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr`. Fly to a black hole: `galaxy-sgra`, `galaxy-cygx1`, `galaxy-m87bh` | `middle` |
+| `view` | Look at: `system`, `middle`, `inner`, `sun`, or a planet (`mercury` ... `pluto`). Look from: `from-earth`, `from-mars` ... any planet or moon, like `from-moon` or `from-io`. Fly to a galaxy: `galaxy-m31`, `galaxy-m33`, `galaxy-lmc`, `galaxy-smc`, `galaxy-sgr`, or one of the far ones (`galaxy-m51`, `galaxy-m81`, `galaxy-m82`, `galaxy-cena`, `galaxy-ngc253`, `galaxy-m101`, `galaxy-m104`, `galaxy-m87`, `galaxy-ngc1300`, `galaxy-antennae`, `galaxy-cartwheel`). Fly to a black hole: `galaxy-sgra`, `galaxy-cygx1`, `galaxy-m87bh` | `middle` |
 | `reverse` | `1` to run time backwards | `0` |
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
 | `labels`, `orbits`, `belts`, `clock`, `drift` | `0` or `1` | all `1` |
@@ -123,6 +126,7 @@ npm run textures   # then open tools/textures.html to see every painted surface 
 | `src/belts.js`, `src/sky.js` | Asteroids and the Kuiper belt; stars and the Milky Way |
 | `src/galaxies.js` | The nearest galaxies on the sky: where they are, how big, and how they're painted |
 | `src/localgroup.js` | Out among the galaxies: each one (and the Milky Way) as a 3D cloud of stars, and the flights between them |
+| `src/clouds.js` | How each kind of galaxy's stars are laid out: spirals, bars, ellipticals, rings, collisions |
 | `src/blackholes.js` | The black holes: where they are, how big they're drawn, how their discs are tilted. The light-bending itself is in `src/shaders.js` |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |

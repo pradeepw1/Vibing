@@ -48,6 +48,7 @@ export const BLACK_HOLES = [
   },
   {
     id: "m87bh",
+    host: "m87", // the galaxy it's in, which has to be there round it
     name: "M87*",
     lightYears: "53.5 million light-years",
     about: "The first black hole ever photographed (2019): about 6.5 billion suns, in the galaxy M87. Not to scale.",
