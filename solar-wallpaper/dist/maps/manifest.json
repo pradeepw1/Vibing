@@ -1,11 +1,11 @@
 {
  "ariel": {
   "lite": {
-   "bytes": 65856,
+   "bytes": 65668,
    "width": 1024
   },
   "sharp": {
-   "bytes": 111624,
+   "bytes": 110446,
    "width": 1440
   }
  },
@@ -51,11 +51,11 @@
  },
  "earth": {
   "lite": {
-   "bytes": 246354,
+   "bytes": 245324,
    "width": 2048
   },
   "sharp": {
-   "bytes": 781942,
+   "bytes": 782006,
    "width": 4096
   }
  },
@@ -67,31 +67,31 @@
  },
  "europa": {
   "lite": {
-   "bytes": 105228,
+   "bytes": 105264,
    "width": 1024
   },
   "sharp": {
-   "bytes": 409318,
+   "bytes": 409306,
    "width": 2048
   }
  },
  "ganymede": {
   "lite": {
-   "bytes": 61750,
+   "bytes": 61974,
    "width": 1024
   },
   "sharp": {
-   "bytes": 240582,
+   "bytes": 240156,
    "width": 2048
   }
  },
  "iapetus": {
   "lite": {
-   "bytes": 136776,
+   "bytes": 136906,
    "width": 1024
   },
   "sharp": {
-   "bytes": 430014,
+   "bytes": 430214,
    "width": 2048
   }
  },
@@ -117,11 +117,11 @@
  },
  "mars": {
   "lite": {
-   "bytes": 149454,
+   "bytes": 149534,
    "width": 2048
   },
   "sharp": {
-   "bytes": 440402,
+   "bytes": 440074,
    "width": 4096
   }
  },
@@ -137,11 +137,11 @@
  },
  "miranda": {
   "lite": {
-   "bytes": 50432,
+   "bytes": 50468,
    "width": 1024
   },
   "sharp": {
-   "bytes": 87570,
+   "bytes": 87504,
    "width": 1440
   }
  },
@@ -167,11 +167,11 @@
  },
  "oberon": {
   "lite": {
-   "bytes": 24092,
+   "bytes": 24232,
    "width": 1024
   },
   "sharp": {
-   "bytes": 38276,
+   "bytes": 38498,
    "width": 1440
   }
  },
@@ -187,11 +187,11 @@
  },
  "pluto": {
   "lite": {
-   "bytes": 69478,
+   "bytes": 69412,
    "width": 1024
   },
   "sharp": {
-   "bytes": 248284,
+   "bytes": 248072,
    "width": 2048
   }
  },
@@ -233,11 +233,11 @@
  },
  "titania": {
   "lite": {
-   "bytes": 48314,
+   "bytes": 48302,
    "width": 1024
   },
   "sharp": {
-   "bytes": 84162,
+   "bytes": 85298,
    "width": 1440
   }
  },

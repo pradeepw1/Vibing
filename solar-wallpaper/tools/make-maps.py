@@ -396,22 +396,24 @@ def scale_mean(a, mean):
 # One recipe for each map. Each gets the width it should be made at and returns
 # a float array of that width. `rng` makes the grain the same on every run.
 
-def heal_edges(a):
-    """The outermost columns of a mosaic are often darkened, where its picture ran out.
-    Copies in the columns next to them, so no line shows at the 180 degree seam."""
-    h, w = a.shape[:2]
-    n = max(2, w // 1024)
-    col = a[h // 4:3 * h // 4].mean(axis=(0, 2))  # how bright each column is
+def heal_left(a):
+    """Replaces the outermost columns on the left that don't look like their neighbours."""
+    n = max(2, a.shape[1] // 1024)
+    lum = luma(a)
+    ref = n + 1  # the first column taken to be good
     out = a.copy()
-    left = col[n + 1:n + 5].mean()
     for i in range(n + 1):
-        if col[i] < 0.97 * left:  # only the columns that really are darker
-            out[:, i] = a[:, n + 1]
-    right = col[w - n - 5:w - n - 1].mean()
-    for i in range(w - n - 1, w):
-        if col[i] < 0.97 * right:
-            out[:, i] = a[:, w - n - 2]
+        off = np.abs(lum[:, i] - lum[:, ref]).mean()  # how far this column is from the good one
+        usual = np.abs(lum[:, 2 * ref - i] - lum[:, ref]).mean()  # how far the same distance away on the other side is
+        if off > 2.0 * usual + 0.004:
+            out[:, i] = a[:, ref]
     return out
+
+
+def heal_edges(a):
+    """The outermost columns of a mosaic are often off (darkened where its picture ran out).
+    Copies in the column next to them, so no line shows at the 180 degree seam."""
+    return heal_left(heal_left(a[:, ::-1])[:, ::-1])
 
 
 def box_mask(shape, lon0, lon1, lat0, lat1):
