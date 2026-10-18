@@ -122,7 +122,7 @@ function set(key, value, how = {}) {
     if (how.remember !== false) savedView = value;
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
-  if (key === "strange") stage.enabled = value;
+  if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
   store();
@@ -164,8 +164,10 @@ function labelOf(id) {
 }
 
 // Strange sightings: made-up ships and craft (and two real probes) that drift past now and then.
+// Not by themselves for anyone who has asked for less motion (the button still works).
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const stage = createStage({ scene, builders: [...UFOS, ...SHIPS, ...PHENOMENA], pixelRatio });
-stage.enabled = settings.strange;
+stage.enabled = settings.strange && !reducedMotion;
 
 const ui = createUI({
   settings,
@@ -1056,7 +1058,6 @@ function sharpen(id) {
 const startTime = performance.now();
 let lastFrame = startTime;
 let lastTick = startTime;
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Moves everything to `date` (and the asteroids). */
 function layOut(date, dt, seconds) {

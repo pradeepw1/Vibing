@@ -81,7 +81,7 @@ None of it is real; the picture is drawn by the computer from a few formulas (`s
 
 ## Strange sightings
 
-Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`), or press **Show me one now** in the panel.
+Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`), or press **Show me one now** in the panel. If your system asks for reduced motion, none come by themselves, but the button still works.
 
 **All of them are made up, apart from the two real Voyager probes.** When one ends, a note in the corner says what it was and that it was invented. Each one is drawn from scratch in code (no models or pictures), in `src/oddities/`.
 
