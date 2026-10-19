@@ -32,7 +32,7 @@ export const VIEWS = [
   { id: "from-moon", label: "From the Moon", from: "moon" },
   // Out among the nearest galaxies, and to the black holes.
   ...GALAXIES.filter((g) => g.name).map((g) => ({ id: `galaxy-${g.id}`, label: g.name, galaxy: g.id })),
-  ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id })),
+  ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id, hole: true })),
   // Other stars and their planets (nearest first).
   ...EXOPLANET_SYSTEMS.map((s) => ({ id: `galaxy-${s.id}`, label: s.name, galaxy: s.id, star: true })),
   // Made up, and said to be.

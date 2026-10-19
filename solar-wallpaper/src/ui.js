@@ -39,16 +39,18 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   const lookFrom = document.createElement("optgroup");
   lookFrom.label = "Look from";
   const visit = document.createElement("optgroup");
-  visit.label = "Fly out to a galaxy or black hole";
+  visit.label = "Fly out to a galaxy";
+  const holes = document.createElement("optgroup");
+  holes.label = "Fly to a black hole";
   const stars = document.createElement("optgroup");
   stars.label = "Fly to a star with planets";
   const made = document.createElement("optgroup");
   made.label = "A made-up place";
-  for (const v of VIEWS) (v.from ? lookFrom : v.fiction ? made : v.star ? stars : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
+  for (const v of VIEWS) (v.from ? lookFrom : v.fiction ? made : v.star ? stars : v.hole ? holes : v.galaxy ? visit : lookAt).append(new Option(v.label, v.id));
   const extra = new Option("", ""); // for views from moons that aren't in the list
   extra.hidden = true;
   lookFrom.append(extra);
-  viewSel.append(lookAt, lookFrom, visit, stars, made);
+  viewSel.append(lookAt, lookFrom, holes, visit, stars, made); // black holes first among the far places: they are what people look for
   const pill = $("#pov");
   const pillName = $("#pov .name");
   // While idle the Back pill is hidden (the settings button only fades). A click
@@ -80,6 +82,9 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   });
   const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
+
+  // The corner note about where you are would print over the open panel: let it fade while the panel is open.
+  new MutationObserver(() => document.body.classList.toggle("panel-open", !panel.hidden)).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
 
   menuBtn.addEventListener("click", () => {
     // (no justWoke check: the button is always in sight, so a click on it is meant)
@@ -468,7 +473,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   // A line beside the settings button for a few seconds once the picture is up.
   const hintEl = document.createElement("div");
   hintEl.id = "hint";
-  hintEl.textContent = "Settings are here. Fly to black holes, galaxies and the Gate from the View list.";
+  hintEl.textContent = "Settings are here. Pick a black hole, a galaxy or the Gate from the View list.";
   document.body.append(hintEl);
   function showHint() {
     if (!settings.ui || hiddenAll) return;
