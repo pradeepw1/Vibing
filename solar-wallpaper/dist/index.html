@@ -3,42 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Milky Way</title>
-<meta name="description" content="A still picture of the Milky Way. Nothing moves, so it uses almost no battery.">
+<title>Solar System Live</title>
+<meta name="description" content="The Sun and the nine planets where they really are, under the real sky, with the camera slowly going round. Made to be easy on the battery.">
 <style>
-  /* The wallpaper: one still picture, no animation, no 3D. The only script is the small menu (wallpaper.js). */
   :root {
     color-scheme: dark;
     --sky: #02030a;
-    --panel: rgba(12, 15, 24, 0.78);
+    --panel: rgba(12, 15, 24, 0.9);
     --panel-line: rgba(255, 255, 255, 0.09);
     --text: #e9edf5;
     --muted: #9aa5b8;
+    --faint: rgba(233, 237, 245, 0.62);
     --accent: #ffcb74;
     --chip: rgba(255, 255, 255, 0.06);
     --chip-on: rgba(255, 203, 116, 0.18);
+    --gutter: 24px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* Space is dark whatever the system theme, so there is one look on purpose.
+     This page is the easy one on battery: nothing here blurs, pulses or fades by itself. */
+
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--text);
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  /* The picture ignores the pointer: clicking, dragging or scrolling it does nothing. */
+  canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
 
-  /* The picture fills the screen, cropped to fit like "cover", with the Sun's marker riding on it. */
-  .pic { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background-size: 100% 100%; background-repeat: no-repeat; }
-  .pic.land { width: max(100vw, 177.78vh); aspect-ratio: 16 / 9; background-image: url("milkyway.webp"); }
-  .pic.tall { display: none; width: max(100vw, 56.25vh); aspect-ratio: 9 / 16; background-image: url("milkyway-tall.webp"); }
-  @media (orientation: portrait) {
-    .pic.land { display: none; }
-    .pic.tall { display: block; }
-  }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .label { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none; opacity: 0;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); text-shadow: 0 1px 3px #000; user-select: none; }
+  .label.sun { color: rgba(255, 214, 150, 0.75); }
+  .label.galaxy { display: grid; font-size: 10px; color: rgba(205, 200, 235, 0.55); }
+  .label.galaxy .far { font-size: 9px; letter-spacing: 0.04em; text-transform: none; color: rgba(205, 200, 235, 0.38); }
+  /* A black hole is too small to see from here, so a small ring marks where it is. */
+  .label.hole::before { content: ""; position: absolute; left: -14px; top: 1px; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid rgba(255, 200, 150, 0.7); }
 
-  .sun { position: absolute; width: 0; height: 0; }
-  .sun b { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid rgba(255, 233, 190, 0.9); box-shadow: 0 0 8px rgba(255, 220, 150, 0.6); }
-  .sun em { position: absolute; left: 14px; top: -9px; white-space: nowrap; font-style: normal; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 240, 215, 0.9); text-shadow: 0 1px 4px #000; }
-  .sun small { position: absolute; left: 14px; top: 6px; white-space: nowrap; font-size: 11px; color: rgba(225, 232, 248, 0.9); text-shadow: 0 0 3px #000, 0 1px 5px #000; }
-  .no-sun .sun { display: none; }
+  #clock { position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #clock .date { font-size: clamp(18px, 2.2vw, 28px); font-weight: 300; letter-spacing: 0.01em; }
+  #clock .time { font-size: clamp(13px, 1.2vw, 16px); color: var(--faint); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  #clock .rate { margin-top: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  #clock .dot { width: 7px; height: 7px; border-radius: 50%; background: #5ee08f; box-shadow: 0 0 8px #5ee08f; }
+  #clock .dot.off { background: var(--accent); box-shadow: none; }
 
+  /* Faint, not gone, so it can always be found. */
   #menu-btn { position: fixed; top: calc(18px + var(--safe-top)); right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--panel-line);
     background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; opacity: 0.3; }
   #menu-btn:hover, #menu-btn:focus-visible, #menu-btn[aria-expanded="true"] { opacity: 1; border-color: rgba(255,255,255,.25); }
@@ -50,25 +58,36 @@
   #panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
   #panel section + section { margin-top: 16px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { border: 1px solid var(--panel-line); background: var(--chip); color: var(--text); border-radius: 999px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  .chip { border: 1px solid var(--panel-line); background: var(--chip); color: var(--text); border-radius: 999px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
   .chip:hover { border-color: rgba(255,255,255,.25); }
   .chip[aria-pressed="true"] { background: var(--chip-on); border-color: rgba(255, 203, 116, .55); color: #fff3dc; }
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
   .toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
   .toggles input { accent-color: var(--accent); }
   .note { color: var(--muted); font-size: 11.5px; margin: 0; }
   .note + .note { margin-top: 6px; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  #loading { position: fixed; right: var(--gutter); bottom: calc(var(--gutter) + var(--safe-bottom)); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); pointer-events: none; }
+  #loading.done { display: none; }
+  #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+  #error[hidden] { display: none; }
+
   @media (max-width: 600px) {
+    :root { --gutter: 16px; }
     #menu-btn { top: calc(12px + var(--safe-top)); right: 16px; }
     #panel { top: calc(60px + var(--safe-top)); right: 16px; left: 16px; width: auto; }
   }
 </style>
 </head>
 <body>
-<div role="img" aria-label="The Milky Way seen from above: a spiral of stars with a bright, glowing middle. A ring marks where the Sun is, in one of the arms.">
-  <div class="pic land"><span class="sun" style="left: 34.2%; top: 41%"><b></b><em>You are here</em><small>The Sun, 26,700 light-years from the middle</small></span></div>
-  <div class="pic tall"><span class="sun" style="left: 15.5%; top: 43.8%"><b></b><em>You are here</em><small>The Sun, 26,700 light-years from the middle</small></span></div>
+<div id="labels"></div>
+
+<div id="clock" aria-live="off">
+  <div class="date"></div>
+  <div class="time"></div>
+  <div class="rate"><span class="dot"></span><span class="rate-text"></span></div>
 </div>
 
 <button id="menu-btn" type="button" aria-label="Settings" aria-expanded="false" aria-controls="panel">
@@ -84,19 +103,31 @@
       <button class="chip" id="mode-wallpaper" type="button" aria-pressed="true">Wallpaper</button>
       <button class="chip" id="mode-scope" type="button" aria-pressed="false">Space Scope</button>
     </div>
-    <p class="note" style="margin-top: 8px">Wallpaper is one still picture of the Milky Way. It uses almost no battery. Space Scope is everything: the planets, other galaxies, black holes and more. It uses a lot more.</p>
+    <p class="note" style="margin-top: 8px">Wallpaper is the planets with the camera slowly going round. Nothing here reacts to clicks, and it goes easy on the battery. Space Scope is where you fly: to any planet or moon, other galaxies, black holes and the planets of other stars. It uses a lot more.</p>
+  </section>
+  <section>
+    <h2>Time</h2>
+    <div class="chips" id="speeds"></div>
   </section>
   <section>
     <h2>Show</h2>
     <div class="toggles">
-      <label><input type="checkbox" id="sun-on" checked> Mark where the Sun is</label>
+      <label><input type="checkbox" id="labels-on"> Names</label>
+      <label><input type="checkbox" id="orbits-on"> Orbits</label>
+      <label><input type="checkbox" id="belts-on"> Asteroids</label>
+      <label><input type="checkbox" id="clock-on"> Clock</label>
+      <label><input type="checkbox" id="drift-on"> Camera goes round</label>
+      <label><input type="checkbox" id="photos-on"> Real maps</label>
     </div>
   </section>
   <section>
-    <p class="note">A made-up picture. The galaxy's shape (a spiral with a bar and arms) and the Sun's place in it come from measurements; every star is drawn by the computer.</p>
-    <p class="note" id="credits">Credits: drawn with three.js (MIT). Full list in CREDITS.txt.</p>
+    <p class="note">Every planet is where it really is at the time shown. Sizes and distances are squashed so it all fits; directions are real. The stars are made up, but the galaxies and black holes named on the sky are where the real ones are.</p>
+    <p class="note" id="credits">Credits: planet maps from NASA, USGS and Solar System Scope (CC BY 4.0, resized and recoloured), Natural Earth and Celestia. Positions by astronomy-engine, drawing by three.js. Full list in CREDITS.txt.</p>
   </section>
 </aside>
+
+<div id="loading">Loading planets…</div>
+<div id="error" hidden>This needs WebGL, which this browser or wallpaper app doesn't have turned on.</div>
 
 <script src="wallpaper.js"></script>
 </body>

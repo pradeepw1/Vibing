@@ -1,7 +1,8 @@
 // Bundles src/ into two plain scripts, so the pages work straight from disk
 // (file://) and inside wallpaper apps, with no server:
 //   dist/solar.js      Space Scope (dist/scope.html): everything
-//   dist/wallpaper.js  the Wallpaper page (dist/index.html): a few KB for its menu
+//   dist/wallpaper.js  the Wallpaper page (dist/index.html): the planets and the sky,
+//                      without flying, galaxies up close, other stars' planets or sightings
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
@@ -27,50 +28,44 @@ try {
   // none built: the painted surfaces are used
 }
 
-await build({
-  entryPoints: ["src/main.js"],
-  bundle: true,
-  minify: true,
-  format: "iife",
-  target: "es2020",
-  outfile: "dist/solar.js",
-  legalComments: "eof",
-  define: { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text), MAP_MANIFEST: JSON.stringify(maps) },
-  banner: {
-    js: "/*! Solar System Live. Bundles three.js (MIT, three.js authors), astronomy-engine (MIT, Don Cross), simplex noise (MIT, Copyright (C) 2011 Ashima Arts, Ian McEwan and Stefan Gustavson), hash functions (MIT, Copyright (c) 2014 David Hoskins) and data from the Open Exoplanet Catalogue (MIT, Copyright (C) 2012 Hanno Rein). Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural Earth, Celestia; see CREDITS.txt. */",
-  },
-  logLevel: "info",
-});
+const define = { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text), MAP_MANIFEST: JSON.stringify(maps) };
+const banner = {
+  js: "/*! Solar System Live. Bundles three.js (MIT, three.js authors), astronomy-engine (MIT, Don Cross), simplex noise (MIT, Copyright (C) 2011 Ashima Arts, Ian McEwan and Stefan Gustavson), hash functions (MIT, Copyright (c) 2014 David Hoskins) and data from the Open Exoplanet Catalogue (MIT, Copyright (C) 2012 Hanno Rein). Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural Earth, Celestia; see CREDITS.txt. */",
+};
 
-// The Wallpaper page: a still picture and a small menu. Tiny on purpose.
-await build({
-  entryPoints: ["src/wallpaper.js"],
-  bundle: true,
-  minify: true,
-  format: "iife",
-  target: "es2020",
-  outfile: "dist/wallpaper.js",
-  logLevel: "info",
-});
+for (const [entry, outfile] of [["src/main.js", "dist/solar.js"], ["src/wallpaper.js", "dist/wallpaper.js"]]) {
+  await build({
+    entryPoints: [entry],
+    bundle: true,
+    minify: true,
+    format: "iife",
+    target: "es2020",
+    outfile,
+    legalComments: "eof",
+    define,
+    banner,
+    logLevel: "info",
+  });
+}
 
 // Lively Wallpaper's settings, made from the same lists the page uses so they can't drift apart.
 const { SPEEDS, VIEWS } = await import("../src/settings.js");
 const lookAt = VIEWS.filter((v) => !v.from);
 const lively = {
-  mode: { type: "dropdown", value: 0, text: "Mode", items: ["Wallpaper (a still picture, lowest battery)", "Space Scope (everything)"] },
+  mode: { type: "dropdown", value: 0, text: "Mode", items: ["Wallpaper (the planets, easy on battery)", "Space Scope (fly anywhere)"] },
   speed: { type: "dropdown", value: 0, text: "Speed", items: SPEEDS.map((s) => s.label) },
-  view: { type: "dropdown", value: lookAt.findIndex((v) => v.id === "middle"), text: "Look at", items: lookAt.map((v) => v.label) },
-  from: { type: "dropdown", value: 0, text: "Look from", items: ["Nothing", ...VIEWS.filter((v) => v.from).map((v) => v.label)] },
+  view: { type: "dropdown", value: lookAt.findIndex((v) => v.id === "middle"), text: "Look at (Space Scope)", items: lookAt.map((v) => v.label) },
+  from: { type: "dropdown", value: 0, text: "Look from (Space Scope)", items: ["Nothing", ...VIEWS.filter((v) => v.from).map((v) => v.label)] },
   labels: { type: "checkbox", value: true, text: "Show names" },
   orbits: { type: "checkbox", value: true, text: "Show orbits" },
   belts: { type: "checkbox", value: true, text: "Show asteroids" },
   clock: { type: "checkbox", value: true, text: "Show clock" },
-  drift: { type: "checkbox", value: true, text: "Slow camera drift" },
-  strange: { type: "checkbox", value: true, text: "Strange sightings (made up)" },
+  drift: { type: "checkbox", value: true, text: "Camera goes round / slow drift" },
+  strange: { type: "checkbox", value: true, text: "Strange sightings (made up, Space Scope)" },
   photos: { type: "checkbox", value: true, text: "Real maps" },
   ui: { type: "checkbox", value: true, text: "Show settings button" },
   credits: { type: "label", text: "Credits: planet maps from NASA, USGS and Solar System Scope (CC BY 4.0, resized and recoloured), Natural Earth and Celestia. Positions by astronomy-engine, drawing by three.js, planets of other stars from the Open Exoplanet Catalogue. Full list in CREDITS.txt." },
-  fps: { type: "slider", value: 30, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
+  fps: { type: "slider", value: 20, text: "Frames per second (lower saves power)", min: 10, max: 60, step: 5 },
 };
 const { writeFileSync } = await import("node:fs");
 writeFileSync(new URL("../dist/LivelyProperties.json", import.meta.url), JSON.stringify(lively, null, 2) + "\n");

@@ -8,6 +8,10 @@ import { createExoSystem } from "./exosystem.js";
 import { createLocalGroup } from "./localgroup.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
+import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
+import { GATE } from "./gate.js";
+import { skyDirection } from "./galaxies.js";
+import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
 import { createMaps, nearestFor } from "./maps.js";
 import { pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
@@ -49,7 +53,21 @@ controls.enablePan = false;
 controls.autoRotateSpeed = 0.12; // one lap every 8 minutes or so
 controls.maxDistance = 500;
 
-const sky = createSky(pixelRatio);
+// Names on the sky besides the galaxies: the black holes (too small to see, but they're there), the made-up Gate,
+// and a few of the best-known stars with planets (all of them are in the menu).
+const skyPlaces = [
+  ...BLACK_HOLE_PLACES,
+  // Made up, and the label says so.
+  { id: GATE.id, name: GATE.name, lightYears: "Made up", direction: skyDirection(GATE.ra, GATE.dec), distance: 960 },
+  ...EXOPLANET_SYSTEMS.filter((s) => s.famous).map((s) => ({
+    id: s.id,
+    name: s.name,
+    lightYears: `${s.ly < 100 ? s.ly.toFixed(1) : Math.round(s.ly).toLocaleString("en-US")} light-years · ${s.planets.length} planet${s.planets.length === 1 ? "" : "s"}`,
+    direction: skyDirection(s.ra, s.dec),
+    distance: 940,
+  })),
+];
+const sky = createSky(pixelRatio, { places: skyPlaces });
 scene.add(sky.group);
 const system = createSystem(scene, pixelRatio);
 const belts = createBelts(pixelRatio);

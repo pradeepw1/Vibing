@@ -1,15 +1,16 @@
 // The two ways to use it.
 //
-//   Wallpaper (index.html): one still picture of the Milky Way. Nothing is drawn
-//   after the page loads, so it uses almost no battery.
-//   Space Scope (scope.html): everything: the solar system, other galaxies,
+//   Wallpaper (index.html): the Sun and the nine planets under the real sky, with the camera
+//   slowly going round. Nothing reacts to clicks. Made to cost as little battery as it can.
+//   Space Scope (scope.html): everything: fly to any planet or moon, out to other galaxies,
 //   black holes, other stars' planets, the Gate and the rest.
 export const WALLPAPER_PAGE = "index.html";
 export const SCOPE_PAGE = "scope.html";
 
-// Settings only Space Scope understands. An address with one of these (like the old
-// index.html?view=galaxy-sgra) is sent on to Space Scope, so old links keep working.
-const SCOPE_PARAMS = ["view", "speed", "date", "reverse", "paused", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "fps"];
+// Settings only Space Scope understands (the Wallpaper has no views, no sightings and no running time
+// backwards). An address with one of these (like the old index.html?view=galaxy-sgra) is sent on to
+// Space Scope, so old links keep working. The settings both share (speed, names, orbits...) stay.
+const SCOPE_PARAMS = ["view", "strange", "reverse", "paused"];
 
 /** Where an address meant for Space Scope should go (the address after "?"), or null to stay on the wallpaper. */
 export function scopeAddress(search) {

@@ -4,8 +4,8 @@
     "value": 0,
     "text": "Mode",
     "items": [
-      "Wallpaper (a still picture, lowest battery)",
-      "Space Scope (everything)"
+      "Wallpaper (the planets, easy on battery)",
+      "Space Scope (fly anywhere)"
     ]
   },
   "speed": {
@@ -25,7 +25,7 @@
   "view": {
     "type": "dropdown",
     "value": 1,
-    "text": "Look at",
+    "text": "Look at (Space Scope)",
     "items": [
       "Whole solar system",
       "Out to Jupiter",
@@ -104,7 +104,7 @@
   "from": {
     "type": "dropdown",
     "value": 0,
-    "text": "Look from",
+    "text": "Look from (Space Scope)",
     "items": [
       "Nothing",
       "From Mercury",
@@ -142,12 +142,12 @@
   "drift": {
     "type": "checkbox",
     "value": true,
-    "text": "Slow camera drift"
+    "text": "Camera goes round / slow drift"
   },
   "strange": {
     "type": "checkbox",
     "value": true,
-    "text": "Strange sightings (made up)"
+    "text": "Strange sightings (made up, Space Scope)"
   },
   "photos": {
     "type": "checkbox",
@@ -165,7 +165,7 @@
   },
   "fps": {
     "type": "slider",
-    "value": 30,
+    "value": 20,
     "text": "Frames per second (lower saves power)",
     "min": 10,
     "max": 60,

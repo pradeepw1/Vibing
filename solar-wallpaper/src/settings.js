@@ -8,17 +8,9 @@ import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { MOONS, PLANETS } from "./bodies.js";
 import { GALAXIES } from "./galaxies.js";
 import { GATE } from "./gate.js";
+import { bool, parseShared, SPEEDS, speedRate } from "./options.js";
 
-// "live" runs at real speed. If the clock is on today's date, it stays locked to now.
-export const SPEEDS = [
-  { id: "live", label: "Live", rate: 1 },
-  { id: "minute", label: "1 min/s", rate: 60 },
-  { id: "hour", label: "1 hour/s", rate: 3600 },
-  { id: "day", label: "1 day/s", rate: 86400 },
-  { id: "week", label: "1 week/s", rate: 7 * 86400 },
-  { id: "month", label: "1 month/s", rate: 30.436875 * 86400 },
-  { id: "year", label: "1 year/s", rate: 365.2425 * 86400 },
-];
+export { SPEEDS, speedRate };
 
 export const VIEWS = [
   { id: "system", label: "Whole solar system", target: "sun", radius: 76, elevation: 24 },
@@ -86,36 +78,17 @@ export function save(settings) {
   }
 }
 
-const bool = (v) => !["0", "false", "no", "off"].includes(String(v).toLowerCase());
-
 /** Cleans up one setting value, or returns undefined if it isn't valid. */
 export function parse(key, value) {
   switch (key) {
-    case "speed":
-      return SPEEDS.some((s) => s.id === value) ? value : undefined;
     case "view":
       return VIEWS.some((v) => v.id === value) || viewpoint(value) ? value : undefined;
-    case "fps": {
-      const n = Math.round(Number(value));
-      return n >= 5 && n <= 240 ? n : undefined;
-    }
-    case "date": {
-      const d = new Date(value);
-      return Number.isNaN(d.getTime()) ? undefined : d.getTime();
-    }
     case "reverse":
     case "paused":
-    case "labels":
-    case "orbits":
-    case "belts":
-    case "clock":
-    case "drift":
     case "strange":
-    case "photos":
-    case "ui":
       return bool(value);
     default:
-      return undefined;
+      return parseShared(key, value);
   }
 }
 
@@ -137,5 +110,3 @@ export function loadSettings(search = location.search) {
   }
   return settings;
 }
-
-export const speedRate = (id) => SPEEDS.find((s) => s.id === id)?.rate ?? 1;

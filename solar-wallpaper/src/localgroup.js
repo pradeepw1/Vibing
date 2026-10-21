@@ -359,7 +359,6 @@ export function createLocalGroup(canvas, pixelRatio) {
     const mw = pointsOf(spiral(MILKY_WAY, 101), materials);
     mw.position.copy(centre);
     mw.quaternion.setFromRotationMatrix(new Matrix4().makeBasis(basis.center.clone().negate(), basis.north, basis.east));
-    mw.name = "milkyway"; // named so tools/make-milkyway.mjs can photograph it alone
     scene.add(mw);
     for (const g of GALAXIES) {
       if (isFar(g)) standInFor(g);
@@ -384,7 +383,6 @@ export function createLocalGroup(canvas, pixelRatio) {
     gateMesh.position.copy(places.get(GATE.id).position);
     scene.add(gateMesh);
     far = background(pixelRatio);
-    far.name = "background";
     scene.add(far);
   }
   let far = null;

@@ -18,10 +18,7 @@ import {
   Vector3,
 } from "three";
 import { eqjToScene } from "./ephemeris.js";
-import { BLACK_HOLES } from "./blackholes.js";
-import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
-import { GATE } from "./gate.js";
-import { createGalaxies, skyDirection } from "./galaxies.js";
+import { createGalaxies } from "./galaxies.js";
 import { clamp, random } from "./noise.js";
 import * as shaders from "./shaders.js";
 
@@ -80,7 +77,11 @@ function makeStars(count, basis) {
   return g;
 }
 
-export function createSky(pixelRatio) {
+/**
+ * `galaxies: false` leaves the nearest galaxies off the sky (the Wallpaper page: just our own Milky Way).
+ * `places` are more names for labels, as { id, name, lightYears, direction, distance }.
+ */
+export function createSky(pixelRatio, { galaxies: withGalaxies = true, places = [] } = {}) {
   const group = new Group();
   const basis = galacticBasis();
 
@@ -105,8 +106,8 @@ export function createSky(pixelRatio) {
   starPoints.frustumCulled = false;
   group.add(starPoints);
 
-  const galaxies = createGalaxies();
-  group.add(galaxies.group);
+  const galaxies = withGalaxies ? createGalaxies() : { group: null, named: [], setFade() {} };
+  if (galaxies.group) group.add(galaxies.group);
 
   // The ecliptic: the line across the sky that the Sun and planets follow.
   // Only shown in the view from a body.
@@ -132,21 +133,8 @@ export function createSky(pixelRatio) {
     get fade() {
       return fade;
     },
-    /** The named galaxies and black holes, for labels (the black holes are too small to see, but they're there). */
-    galaxies: [
-      ...galaxies.named,
-      ...BLACK_HOLES.map((h) => ({ id: h.id, name: h.name, lightYears: h.lightYears, direction: skyDirection(h.ra, h.dec), distance: 950 })),
-      // Made up, and the label says so.
-      { id: GATE.id, name: GATE.name, lightYears: "Made up", direction: skyDirection(GATE.ra, GATE.dec), distance: 960 },
-      // A few of the best-known stars with planets (all of them are in the menu).
-      ...EXOPLANET_SYSTEMS.filter((s) => s.famous).map((s) => ({
-        id: s.id,
-        name: s.name,
-        lightYears: `${s.ly < 100 ? s.ly.toFixed(1) : Math.round(s.ly).toLocaleString("en-US")} light-years · ${s.planets.length} planet${s.planets.length === 1 ? "" : "s"}`,
-        direction: skyDirection(s.ra, s.dec),
-        distance: 940,
-      })),
-    ],
+    /** The named galaxies and anything else with a name on the sky, for labels. */
+    galaxies: [...galaxies.named, ...places],
     /**
      * Dims the stars, the Milky Way and the galaxies (1 = full). Used when the view turns so fast
      * against the stars that they'd only streak.
