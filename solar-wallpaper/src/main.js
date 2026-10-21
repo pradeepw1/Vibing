@@ -10,6 +10,7 @@ import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEW
 import { createSky } from "./sky.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
 import { createMaps, nearestFor } from "./maps.js";
+import { pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 import { createElsewhere } from "./elsewhere.js";
@@ -1270,7 +1271,7 @@ addEventListener("resize", () => {
 });
 
 // --- Wallpaper apps ---
-// Lively Wallpaper (Windows): see LivelyProperties.json next to index.html.
+// Lively Wallpaper (Windows): see LivelyProperties.json next to index.html (the Wallpaper page; its "mode" setting brings you here).
 // Lists arrive as a position in the list, so turn those back into names.
 // The View list there holds the "look at" views; "Look from" picks a body to
 // see the sky from (or Nothing), so the wallpaper app's own setting is always
@@ -1281,6 +1282,12 @@ let livelyFrom = null;
 let livelyLookAt = null; // what Look from: Nothing goes back to
 window.livelyPropertyListener = (name, value) => {
   if (name === "back") return goBack();
+  // The Mode setting in the wallpaper app's own panel. (The values it pushes in as the page starts are ignored:
+  // someone who opened Space Scope from the menu button should stay here.)
+  if (name === "mode") {
+    if (wantsWallpaper(value) && performance.now() > 4000) location.assign(pageAddress(WALLPAPER_PAGE, location.search));
+    return;
+  }
   if (name === "from") {
     const view = typeof value === "number" ? LOOK_FROM[value - 1]?.id : value && value !== "none" ? `from-${value}` : null;
     livelyFrom = viewpoint(view) ? view : null;

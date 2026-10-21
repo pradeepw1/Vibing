@@ -1,5 +1,7 @@
-// Bundles src/ into dist/solar.js: one plain script, so dist/index.html works
-// straight from disk (file://) and inside wallpaper apps, with no server.
+// Bundles src/ into two plain scripts, so the pages work straight from disk
+// (file://) and inside wallpaper apps, with no server:
+//   dist/solar.js      Space Scope (dist/scope.html): everything
+//   dist/wallpaper.js  the Wallpaper page (dist/index.html): a few KB for its menu
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
@@ -40,10 +42,22 @@ await build({
   logLevel: "info",
 });
 
+// The Wallpaper page: a still picture and a small menu. Tiny on purpose.
+await build({
+  entryPoints: ["src/wallpaper.js"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2020",
+  outfile: "dist/wallpaper.js",
+  logLevel: "info",
+});
+
 // Lively Wallpaper's settings, made from the same lists the page uses so they can't drift apart.
 const { SPEEDS, VIEWS } = await import("../src/settings.js");
 const lookAt = VIEWS.filter((v) => !v.from);
 const lively = {
+  mode: { type: "dropdown", value: 0, text: "Mode", items: ["Wallpaper (a still picture, lowest battery)", "Space Scope (everything)"] },
   speed: { type: "dropdown", value: 0, text: "Speed", items: SPEEDS.map((s) => s.label) },
   view: { type: "dropdown", value: lookAt.findIndex((v) => v.id === "middle"), text: "Look at", items: lookAt.map((v) => v.label) },
   from: { type: "dropdown", value: 0, text: "Look from", items: ["Nothing", ...VIEWS.filter((v) => v.from).map((v) => v.label)] },

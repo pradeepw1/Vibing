@@ -1,5 +1,6 @@
 // The clock, the settings panel, planet names and keyboard shortcuts.
 import { Ray, Vector3 } from "three";
+import { pageAddress, WALLPAPER_PAGE } from "./modes.js";
 import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -68,6 +69,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
+  $("#mode-wallpaper").addEventListener("click", () => location.assign(pageAddress(WALLPAPER_PAGE, location.search))); // the still Milky Way: almost no battery
   const strangeBtn = $("#strange-now");
   const strangeLabel = strangeBtn.textContent;
   strangeBtn.addEventListener("click", () => {

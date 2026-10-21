@@ -1,4 +1,13 @@
 {
+  "mode": {
+    "type": "dropdown",
+    "value": 0,
+    "text": "Mode",
+    "items": [
+      "Wallpaper (a still picture, lowest battery)",
+      "Space Scope (everything)"
+    ]
+  },
   "speed": {
     "type": "dropdown",
     "value": 0,

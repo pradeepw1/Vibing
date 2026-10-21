@@ -1,7 +1,7 @@
 // Settings come from three places, later ones winning:
 //   1. the defaults below
 //   2. whatever you last picked in the settings panel (saved in this browser)
-//   3. the page address, e.g. index.html?speed=day&view=earth&ui=0
+//   3. the page address, e.g. scope.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
 import { BLACK_HOLES } from "./blackholes.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";

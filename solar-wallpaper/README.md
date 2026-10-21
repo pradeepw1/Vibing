@@ -5,7 +5,20 @@ A live wallpaper of the solar system. Every planet and moon sits where it really
 ![The solar system on 14 October 2026](docs/overview.jpg)
 ![Earth with the Moon, Jupiter with its four big moons, Saturn with its rings](docs/close-ups.jpg)
 
-It's one web page. It runs in any browser and works as a desktop wallpaper on Windows, macOS and Linux. It needs no internet connection and no server, so you can just open `dist/index.html`.
+It runs in any browser and works as a desktop wallpaper on Windows, macOS and Linux. It needs no internet connection and no server, so you can just open `dist/index.html`.
+
+## Two modes
+
+| | Wallpaper | Space Scope |
+|---|---|---|
+| Page | `dist/index.html` | `dist/scope.html` |
+| What you get | One still picture of the Milky Way, seen from above, with a ring where the Sun is | Everything below: the real solar system, other galaxies, black holes, other stars' planets, strange sightings, the Gate |
+| Battery | Almost none. Nothing is drawn after the page loads: no 3D, no animation, no timers | A lot more. It draws the sky all the time |
+| Download | Under 1 MB | About 1 MB of code, plus up to 16 MB of planet maps |
+
+Wallpaper is what you get when you open `index.html`, and it's the one to leave running. Open the settings button, then pick **Space Scope** under *Mode* to dive into the full version. Pick **Wallpaper** in the same place to come back. The wallpaper always starts in Wallpaper mode.
+
+The picture is made by `tools/make-milkyway.mjs` from the app's own Milky Way, so every star is made up (the shape of the galaxy and the Sun's place in it are real). I haven't measured the battery on a real laptop. Wallpaper mode is low because the page has nothing to run: a test checks it has no animation loop and no timers, and a browser check counted none while it sat there.
 
 ## What's real
 
@@ -93,9 +106,9 @@ They show up in the Sun-and-planets views and from the ground. They're placed a 
 
 ## Use it as your wallpaper
 
-The files you need are all in `dist/`: `index.html`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere.
+Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-battery one. The files you need are all in `dist/`: `index.html`, `scope.html`, `wallpaper.js`, `milkyway.webp`, `milkyway-tall.webp`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere. If you only ever want the still picture, you can leave out `scope.html`, `solar.js` and `maps`.
 
-**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. The settings (speed, view, names...) show up in Lively's customise panel. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
+**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. In Lively's customise panel, **Mode** switches between Wallpaper and Space Scope. In Space Scope the other settings (speed, view, names...) show up there too; in Wallpaper mode they do nothing. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
 
 **Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved.
 
@@ -105,11 +118,11 @@ The files you need are all in `dist/`: `index.html`, `solar.js`, `LivelyProperti
 
 **Phones:** not yet. That needs a native app (see Next).
 
-For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It hides the settings button and runs at 30 frames a second to save power.
+For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It hides the settings button. In Space Scope it also runs at 30 frames a second to save power (`scope.html?wallpaper`). The flag goes with you if you switch modes.
 
 ## Settings
 
-Click the button in the top right, or add them to the address, like `index.html?speed=day&view=earth`.
+These are Space Scope's settings. Click the button in the top right, or add them to the address, like `scope.html?speed=day&view=earth`. Old addresses like `index.html?speed=day&view=earth` still work: the Wallpaper page sees a Space Scope setting and sends you on.
 
 | Setting | Values | Default |
 |---|---|---|
@@ -120,8 +133,8 @@ Click the button in the top right, or add them to the address, like `index.html?
 | `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
 | `photos` | `0` for painted planets only (the menu's **Real maps** box). Good for a slow computer or a small download | `1` |
 | `fps` | frames per second, 5 to 240 | 60 |
-| `ui` | `0` hides the settings button | `1` |
-| `wallpaper` | shorthand for `ui=0&fps=30` | |
+| `ui` | `0` hides the settings button (works on both pages) | `1` |
+| `wallpaper` | shorthand for `ui=0&fps=30` (works on both pages) | |
 
 Keys: <kbd>Space</kbd> pause, <kbd>←</kbd> <kbd>→</kbd> slower/faster, <kbd>R</kbd> backwards, <kbd>N</kbd> back to now, <kbd>L</kbd> names, <kbd>O</kbd> orbits, <kbd>H</kbd> hide everything, <kbd>F</kbd> full screen, <kbd>1</kbd>-<kbd>9</kbd> look at a planet, <kbd>Shift</kbd>+<kbd>1</kbd>-<kbd>9</kbd> look from it, <kbd>Enter</kbd> look from the planet you're looking at, <kbd>Esc</kbd> / <kbd>B</kbd> / <kbd>Backspace</kbd> back, <kbd>0</kbd> overview.
 
@@ -138,13 +151,13 @@ You need [Node.js](https://nodejs.org) 18 or newer.
 ```sh
 cd solar-wallpaper
 npm install
-npm run build      # rebuilds dist/solar.js from src/
+npm run build      # rebuilds dist/solar.js (Space Scope) and dist/wallpaper.js (Wallpaper) from src/
 npm test           # checks positions against real events (equinox, Mars opposition, eclipses, full moon...), and the data and shapes behind the galaxies, black holes, sightings, the Gate and the maps
 npm run textures   # then open tools/textures.html to see every painted surface flat
 npm run maps       # rebuilds dist/maps/ from the original NASA and USGS maps (see below)
 ```
 
-`dist/solar.js` and `dist/maps/` are committed, so the wallpaper works without building. Rebuild `solar.js` after you change anything in `src/`, and also after you rebuild the maps: `solar.js` has the list of maps baked in.
+`dist/solar.js`, `dist/wallpaper.js`, `dist/maps/` and the two Milky Way pictures are committed, so the wallpaper works without building. Rebuild after you change anything in `src/`, and also after you rebuild the maps: `solar.js` has the list of maps baked in. To make the Milky Way pictures again, run `node tools/make-milkyway.mjs` (it needs Playwright and Python's Pillow; the header of the file says how).
 
 ### How the maps are made
 
@@ -187,13 +200,20 @@ The built files are in git, but the originals are not.
 | `src/noise.js` | The noise functions the painted surfaces, the galaxies and the Gate are made from |
 | `src/gate.js`, `src/elsewhere.js` | The Gate (made up) and the endless hall beyond it, with its doorways and changing places |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
-| `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks |
+| `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |
+| `dist/index.html`, `src/wallpaper.js` | Wallpaper mode: the still picture, its small menu, and forwarding of old addresses to Space Scope |
+| `dist/scope.html` | Space Scope: the full app, loads `solar.js` |
+| `src/modes.js` | The two page names, which settings belong to Space Scope, and how a wallpaper app's **Mode** setting is read |
+| `dist/milkyway.webp`, `dist/milkyway-tall.webp` | The Wallpaper pictures (wide and upright), made by `tools/make-milkyway.mjs` |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |
-| `tools/build.mjs` | Builds `dist/solar.js`, and writes `dist/LivelyProperties.json` from the same lists the page uses |
+| `tools/build.mjs` | Builds `dist/solar.js` and `dist/wallpaper.js`, and writes `dist/LivelyProperties.json` from the same lists the page uses |
+| `tools/make-milkyway.mjs` | Takes the two Wallpaper pictures from Space Scope's own Milky Way |
 
 ## Credits
 
 The planets round other stars come from the [Open Exoplanet Catalogue](https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue) (Hanno Rein and contributors, MIT licence; [Rein 2012](http://arxiv.org/abs/1211.7121)), which gathers results from NASA's Exoplanet Archive and the published papers. [three.js](https://threejs.org) (MIT) draws it. The simplex noise in the shaders is by Ian McEwan (Ashima Arts, Copyright (C) 2011) and Stefan Gustavson (MIT), the hash functions in the sky scenes are "Hash without Sine" by David Hoskins (MIT), and the blackbody colour curve is a fit published by Tanner Helland. The licence texts are in `dist/CREDITS.txt`. [astronomy-engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT) works out the positions. The painted stand-in for Earth's coastlines comes from [Natural Earth](https://www.naturalearthdata.com) (public domain) via [world-atlas](https://github.com/topojson/world-atlas).
+
+**The Wallpaper picture** is not a photo of the Milky Way (nobody has one from above). It's drawn by this project, from the shape astronomers have measured, with made-up stars.
 
 **The real maps.** Every picture comes from a space mission, and the maps were joined, cleaned, resized and in some cases tinted or filled in for this project (see "How the maps are made"). NASA and USGS maps are public domain, and NASA should be thanked as their source; no NASA endorsement is meant or implied.
 
