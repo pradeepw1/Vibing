@@ -64,7 +64,8 @@ const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock",
 
 function readSaved() {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {}; // (a stored null or a list would otherwise stop the page)
   } catch {
     return {};
   }

@@ -119,10 +119,11 @@ function makeTexture(image, flipped, layer, blob) {
  *
  *   onSettled()    every map has either arrived or failed
  *   onMissing(id)  a map failed: the painted surface is all there will be
+ *   skip           a Set of body ids that never need a map (the Wallpaper doesn't draw moons)
  */
-export function createMaps({ renderer, system, enabled, onSettled, onMissing }) {
+export function createMaps({ renderer, system, enabled, onSettled, onMissing, skip = new Set() }) {
   const units = new Map(); // id -> { id, sizes, lite, sharp, wantedAt }
-  const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth"), "saturn-rings"];
+  const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth"), "saturn-rings"].filter((id) => !skip.has(id));
   for (const id of ids) {
     const sizes = sizesOf(id, renderer.capabilities.maxTextureSize);
     if (sizes.length) units.set(id, { id, sizes, lite: { state: "idle", look: null }, sharp: { state: "idle", look: null }, wantedAt: -Infinity });
@@ -240,6 +241,7 @@ export function createMaps({ renderer, system, enabled, onSettled, onMissing }) 
           const { image, flipped } = await decode(t.userData.blob);
           t.image = image;
           t.flipY = !flipped;
+          t.dispose(); // the old copy on the chip is gone with the context: start the upload afresh, with the right size
           t.needsUpdate = true;
         }
       }

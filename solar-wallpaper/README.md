@@ -13,9 +13,9 @@ It runs in any browser and works as a desktop wallpaper on Windows, macOS and Li
 |---|---|---|
 | Page | `dist/index.html` | `dist/scope.html` |
 | What you get | The Sun and the nine planets where they really are, under the real sky (stars, the Milky Way, the near galaxies and the black holes, named), with the camera slowly going round | Everything below: fly to any planet or moon, out to other galaxies, black holes, other stars' planets, strange sightings, the Gate |
-| Clicking | Does nothing. Click, drag, scroll or press keys: the picture never changes | Click a planet to see its sky, drag to look around, scroll to zoom |
+| Clicking | Nothing on the picture reacts. Click, tap, drag, scroll, pinch or press keys: it never changes (only the menu button and its menu do anything) | Click a planet to see its sky, drag to look around, scroll to zoom |
 | Battery | As low as it can be (see below) | Much more. It draws all the time, at up to 60 frames a second |
-| Download | About 0.9 MB of code, plus the planet maps (about 4 MB; no sharp maps) | About 1.1 MB of code, plus up to 16 MB of planet maps |
+| Download | About 0.9 MB of code, plus 12 small planet maps (about 1.7 MB as files, a bit more once loaded; no moon maps, no sharp maps) | About 1.1 MB of code, plus up to 16 MB of planet maps |
 
 Wallpaper is what you get when you open `index.html`, and it's the one to leave running. Open the settings button, then pick **Space Scope** under *Mode* to fly about. Pick **Wallpaper** in the same place to come back. The wallpaper always starts in Wallpaper mode.
 
@@ -23,11 +23,12 @@ The camera takes a long, slow path: a lap round the Sun every 10 minutes, rising
 
 **What keeps the battery use low.** I haven't measured it on a real laptop, so these are the things the page does, not a figure:
 
-- It draws about 20 times a second, not 60, and the camera moves slowly enough that you can't tell.
+- It draws about 20 times a second, not 60, and the camera moves slowly enough that you can't tell. If you switch the camera off and leave time at real speed, nothing on the picture moves, and it draws once a second.
 - It stops completely while the page is hidden. There are no timers, no animations and no blur effects on the page.
 - At real speed, the planets are moved once a second instead of every frame.
-- It never draws more than about 4 million pixels, however big the screen is, and it never draws moons (from this far each is under a pixel) or the fine spheres Space Scope uses for close-ups. That's about a sixth of the triangles.
-- It loads only the small planet maps. It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
+- It never draws more than about 2.5 million pixels (a 1080p screen is 2.1 million), however big the screen is or becomes, and it smooths edges only on screens that aren't sharp enough to hide them. It asks the browser for an opaque drawing surface and for the low-power graphics chip.
+- It never draws or loads the moons (from this far each is under a pixel), and the planets are lighter spheres than Space Scope's close-up ones: about a fifth of the triangles (37,000 against 199,000).
+- It loads only the small planet maps, 12 of them. It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
 
 ## What's real
 
@@ -115,11 +116,11 @@ They show up in the Sun-and-planets views and from the ground. They're placed a 
 
 ## Use it as your wallpaper
 
-Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-battery one. The files you need are all in `dist/`: `index.html`, `wallpaper.js`, `scope.html`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere. If you only ever want Wallpaper mode, you can leave out `scope.html` and `solar.js` (the Space Scope button then goes nowhere), and the sharp maps (`maps/*.sharp.js`) are never used by it.
+Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-battery one. The files you need are all in `dist/`: `index.html`, `wallpaper.js`, `scope.html`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere. Keep the whole folder: the Space Scope button, and Lively's *Mode* setting, open `scope.html`. (Wallpaper mode itself never uses the sharp maps `maps/*.sharp.js` or the moon maps, so those files could go if space matters.)
 
-**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. In Lively's customise panel, **Mode** switches between Wallpaper and Space Scope. Speed, names, orbits, asteroids, clock, camera and real maps work in both; *Look at*, *Look from* and *Strange sightings* are Space Scope's only, and do nothing in Wallpaper mode. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
+**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. In Lively's customise panel, **Mode** switches between Wallpaper and Space Scope. Speed, names, orbits, asteroids, clock, camera and real maps work in both; *Look at*, *Look from* and *Strange sightings* are Space Scope's only, and do nothing in Wallpaper mode. There are two frame-rate sliders, one for each page (Wallpaper's starts at 20, Space Scope's at 30). Lively sends all its saved settings when a page opens, and the first *Mode* it sends is ignored, so the wallpaper always opens in Wallpaper mode and only a change you make in Lively's panel switches it. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
 
-**Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved.
+**Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved. (Its own settings panel isn't set up: that needs a `project.json` listing the settings, which isn't included. The page does read Wallpaper Engine's settings by the same names as Lively's, if you write one.)
 
 **macOS, with [Plash](https://sindresorhus.com/plash) (free):** add a website and point it at the `index.html` file.
 
@@ -211,13 +212,13 @@ The built files are in git, but the originals are not.
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |
 | `dist/index.html`, `src/wallpaper.js` | Wallpaper mode: the page, and the lean program that draws the planets and sky with no click handling at all. It also sends old full-app addresses on to Space Scope |
-| `src/wallpaper-camera.js` | The camera's path, and how far back to stand so the planets' orbits fit any screen shape |
+| `src/wallpaper-camera.js` | The camera's path, and how far back to stand so the planets' orbits (and every planet, however Pluto's orbit lies) fit any screen shape |
 | `src/wallpaper-labels.js`, `src/wallpaper-settings.js` | The Wallpaper's names (not clickable) and its settings |
 | `src/options.js`, `src/skyplaces.js` | What both pages share: the time speeds and how a setting is cleaned up, and the black holes as names on the sky |
 | `dist/scope.html` | Space Scope: the full app, loads `solar.js` |
 | `src/modes.js` | The two page names, which settings only Space Scope has, and how a wallpaper app's **Mode** setting is read |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |
-| `tools/build.mjs` | Builds `dist/solar.js` and `dist/wallpaper.js`, and writes `dist/LivelyProperties.json` from the same lists the page uses |
+| `tools/build.mjs`, `tools/bundles.mjs` | Build `dist/solar.js` and `dist/wallpaper.js`, and write `dist/LivelyProperties.json` from the same lists the pages use. `test/dist.test.mjs` makes them again and fails if the committed ones are out of date |
 
 ## Credits
 

@@ -2,12 +2,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PerspectiveCamera, Vector3 } from "three";
-import { auToScene } from "../src/ephemeris.js";
+import { auToScene, planetPosition } from "../src/ephemeris.js";
 import { PLANETS } from "../src/bodies.js";
+import * as A from "astronomy-engine";
 import { BLACK_HOLE_PLACES } from "../src/skyplaces.js";
 import { distanceFor, PATH, pathAt, placeCamera } from "../src/wallpaper-camera.js";
 import { createLabels } from "../src/wallpaper-labels.js";
-import { DEFAULTS, loadSettings, parse } from "../src/wallpaper-settings.js";
+import { DEFAULTS, loadSettings, parse, save } from "../src/wallpaper-settings.js";
 
 const DEG = Math.PI / 180;
 
@@ -86,11 +87,30 @@ test("a thinner screen has to stand further back", () => {
   assert.ok(distanceFor(59, 45, 9 / 16, 24 * DEG) > distanceFor(59, 45, 16 / 9, 24 * DEG));
 });
 
-test("the closest framing still shows out to Neptune's orbit, and the widest shows Pluto's whole orbit", () => {
+test("all nine planets are in the picture at every moment, wherever Pluto is on its orbit", () => {
+  // Pluto's orbit is long and lopsided: 30 to 49 AU. Four dates: now, and out to its farthest (about 2114).
+  for (const date of ["2026-10-21", "2060-01-01", "2113-07-01", "2200-01-01"]) {
+    const time = A.MakeTime(new Date(date));
+    const positions = PLANETS.map((p) => planetPosition(p, time, new Vector3()));
+    for (const [w, h] of [[1920, 1080], [2560, 1080], [1080, 1920], [390, 844]]) {
+      const camera = new PerspectiveCamera(45, w / h, 0.5, 3000);
+      for (let t = 0; t < 1700; t += 53) {
+        placeCamera(camera, t, PATH, positions);
+        camera.updateMatrixWorld();
+        for (const [i, v] of positions.entries()) {
+          const ndc = v.clone().project(camera);
+          assert.ok(Math.abs(ndc.x) <= 0.97 && Math.abs(ndc.y) <= 0.97, `${date} ${w}x${h} at ${t}s: ${PLANETS[i].id} is off the screen (${ndc.x.toFixed(2)}, ${ndc.y.toFixed(2)})`);
+        }
+      }
+    }
+  }
+});
+
+test("the path alone, with no planets to fit, shows out to Neptune's orbit at its closest and Pluto's farthest at its widest", () => {
   const near = PATH.reach.mid / PATH.reach.ratio;
   const far = PATH.reach.mid * PATH.reach.ratio;
-  assert.ok(near >= auToScene(30.1) - 1.5, `closest reach ${near.toFixed(1)} holds Neptune's orbit (${auToScene(30.1).toFixed(1)})`);
-  assert.ok(far >= auToScene(39.5) - 1, `widest reach ${far.toFixed(1)} holds Pluto's average distance (${auToScene(39.5).toFixed(1)})`);
+  assert.ok(near >= auToScene(30.33) - 0.5, `closest reach ${near.toFixed(1)} holds Neptune's farthest (${auToScene(30.33).toFixed(1)})`);
+  assert.ok(far >= auToScene(49.3), `widest reach ${far.toFixed(1)} holds Pluto's farthest (${auToScene(49.3).toFixed(1)})`);
 });
 
 test("the Wallpaper's settings: only the ones it has", () => {
@@ -112,11 +132,41 @@ test("the Wallpaper's settings: only the ones it has", () => {
   assert.equal(loadSettings("?speed=banana").speed, "live");
 });
 
+test("only what the person changed is remembered, and a damaged store doesn't stop the page", () => {
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  try {
+    // One-off values from the address are never written by someone else's change.
+    save({ labels: false });
+    assert.deepEqual(JSON.parse([...store.values()][0]), { labels: false });
+    save({ speed: "day", view: "mars", nonsense: 1 }); // (only the Wallpaper's own settings are kept)
+    assert.deepEqual(JSON.parse([...store.values()][0]), { labels: false, speed: "day" });
+    assert.equal(loadSettings("").labels, false);
+    assert.equal(loadSettings("").speed, "day");
+    assert.equal(loadSettings("?labels=1").labels, true, "the address wins over what was saved");
+    assert.equal(loadSettings("", true).drift, false);
+    save({ labels: true });
+    assert.equal(JSON.parse([...store.values()][0]).drift, undefined, "the 'camera still' default for reduced motion was never saved");
+    for (const damaged of ["null", "5", "true", "[1,2]", '"text"', "{", "{\"__proto__\":{\"x\":1}}"]) {
+      store.set([...store.keys()][0], damaged);
+      assert.doesNotThrow(() => loadSettings(""), damaged);
+      assert.equal(loadSettings("").fps, 20, damaged);
+    }
+  } finally {
+    delete globalThis.localStorage;
+  }
+});
+
 // --- Names ---
 function fakeDocument() {
   const made = [];
   const element = () => {
-    const el = { className: "", textContent: "", style: {}, children: [], listeners: [], append(...c) { this.children.push(...c); }, addEventListener(type) { this.listeners.push(type); } };
+    const el = {
+      className: "", textContent: "", style: {}, children: [], listeners: [],
+      classList: { toggle() {} },
+      append(...c) { this.children.push(...c); },
+      addEventListener(type) { this.listeners.push(type); },
+    };
     made.push(el);
     return el;
   };
@@ -148,6 +198,65 @@ test("the names: Sun, nine planets, galaxies and black holes, none of them click
     const sunLabel = box.children.find((el) => el.textContent === "Sun");
     assert.equal(sunLabel.style.opacity, "1");
     assert.match(sunLabel.style.transform, /^translate\(\d+px, \d+px\)$/);
+  } finally {
+    delete globalThis.document;
+  }
+});
+
+test("a name is moved to another side when its first choice runs off the screen, and holes are named before galaxies", () => {
+  const doc = fakeDocument();
+  globalThis.document = doc;
+  try {
+    const sun = { kind: "sun", def: { name: "Sun" }, radius: 2.4, group: { position: new Vector3(0, 0, 0), scale: { x: 1 } } };
+    // Neptune ends up near the right-hand edge of the screen; Pluto near the left.
+    const mk = (name, x) => ({ kind: "planet", def: { name }, radius: 0.5, group: { position: new Vector3(x, 0, 0), scale: { x: 1 } } });
+    const neptune = mk("Neptune", 40);
+    const camera = new PerspectiveCamera(45, 16 / 9, 0.5, 3000);
+    camera.position.set(0, 0, 100);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const edge = neptune.group.position.clone().project(camera); // where it lands
+    assert.ok(edge.x > 0.5, "Neptune is to the right");
+    // Push it so its name can't fit on the right.
+    neptune.group.position.x = 69.5; // about 1900 px of 1920
+    const there = new Vector3(0.35, 0.2, -1).normalize(); // beside the Sun, not behind it
+    const m87 = { name: "Messier 87", lightYears: "53 million light-years", direction: there.clone(), distance: 950 };
+    const hole = { name: "M87*", lightYears: "53.5 million light-years", direction: there.clone(), distance: 950, hole: true };
+    const box = { children: [], append(...c) { this.children.push(...c); } };
+    const labels = createLabels({ box, bodies: [sun, neptune], places: [m87, hole] });
+    labels.update(camera, 1920, 1080);
+    const byText = (text) => box.children.find((el) => (el.children.length ? el.children[0].textContent : el.textContent) === text);
+    const neptuneLabel = byText("Neptune");
+    assert.equal(neptuneLabel.style.opacity, "1", "Neptune is still named");
+    const x = Number(/translate\((-?\d+)px/.exec(neptuneLabel.style.transform)[1]);
+    assert.ok(x + 60 <= 1920 - 8, `the whole name is on the screen (starts at ${x})`);
+    // Both names at the same spot on the sky: the black hole first, the galaxy on the other side.
+    assert.equal(byText("M87*").style.opacity, "1", "the black hole is named");
+    assert.equal(byText("Messier 87").style.opacity, "1", "and the galaxy beside it");
+    assert.notEqual(byText("M87*").style.transform, byText("Messier 87").style.transform);
+  } finally {
+    delete globalThis.document;
+  }
+});
+
+test("names keep off the clock", () => {
+  const doc = fakeDocument();
+  globalThis.document = doc;
+  try {
+    const camera = new PerspectiveCamera(45, 16 / 9, 0.5, 3000);
+    camera.position.set(0, 0, 100);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    // A galaxy straight ahead lands in the middle of the screen. Put the clock box over the middle.
+    const place = { name: "Andromeda Galaxy", lightYears: "2.5 million light-years", direction: new Vector3(0, 0, -1), distance: 950 };
+    const box = { children: [], append(...c) { this.children.push(...c); } };
+    const labels = createLabels({ box, bodies: [], places: [place], avoid: () => [{ x: 900, y: 500, w: 300, h: 100 }] });
+    labels.update(camera, 1920, 1080);
+    assert.equal(box.children[0].style.opacity, "0", "kept off the clock's box");
+    const clear = { children: [], append(...c) { this.children.push(...c); } };
+    const elsewhere = createLabels({ box: clear, bodies: [], places: [place], avoid: () => [{ x: 0, y: 900, w: 300, h: 100 }] });
+    elsewhere.update(camera, 1920, 1080);
+    assert.equal(clear.children[0].style.opacity, "1", "and shown when the clock is elsewhere");
   } finally {
     delete globalThis.document;
   }

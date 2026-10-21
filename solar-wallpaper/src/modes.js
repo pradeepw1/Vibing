@@ -33,6 +33,25 @@ export function pageAddress(page, search) {
   return page + (rest ? `?${rest}` : "");
 }
 
-/** A wallpaper app's "mode" setting: a dropdown position (0, 1) or the name picked. */
-export const wantsScope = (value) => value === 1 || /scope/i.test(String(value));
-export const wantsWallpaper = (value) => value === 0 || /wallpaper/i.test(String(value));
+/**
+ * A wallpaper app's "mode" setting: a dropdown position (0, 1) or the name picked. Wallpaper Engine sends
+ * positions as text ("1"), so digits in a string count too. Anything else (true, a list, nothing) is neither.
+ */
+const position = (value) => (typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value) ? Number(value) : null);
+export const wantsScope = (value) => position(value) === 1 || (typeof value === "string" && position(value) === null && /scope/i.test(value));
+export const wantsWallpaper = (value) => position(value) === 0 || (typeof value === "string" && position(value) === null && /wallpaper/i.test(value));
+
+/**
+ * A wallpaper app pushes every one of its settings in as a page starts, the Mode among them, whichever page
+ * you were on. That first push says what the app has saved, not that you just changed it, so it must not
+ * move you to the other page. Later pushes are real changes. Returns a function that is given each pushed
+ * value and says whether to act on it. (A first push far into the page's life can only be a real change.)
+ */
+export function createModeGate(now = () => performance.now(), startupMs = 15000) {
+  let seen = false;
+  return () => {
+    const first = !seen;
+    seen = true;
+    return !(first && now() < startupMs);
+  };
+}

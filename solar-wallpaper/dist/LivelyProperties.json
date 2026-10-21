@@ -165,9 +165,17 @@
   },
   "fps": {
     "type": "slider",
-    "value": 20,
-    "text": "Frames per second (lower saves power)",
+    "value": 30,
+    "text": "Frames per second in Space Scope (lower saves power)",
     "min": 10,
+    "max": 60,
+    "step": 5
+  },
+  "wallpaperFps": {
+    "type": "slider",
+    "value": 20,
+    "text": "Frames per second in Wallpaper (lower saves power)",
+    "min": 5,
     "max": 60,
     "step": 5
   }

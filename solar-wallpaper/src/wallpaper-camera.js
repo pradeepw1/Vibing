@@ -17,7 +17,8 @@ export const PATH = {
   // two ends and pass quickly through the flat edge-on view in between, which is the dullest one.
   elevation: { low: -42, high: 68, sharp: 2.2 },
   // How far out from the Sun to fit across the screen, in scene units. Neptune's orbit is about 55 and
-  // Pluto's about 63 (up to 70), so this goes from "out past Neptune" to "all of Pluto's orbit".
+  // Pluto's about 63 (up to 70), so this goes from "out to Neptune" to "all of Pluto's orbit". On top of that the
+  // camera makes sure every planet, wherever it is right now, is on screen (see `placeCamera`).
   reach: { mid: 63.5, ratio: 1.16 },
 };
 
@@ -70,10 +71,27 @@ export function distanceFor(reach, fovDeg, aspect, elevation, margin = 0.94) {
   return hi;
 }
 
-/** Puts `camera` on the path and looks at the Sun (the middle of the scene). */
-export function placeCamera(camera, seconds, path = PATH) {
+/**
+ * Puts `camera` on the path and looks at the Sun (the middle of the scene). `points` are the planets' places
+ * right now: the camera also stands back far enough that every one of them is on screen, worked out exactly
+ * (Pluto's orbit is lopsided and tilted 17 degrees, so a flat disc alone could clip it).
+ */
+export function placeCamera(camera, seconds, path = PATH, points = [], margin = 0.94) {
   const { azimuth, elevation, reach } = pathAt(seconds, path);
-  const d = distanceFor(reach, camera.fov, camera.aspect, elevation);
-  camera.position.set(Math.cos(elevation) * Math.cos(azimuth) * d, Math.sin(elevation) * d, Math.cos(elevation) * Math.sin(azimuth) * d);
+  let d = distanceFor(reach, camera.fov, camera.aspect, elevation, margin);
+  const sinE = Math.sin(elevation);
+  const cosE = Math.cos(elevation);
+  const sinA = Math.sin(azimuth);
+  const cosA = Math.cos(azimuth);
+  const tv = Math.tan((camera.fov * DEG) / 2);
+  const th = tv * camera.aspect;
+  for (const p of points) {
+    // The point's place across the picture (x), up it (y) and towards the camera (along), in the camera's own directions.
+    const x = p.x * sinA - p.z * cosA;
+    const y = -p.x * sinE * cosA + p.y * cosE - p.z * sinE * sinA;
+    const along = p.x * cosE * cosA + p.y * sinE + p.z * cosE * sinA;
+    d = Math.max(d, Math.max(Math.abs(x) / (margin * th), Math.abs(y) / (margin * tv)) + along);
+  }
+  camera.position.set(cosE * cosA * d, sinE * d, cosE * sinA * d);
   camera.lookAt(0, 0, 0);
 }

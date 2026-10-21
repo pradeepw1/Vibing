@@ -69,7 +69,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
-  $("#mode-wallpaper").addEventListener("click", () => location.assign(pageAddress(WALLPAPER_PAGE, location.search))); // the still Milky Way: almost no battery
+  $("#mode-wallpaper").addEventListener("click", () => location.assign(pageAddress(WALLPAPER_PAGE, location.search))); // the Wallpaper: the planets with the camera going round, easy on the battery
   const strangeBtn = $("#strange-now");
   const strangeLabel = strangeBtn.textContent;
   strangeBtn.addEventListener("click", () => {

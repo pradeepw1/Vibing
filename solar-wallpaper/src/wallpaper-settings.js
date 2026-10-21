@@ -27,15 +27,23 @@ export function parse(key, value) {
 
 function readSaved() {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {}; // (a stored null or a list would otherwise stop the page)
   } catch {
     return {};
   }
 }
 
-export function save(settings) {
+/**
+ * Remembers settings the person changed (`changes` is { name: value }). Only those are written, on top of what was
+ * saved before, so a setting nobody touched stays at its default: a one-off value from the address, or the
+ * "camera still" default for someone who asked their computer for less motion, is never saved by accident.
+ */
+export function save(changes) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(SAVED.map((k) => [k, settings[k]]))));
+    const next = { ...readSaved() };
+    for (const [key, value] of Object.entries(changes)) if (SAVED.includes(key)) next[key] = value;
+    localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     // Private windows and some wallpaper hosts block storage. Settings just won't stick.
   }

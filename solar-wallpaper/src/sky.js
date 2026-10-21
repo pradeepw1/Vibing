@@ -77,11 +77,8 @@ function makeStars(count, basis) {
   return g;
 }
 
-/**
- * `galaxies: false` leaves the nearest galaxies off the sky (the Wallpaper page: just our own Milky Way).
- * `places` are more names for labels, as { id, name, lightYears, direction, distance }.
- */
-export function createSky(pixelRatio, { galaxies: withGalaxies = true, places = [] } = {}) {
+/** `places` are more names for labels besides the galaxies', as { id, name, lightYears, direction, distance }. */
+export function createSky(pixelRatio, { places = [] } = {}) {
   const group = new Group();
   const basis = galacticBasis();
 
@@ -106,8 +103,8 @@ export function createSky(pixelRatio, { galaxies: withGalaxies = true, places = 
   starPoints.frustumCulled = false;
   group.add(starPoints);
 
-  const galaxies = withGalaxies ? createGalaxies() : { group: null, named: [], setFade() {} };
-  if (galaxies.group) group.add(galaxies.group);
+  const galaxies = createGalaxies();
+  group.add(galaxies.group);
 
   // The ecliptic: the line across the sky that the Sun and planets follow.
   // Only shown in the view from a body.
@@ -132,6 +129,13 @@ export function createSky(pixelRatio, { galaxies: withGalaxies = true, places = 
     /** How much the stars are showing (see setStarFade). */
     get fade() {
       return fade;
+    },
+    /**
+     * Skip drawing the galaxy patches that are off the screen. The patches sit on a sphere round the camera
+     * and the sky moves with it, so this is safe; Space Scope doesn't bother (it turns about too fast to gain).
+     */
+    cullGalaxies() {
+      for (const patch of galaxies.group.children) patch.frustumCulled = true;
     },
     /** The named galaxies and anything else with a name on the sky, for labels. */
     galaxies: [...galaxies.named, ...places],

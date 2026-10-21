@@ -53,7 +53,7 @@ const sphere = new SphereGeometry(1, 96, 48);
 // Moons and glows are small on screen, but their edge still shows corners if there are too few sides.
 const smallSphere = new SphereGeometry(1, 64, 32);
 // The body you stand on fills half the screen, so it gets a much finer sphere.
-const groundSphere = new SphereGeometry(1, 384, 192);
+let groundSphere = null; // the very fine sphere for standing on a body: built the first time it's needed, so the Wallpaper never pays for it
 
 let anisotropy = 4;
 /** How well textures hold up when seen at a slant (the edges of a planet): as much as the graphics chip allows. */
@@ -420,6 +420,7 @@ export function createSystem(scene, pixelRatio) {
     const msPerFrame = Math.abs(simRate) * Math.max(dtReal, 1 / 60) * 1000;
     for (const def of MOONS) {
       const b = bodies.get(def.id);
+      if (!b.group.visible) continue; // left out altogether (the Wallpaper): nothing to move
       moonOffset(def, time, axes, tmp, galilean);
       b.group.position.copy(b.parent.group.position).add(tmp);
       if (def.orbit === "moon") orient(b, "Moon", time, dtReal);
@@ -446,7 +447,7 @@ export function createSystem(scene, pixelRatio) {
     }
 
     // At most one orbit resample per frame keeps frames smooth.
-    for (const b of bodies.values()) if (b.orbit && resampleOrbits(b, timeMs, time)) break;
+    for (const b of bodies.values()) if (b.orbit && (b.kind !== "moon" || b.group.visible) && resampleOrbits(b, timeMs, time)) break;
 
     for (const b of bodies.values()) (overviews.get(b.id) ?? overviews.set(b.id, new Vector3()).get(b.id)).copy(b.group.position);
 
@@ -462,6 +463,7 @@ export function createSystem(scene, pixelRatio) {
     // and moons go dark in their planet's shadow.
     for (const def of MOONS) {
       const b = bodies.get(def.id);
+      if (!b.group.visible) continue;
       b.material.uniforms.sunlight.value = sunlight(shownPositions.get(def.id), shownPositions.get(def.parent), b.parent.def.radiusKm);
     }
     for (const b of bodies.values()) {
@@ -578,7 +580,7 @@ export function createSystem(scene, pixelRatio) {
     if (!b) return;
     const parts = [b.mesh, b.clouds, b.halo].filter(Boolean).map((mesh) => ({ mesh, geometry: mesh.geometry }));
     for (const part of parts) {
-      part.mesh.geometry = groundSphere;
+      part.mesh.geometry = (groundSphere ??= new SphereGeometry(1, 384, 192));
       part.mesh.layers.set(1);
     }
     if (b.ring) b.ring.layers.set(1);
@@ -586,7 +588,7 @@ export function createSystem(scene, pixelRatio) {
     const old = alsoFine && bodies.get(alsoFine);
     for (const mesh of old ? [old.mesh, old.clouds, old.halo].filter(Boolean) : []) {
       parts.push({ mesh, geometry: mesh.geometry });
-      mesh.geometry = groundSphere;
+      mesh.geometry = (groundSphere ??= new SphereGeometry(1, 384, 192));
     }
     ground = { id, parts, ring: b.ring };
   }
@@ -726,6 +728,11 @@ export function createSystem(scene, pixelRatio) {
     skyAnchor,
     get overviewShare() {
       return overviewShare;
+    },
+    /** Is a real map or a painted surface fading in now? (Then the planets should be drawn every frame, so the fade is smooth.) */
+    get fading() {
+      for (const slot of slots.values()) if (slot.fade) return true;
+      return false;
     },
   };
 }

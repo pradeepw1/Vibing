@@ -35,9 +35,9 @@ NASA's Exoplanet Archive, exoplanet.eu and the published papers.
 
 CODE
   three.js                      MIT licence, Copyright (c) 2010-2025 three.js authors
-                                (notice kept at the end of solar.js)
+                                (notice kept at the end of solar.js and wallpaper.js)
   astronomy-engine              MIT licence, Copyright (c) Don Cross
-                                (notice kept at the end of solar.js)
+                                (notice kept at the end of solar.js and wallpaper.js)
   Simplex noise (GLSL)          MIT licence, Copyright (C) 2011 Ashima Arts, by Ian McEwan
                                 and Stefan Gustavson, https://github.com/stegu/webgl-noise
   "Hash without Sine"           MIT licence, Copyright (c) 2014 David Hoskins (the hash

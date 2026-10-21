@@ -14,7 +14,7 @@ import { skyDirection } from "./galaxies.js";
 import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
 import { createMaps, nearestFor } from "./maps.js";
-import { pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
+import { createModeGate, pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 import { createElsewhere } from "./elsewhere.js";
@@ -1294,16 +1294,17 @@ addEventListener("resize", () => {
 // The View list there holds the "look at" views; "Look from" picks a body to
 // see the sky from (or Nothing), so the wallpaper app's own setting is always
 // the one that counts when it starts up again.
+const modeGate = createModeGate();
 const LOOK_AT = VIEWS.filter((v) => !v.from);
 const LOOK_FROM = VIEWS.filter((v) => v.from);
 let livelyFrom = null;
 let livelyLookAt = null; // what Look from: Nothing goes back to
 window.livelyPropertyListener = (name, value) => {
   if (name === "back") return goBack();
-  // The Mode setting in the wallpaper app's own panel. (The values it pushes in as the page starts are ignored:
-  // someone who opened Space Scope from the menu button should stay here.)
+  // The Mode setting in the wallpaper app's own panel. (The first push, as the page starts, is only what the app
+  // has saved: someone who opened Space Scope from the menu button should stay here.)
   if (name === "mode") {
-    if (wantsWallpaper(value) && performance.now() > 4000) location.assign(pageAddress(WALLPAPER_PAGE, location.search));
+    if (modeGate() && wantsWallpaper(value)) location.assign(pageAddress(WALLPAPER_PAGE, location.search));
     return;
   }
   if (name === "from") {
