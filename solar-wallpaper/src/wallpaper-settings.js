@@ -3,7 +3,7 @@
 // settings.js: the defaults, what you last picked in the menu (saved in this browser,
 // under its own name so it never mixes with Space Scope's), then the page address.
 import { bool, parseShared } from "./options.js";
-import { ZOOMS } from "./wallpaper-camera.js";
+import { clampZoom, ZOOM } from "./wallpaper-camera.js";
 
 export const DEFAULTS = {
   speed: "live",
@@ -11,7 +11,7 @@ export const DEFAULTS = {
   orbits: true,
   belts: true,
   clock: true,
-  zoom: 2, // 1 to 4: how close the camera is (see wallpaper-camera.js)
+  zoom: ZOOM.default, // 1 to 10: how close the camera is (see wallpaper-camera.js)
   drift: true, // the camera goes round the Sun
   photos: true, // real maps (NASA and others) instead of painted surfaces
   ui: true, // false hides the settings button completely
@@ -25,8 +25,9 @@ const SAVED = ["speed", "zoom", "labels", "orbits", "belts", "clock", "drift", "
 /** Cleans up one setting value, or returns undefined if the Wallpaper has no such setting or it isn't valid. */
 export function parse(key, value) {
   if (key === "zoom") {
-    const n = typeof value === "number" || (typeof value === "string" && /^\d+$/.test(value)) ? Number(value) : NaN;
-    return ZOOMS.some((z) => z.id === n) ? n : undefined;
+    // A number (or a number written as text), kept between 1 and 10, to two decimal places.
+    const n = typeof value === "number" || (typeof value === "string" && /^\s*\d+(\.\d+)?\s*$/.test(value)) ? Number(value) : NaN;
+    return Number.isFinite(n) ? Math.round(clampZoom(n) * 100) / 100 : undefined;
   }
   return key in DEFAULTS ? parseShared(key, value) : undefined;
 }

@@ -66,6 +66,11 @@
   .chip { border: 1px solid var(--panel-line); background: var(--chip); color: var(--text); border-radius: 999px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
   .chip:hover { border-color: rgba(255,255,255,.25); }
   .chip[aria-pressed="true"] { background: var(--chip-on); border-color: rgba(255, 203, 116, .55); color: #fff3dc; }
+  .zoom { display: flex; align-items: center; gap: 8px; }
+  .zoom input { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+  .chip.step { width: 30px; height: 30px; padding: 0; font-size: 16px; line-height: 1; display: grid; place-items: center; }
+  .chip:disabled { opacity: 0.35; cursor: default; }
+  #zoom-note { font-variant-numeric: tabular-nums; }
   .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
   .toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
   .toggles input { accent-color: var(--accent); }
@@ -112,8 +117,12 @@
   </section>
   <section>
     <h2>Zoom</h2>
-    <div class="chips" id="zooms"></div>
-    <p class="note" id="zoom-note" style="margin-top: 8px"></p>
+    <div class="zoom">
+      <button class="chip step" id="zoom-out" type="button" aria-label="Zoom out">−</button>
+      <input type="range" id="zoom" min="0" max="100" step="1" aria-label="Zoom">
+      <button class="chip step" id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    </div>
+    <p class="note" id="zoom-note" style="margin-top: 6px"></p>
   </section>
   <section>
     <h2>Time</h2>

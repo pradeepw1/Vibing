@@ -71,13 +71,13 @@ test("the Wallpaper is clean of everything that lets you click about", () => {
   assert.match(html, /maximum-scale=1/);
   assert.match(html, /#panel \{[^}]*touch-action: pan-y/, "(the menu can still be scrolled)");
   assert.match(html, /\.label \{[^}]*pointer-events: none/, "so do the names");
-  assert.ok(!/cursor: pointer/.test(html.replace(/\.chip[^}]*\}|#menu-btn[^}]*\}|\.toggles label[^}]*\}/g, "")), "nothing but the menu looks clickable");
+  assert.ok(!/cursor: pointer/.test(html.replace(/\.chip[^}]*\}|#menu-btn[^}]*\}|\.toggles label[^}]*\}|\.zoom input[^}]*\}/g, "")), "nothing but the menu looks clickable");
   for (const file of ["wallpaper.js", "wallpaper-labels.js", "wallpaper-camera.js", "wallpaper-settings.js"]) {
     assert.ok(!/pointer(down|up|move|enter|leave|over)|mouse(down|up|move|over)|wheel|touch(start|move|end)|dblclick|contextmenu|Raycaster|OrbitControls/.test(src(file)), `${file} has no pointer code`);
   }
-  // The only things listened to on the page are the menu's own controls, Esc, the page being hidden and the window's size.
+  // The only things listened to on the page are the menu's own controls (the zoom slider among them), Esc, the page being hidden and the window's size.
   const listeners = [...src("wallpaper.js").matchAll(/addEventListener\(\s*"([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(listeners)].sort(), ["change", "click", "keydown", "resize", "visibilitychange"]);
+  assert.deepEqual([...new Set(listeners)].sort(), ["change", "click", "input", "keydown", "resize", "visibilitychange"]); // ("input": the zoom slider, inside the menu)
 });
 
 test("the built Wallpaper script has no pointer, mouse, touch or wheel handlers of its own", () => {

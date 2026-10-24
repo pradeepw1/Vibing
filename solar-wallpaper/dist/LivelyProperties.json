@@ -23,15 +23,12 @@
     ]
   },
   "zoom": {
-    "type": "dropdown",
-    "value": 1,
-    "text": "Zoom (Wallpaper)",
-    "items": [
-      "Whole system",
-      "Out to Saturn",
-      "Inner planets",
-      "Up close"
-    ]
+    "type": "slider",
+    "value": 1.9,
+    "text": "Zoom (Wallpaper): 1 is the whole system, 10 the Sun and Mercury",
+    "min": 1,
+    "max": 10,
+    "step": 0.1
   },
   "view": {
     "type": "dropdown",
