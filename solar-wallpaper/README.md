@@ -21,6 +21,8 @@ Wallpaper is what you get when you open `index.html`, and it's the one to leave 
 
 ### Four zoom levels
 
+![The four zoom levels of Wallpaper mode](docs/zoom-levels.jpg)
+
 Pick one in the menu (**Zoom**), with `?zoom=1` to `?zoom=4`, or in Lively. Changing it is a slow glide, not a jump. The camera keeps moving at every level, and the clock keeps real time unless you speed it up in the menu.
 
 | Level | What you see | How the camera moves |
