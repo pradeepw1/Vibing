@@ -67,7 +67,7 @@ export async function makeBundles() {
   const lively = {
     mode: { type: "dropdown", value: 0, text: "Mode", items: ["Wallpaper (the planets, easy on battery)", "Space Scope (fly anywhere)"] },
     speed: { type: "dropdown", value: 0, text: "Speed", items: SPEEDS.map((s) => s.label) },
-    zoom: { type: "slider", value: DEFAULTS.zoom, text: "Zoom (Wallpaper): 1 is the whole system, 10 the Sun and Mercury", min: ZOOM.min, max: ZOOM.max, step: 0.1 },
+    zoom: { type: "slider", value: DEFAULTS.zoom, text: "Zoom (Wallpaper): 1 is Saturn and its moons, 6 its rings filling the screen", min: ZOOM.min, max: ZOOM.max, step: 0.1 },
     view: { type: "dropdown", value: lookAt.findIndex((v) => v.id === "middle"), text: "Look at (Space Scope)", items: lookAt.map((v) => v.label) },
     from: { type: "dropdown", value: 0, text: "Look from (Space Scope)", items: ["Nothing", ...VIEWS.filter((v) => v.from).map((v) => v.label)] },
     labels: { type: "checkbox", value: true, text: "Show names" },
