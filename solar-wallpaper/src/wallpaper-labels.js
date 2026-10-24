@@ -19,14 +19,13 @@ const touches = (x, y, w, h, d, pad = 2) => {
 };
 
 /**
- * `box`: the element to put names in. `bodies`: the Sun and planets (moons are left out: from out here they
- * are under a pixel). `places`: names on the sky, as { name, lightYears, direction, distance, hole }; black
+ * `box`: the element to put names in. `bodies`: the Sun, planets and moons (a moon is named only when asked, see
+ * `update`, and only while it is drawn). `places`: names on the sky, as { name, lightYears, direction, distance, hole }; black
  * holes get their names first. `avoid()`: rectangles { x, y, w, h } to keep names off (the clock, the button).
  */
 export function createLabels({ box, bodies, places, avoid = () => [] }) {
   const names = [];
   for (const body of bodies) {
-    if (body.kind === "moon") continue;
     const el = document.createElement("div");
     el.className = `label ${body.kind}`;
     el.textContent = body.def.name;
@@ -34,7 +33,7 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
     names.push({ body, el, shown: null, x: 0, y: 0, w: body.def.name.length * 7.5 + 6, h: 16 });
   }
   // Bigger things get their names first; one that has no room is skipped.
-  const rank = { sun: 0, planet: 1 };
+  const rank = { sun: 0, planet: 1, moon: 2 };
   names.sort((a, b) => rank[a.body.kind] - rank[b.body.kind] || b.body.radius - a.body.radius);
 
   const far = places.map((place) => {
@@ -85,8 +84,8 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
       dirty = true;
     },
 
-    /** Moves every name to where its thing is on the screen (or hides it). */
-    update(camera, width, height) {
+    /** Moves every name to where its thing is on the screen (or hides it). `moons`: name the moons that are drawn too. */
+    update(camera, width, height, { moons = false } = {}) {
       if (dirty) measure();
       camera.getWorldDirection(camDir);
       const scale = (camera.projectionMatrix.elements[5] * height) / 2;
@@ -98,6 +97,7 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
       // The round bodies on screen: a name behind one is hidden, and no name is put on top of one.
       const discs = [];
       for (const l of names) {
+        l.wanted = l.body.kind !== "moon" || (moons && l.body.group.visible);
         v.copy(l.body.group.position);
         l.depth = v.clone().sub(camera.position).dot(camDir);
         l.r = (l.body.radius * l.body.group.scale.x * scale) / Math.max(l.depth, 0.01);
@@ -106,12 +106,12 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
         l.px = ((v.x + 1) / 2) * width;
         l.py = ((1 - v.y) / 2) * height;
         l.disc = { l, x: l.px, y: l.py, r: Math.max(l.r * (l.body.ring ? 2.27 : 1), 1) }; // (Saturn's rings count as part of it)
-        discs.push(l.disc);
+        if (l.body.kind !== "moon" && l.wanted) discs.push(l.disc); // (names keep off planets, not off moons)
       }
 
       for (const l of names) {
         let slot = null;
-        const behind = l.depth > 0.01 && discs.some((d) => d.l !== l && d.l.depth < l.depth && Math.hypot(l.px - d.x, l.py - d.y) < d.r);
+        const behind = !l.wanted || (l.depth > 0.01 && discs.some((d) => d.l !== l && d.l.depth < l.depth && Math.hypot(l.px - d.x, l.py - d.y) < d.r));
         if (l.depth > 0.01 && !behind) {
           const off = Math.max(l.disc.r * 0.7, 4) + 4;
           // Right of it and below is the usual place; then left, then above, whichever is the first with room.

@@ -12,14 +12,25 @@ It runs in any browser and works as a desktop wallpaper on Windows, macOS and Li
 | | Wallpaper | Space Scope |
 |---|---|---|
 | Page | `dist/index.html` | `dist/scope.html` |
-| What you get | The Sun and the nine planets where they really are, under the real sky (stars, the Milky Way, the near galaxies and the black holes, named), with the camera slowly going round | Everything below: fly to any planet or moon, out to other galaxies, black holes, other stars' planets, strange sightings, the Gate |
+| What you get | The Sun and the nine planets where they really are, under the real sky (stars, the Milky Way, the near galaxies and the black holes, named), with the camera slowly moving, at one of four zoom levels (below) | Everything below: fly to any planet or moon, out to other galaxies, black holes, other stars' planets, strange sightings, the Gate |
 | Clicking | Nothing on the picture reacts. Click, tap, drag, scroll, pinch or press keys: it never changes (only the menu button and its menu do anything) | Click a planet to see its sky, drag to look around, scroll to zoom |
 | Battery | As low as it can be (see below) | Much more. It draws all the time, at up to 60 frames a second |
-| Download | About 0.9 MB of code, plus 12 small planet maps (about 1.7 MB as files, a bit more once loaded; no moon maps, no sharp maps) | About 1.1 MB of code, plus up to 16 MB of planet maps |
+| Download | About 0.9 MB of code, plus 12 small planet maps (about 1.7 MB as files), and a moon's small map only once the moon is big enough on screen to show one | About 1.1 MB of code, plus up to 16 MB of planet maps |
 
 Wallpaper is what you get when you open `index.html`, and it's the one to leave running. Open the settings button, then pick **Space Scope** under *Mode* to fly about. Pick **Wallpaper** in the same place to come back. The wallpaper always starts in Wallpaper mode.
 
-The camera takes a long, slow path: a lap round the Sun every 10 minutes, rising from below the planets to nearly straight above them and back every 14 minutes, and in and out every 9. Because it looks at different parts of the sky as it goes, every galaxy and black hole comes into view some of the time. The nine planets stay in frame all along (Neptune's orbit always; Pluto's whole orbit at the widest).
+### Four zoom levels
+
+Pick one in the menu (**Zoom**), with `?zoom=1` to `?zoom=4`, or in Lively. Changing it is a slow glide, not a jump. The camera keeps moving at every level, and the clock keeps real time unless you speed it up in the menu.
+
+| Level | What you see | How the camera moves |
+|---|---|---|
+| **1 Whole system** | All nine planets, small and far apart, with the whole sky | A lap round the Sun every 10 minutes, rising from below the planets to nearly overhead every 14, in and out every 9. Every galaxy and black hole comes into view some of the time |
+| **2 Out to Saturn** (the default) | The Sun, Mercury to Saturn, with Jupiter's and Saturn's moons as soon as they're big enough to see | The same lap, at gentler angles that fill a wide screen |
+| **3 Inner planets** | Mercury to Mars, the asteroid belt and our Moon, big and close | The same, closer |
+| **4 Up close** | One planet at a time: Earth, Jupiter, Saturn, Mars, Venus, Uranus, Neptune, Mercury, Pluto, each with its moons, orbit lines and names, for a minute and a half, then a 16 second glide to the next | Swings to and fro over the planet's sunny side and rises and sinks, so it is mostly lit. On a big screen the visited planet gets its sharper map |
+
+Moons are drawn once they are about one pixel across, and get their maps once they are about four, so the widest levels show them as small dots and the closer ones as worlds.
 
 **What keeps the battery use low.** I haven't measured it on a real laptop, so these are the things the page does, not a figure:
 
@@ -27,8 +38,8 @@ The camera takes a long, slow path: a lap round the Sun every 10 minutes, rising
 - It stops completely while the page is hidden. There are no timers, no animations and no blur effects on the page.
 - At real speed, the planets are moved once a second instead of every frame.
 - It never draws more than about 2.5 million pixels (a 1080p screen is 2.1 million), however big the screen is or becomes, and it smooths edges only on screens that aren't sharp enough to hide them. It asks the browser for an opaque drawing surface and for the low-power graphics chip.
-- It never draws or loads the moons (from this far each is under a pixel), and the planets are lighter spheres than Space Scope's close-up ones: about a fifth of the triangles (37,000 against 199,000).
-- It loads only the small planet maps, 12 of them. It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
+- A moon is drawn only once it is big enough to see, and gets its map only once it is big enough to show one. The planets are lighter spheres than Space Scope's close-up ones (about a fifth of the triangles in the widest view); a planet that is big on screen gets a finer one.
+- It loads the small planet maps, 12 of them, and a moon's map when it is needed (never the sharp ones except for the planet being visited at level 4, on a big screen). It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
 
 ## What's real
 
@@ -118,7 +129,7 @@ They show up in the Sun-and-planets views and from the ground. They're placed a 
 
 Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-battery one. The files you need are all in `dist/`: `index.html`, `wallpaper.js`, `scope.html`, `solar.js`, `LivelyProperties.json`, `CREDITS.txt` and the `maps` folder (the real planet maps, about 16 MB; without it you get painted planets). Copy that folder anywhere. Keep the whole folder: the Space Scope button, and Lively's *Mode* setting, open `scope.html`. (Wallpaper mode itself never uses the sharp maps `maps/*.sharp.js` or the moon maps, so those files could go if space matters.)
 
-**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. In Lively's customise panel, **Mode** switches between Wallpaper and Space Scope. Speed, names, orbits, asteroids, clock, camera and real maps work in both; *Look at*, *Look from* and *Strange sightings* are Space Scope's only, and do nothing in Wallpaper mode. There are two frame-rate sliders, one for each page (Wallpaper's starts at 20, Space Scope's at 30). Lively sends all its saved settings when a page opens, and the first *Mode* it sends is ignored, so the wallpaper always opens in Wallpaper mode and only a change you make in Lively's panel switches it. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
+**Windows, with [Lively Wallpaper](https://www.rocksdanister.com/lively/) (free):** click *Add wallpaper*, pick `dist/index.html`. In Lively's customise panel, **Mode** switches between Wallpaper and Space Scope. Speed, names, orbits, asteroids, clock, camera and real maps work in both (*Zoom* is Wallpaper's only); *Look at*, *Look from* and *Strange sightings* are Space Scope's only, and do nothing in Wallpaper mode. There are two frame-rate sliders, one for each page (Wallpaper's starts at 20, Space Scope's at 30). Lively sends all its saved settings when a page opens, and the first *Mode* it sends is ignored, so the wallpaper always opens in Wallpaper mode and only a change you make in Lively's panel switches it. A small settings button also shows in the corner of the picture; untick **Show settings button** to hide it.
 
 **Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved. (Its own settings panel isn't set up: that needs a `project.json` listing the settings, which isn't included. The page does read Wallpaper Engine's settings by the same names as Lively's, if you write one.)
 
@@ -132,7 +143,7 @@ For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It 
 
 ## Settings
 
-These are Space Scope's settings; the Wallpaper has `speed`, `date`, `labels`, `orbits`, `belts`, `clock`, `drift` (the camera going round), `photos`, `ui`, `wallpaper` and `fps` (20 unless you say otherwise). Click the button in the top right, or add them to the address, like `scope.html?speed=day&view=earth`. Old addresses like `index.html?view=earth` still work: the Wallpaper page sees a setting only Space Scope has (`view`, `strange`, `reverse`, `paused`) and sends you on. The Wallpaper saves its own settings under its own name, so the two never mix.
+These are Space Scope's settings; the Wallpaper has `zoom` (1 to 4, 2 unless you say otherwise), `speed`, `date`, `labels`, `orbits`, `belts`, `clock`, `drift` (the camera moving), `photos`, `ui`, `wallpaper` and `fps` (20 unless you say otherwise). Click the button in the top right, or add them to the address, like `scope.html?speed=day&view=earth`. Old addresses like `index.html?view=earth` still work: the Wallpaper page sees a setting only Space Scope has (`view`, `strange`, `reverse`, `paused`) and sends you on. The Wallpaper saves its own settings under its own name, so the two never mix.
 
 | Setting | Values | Default |
 |---|---|---|
@@ -212,7 +223,7 @@ The built files are in git, but the originals are not.
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |
 | `dist/index.html`, `src/wallpaper.js` | Wallpaper mode: the page, and the lean program that draws the planets and sky with no click handling at all. It also sends old full-app addresses on to Space Scope |
-| `src/wallpaper-camera.js` | The camera's path, and how far back to stand so the planets' orbits (and every planet, however Pluto's orbit lies) fit any screen shape |
+| `src/wallpaper-camera.js` | The four zoom levels: the camera's paths, how far back to stand so the planets' orbits (and every planet, however Pluto's orbit lies) fit any screen shape, and the tour of planets |
 | `src/wallpaper-labels.js`, `src/wallpaper-settings.js` | The Wallpaper's names (not clickable) and its settings |
 | `src/options.js`, `src/skyplaces.js` | What both pages share: the time speeds and how a setting is cleaned up, and the black holes as names on the sky |
 | `dist/scope.html` | Space Scope: the full app, loads `solar.js` |

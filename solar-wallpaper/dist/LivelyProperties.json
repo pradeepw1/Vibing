@@ -22,6 +22,17 @@
       "1 year/s"
     ]
   },
+  "zoom": {
+    "type": "dropdown",
+    "value": 1,
+    "text": "Zoom (Wallpaper)",
+    "items": [
+      "Whole system",
+      "Out to Saturn",
+      "Inner planets",
+      "Up close"
+    ]
+  },
   "view": {
     "type": "dropdown",
     "value": 1,

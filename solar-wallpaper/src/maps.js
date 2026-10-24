@@ -124,10 +124,11 @@ function makeTexture(image, flipped, layer, blob) {
 export function createMaps({ renderer, system, enabled, onSettled, onMissing, skip = new Set() }) {
   const units = new Map(); // id -> { id, sizes, lite, sharp, wantedAt }
   const ids = ["earth", "clouds", ...[...system.bodies.keys()].filter((k) => k !== "sun" && k !== "earth"), "saturn-rings"].filter((id) => !skip.has(id));
-  for (const id of ids) {
+  const addUnit = (id) => {
     const sizes = sizesOf(id, renderer.capabilities.maxTextureSize);
     if (sizes.length) units.set(id, { id, sizes, lite: { state: "idle", look: null }, sharp: { state: "idle", look: null }, wantedAt: -Infinity });
-  }
+  };
+  for (const id of ids) addUnit(id);
   let on = Boolean(enabled) && units.size > 0;
   let started = false;
   let settled = false;
@@ -259,6 +260,18 @@ export function createMaps({ renderer, system, enabled, onSettled, onMissing, sk
     covers(id) {
       const unit = units.get(id);
       return on && Boolean(unit) && unit.lite.state !== "failed";
+    },
+
+    /** Starts wanting maps for more bodies (ones left out with `skip` at the start). Returns the ids that have a map to load. */
+    add(bodyIds) {
+      const added = [];
+      for (const id of bodyIds) {
+        if (units.has(id)) continue;
+        addUnit(id);
+        if (units.has(id)) added.push(id);
+      }
+      if (added.length && started) settled = false; // so onSettled is called again once these have arrived
+      return added;
     },
 
     /** Starts the loading (call after the first picture). */

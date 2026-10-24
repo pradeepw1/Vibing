@@ -1,6 +1,7 @@
 // The Wallpaper: the Sun and the nine planets where they really are, under the real sky
 // (the stars, our galaxy, the near galaxies and the black holes), with the camera slowly
-// going round. Made to cost as little battery as it can:
+// going round, at one of four zoom levels (see wallpaper-camera.js). Made to cost as little
+// battery as it can:
 //   - no clicking, dragging or scrolling does anything: there is no code for it here;
 //   - it draws about 20 times a second (and once a second when nothing is moving), at a
 //     size that never goes past about 2.5 million pixels;
@@ -8,9 +9,11 @@
 //   - it stops completely while the page is hidden.
 // Space Scope (main.js) is the page for flying about. The two share the planets, the sky
 // and the maps; everything that flies, picks or loads galaxies stays out of this file.
-import { PerspectiveCamera, Scene, SphereGeometry, WebGLRenderer } from "three";
+import { PerspectiveCamera, Scene, SphereGeometry, Vector3, WebGLRenderer } from "three";
 import * as A from "astronomy-engine";
+import { MOONS } from "./bodies.js";
 import { createBelts } from "./belts.js";
+import { moonDistance } from "./ephemeris.js";
 import { createMaps } from "./maps.js";
 import { createModeGate, pageAddress, SCOPE_PAGE, scopeAddress, wantsScope } from "./modes.js";
 import { SPEEDS, speedRate } from "./options.js";
@@ -18,7 +21,7 @@ import { startPainting } from "./painter.js";
 import { createSky } from "./sky.js";
 import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
-import { placeCamera } from "./wallpaper-camera.js";
+import { tourAt, viewAt, ZOOMS, zoomOf } from "./wallpaper-camera.js";
 import { createLabels } from "./wallpaper-labels.js";
 import { loadSettings, parse, save } from "./wallpaper-settings.js";
 
@@ -34,6 +37,11 @@ function start() {
   const LAYOUT_EVERY = 1000; // ms between moving the planets (and drawing, when nothing else moves), at real speed
   const MAX_PIXELS = 2.5e6; // the most pixels drawn, however big the screen is (a 1080p screen is 2.1 million)
   const EARLY = 4; // ms: a frame this much early is still on time
+  const MOON_SHOWN_PX = 0.9; // a moon is drawn once it is this many pixels across its radius (and dropped below the second figure)
+  const MOON_HIDDEN_PX = 0.6;
+  const MOON_MAP_PX = 4; // and gets its map once it is this big: before that it is a dot, and a map would only be memory
+  const CLOSE_PX = 70; // a planet this big on screen gets a finer sphere
+  const SHARP_PX = 150; // and, in the close-up, a sharper map
 
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const settings = loadSettings(location.search, reducedMotion);
@@ -69,25 +77,36 @@ function start() {
   const belts = createBelts(pixelRatio);
   scene.add(...belts.parts);
   const bodies = [...system.bodies.values()];
-  const planetSpots = bodies.filter((b) => b.kind === "planet").map((b) => b.group.position); // (these are the objects the planets move, so they stay current)
-  const moonIds = new Set(bodies.filter((b) => b.kind === "moon").map((b) => b.id));
-  // From out here a planet is a few dozen pixels across, so the fine spheres Space Scope uses for close-ups are wasted:
-  // lighter ones draw the same picture with far fewer triangles. The moons are left out (under a pixel each), and
-  // so are their maps. The night side of a planet is a little less black than in Space Scope, so a planet standing
-  // between us and the Sun still reads as a planet.
-  const planetSphere = new SphereGeometry(1, 48, 24);
-  const sunSphere = new SphereGeometry(1, 64, 32);
-  const haloSphere = new SphereGeometry(1, 32, 16);
+  const planets = bodies.filter((b) => b.kind === "planet");
+  const moons = bodies.filter((b) => b.kind === "moon");
+  const planetSpots = Object.fromEntries(planets.map((b) => [b.id, b.group.position])); // (the objects the planets move, so they stay current)
+  // Far out a planet is a few dozen pixels across, so the fine spheres Space Scope uses for close-ups are wasted:
+  // lighter ones draw the same picture with far fewer triangles; a planet that is big on screen gets a finer one (see
+  // `updateDetail`). A moon is drawn only once it is big enough to see (`updateMoons`), and gets its map when it is big enough to show one. The
+  // night side of a planet is a little less black than in Space Scope, so a planet standing between us and the Sun
+  // still reads as a planet.
+  const spheres = { plain: new SphereGeometry(1, 48, 24), fine: new SphereGeometry(1, 96, 48), sun: new SphereGeometry(1, 64, 32), halo: new SphereGeometry(1, 32, 16), fineHalo: new SphereGeometry(1, 64, 32) };
   for (const b of bodies) {
     if (b.kind === "moon") {
       b.group.visible = false;
+      b.mesh.geometry = spheres.plain;
       continue;
     }
-    b.mesh.geometry = b.kind === "sun" ? sunSphere : planetSphere;
-    if (b.halo) b.halo.geometry = haloSphere;
-    if (b.clouds) b.clouds.geometry = planetSphere;
-    if (b.kind === "planet") b.material.uniforms.ambient.value = 0.03;
+    b.mesh.geometry = b.kind === "sun" ? spheres.sun : spheres.plain;
+    if (b.halo) b.halo.geometry = spheres.halo;
+    if (b.clouds) b.clouds.geometry = spheres.plain;
+    if (b.kind === "planet") b.material.uniforms.ambient.value = 0.06;
   }
+  const moonIds = new Set(moons.map((b) => b.id));
+  // How much to fit round each planet in the close-up: the planet, its rings, and its moons' orbits.
+  const MOON_KM = { moon: 384400, io: 421700, europa: 671100, ganymede: 1070400, callisto: 1882700 }; // (the other moons have their own `aKm`)
+  const framing = new Map(
+    planets.map((b) => {
+      const reach = Math.max(0, ...MOONS.filter((m) => m.parent === b.id).map((m) => moonDistance(m.aKm ?? MOON_KM[m.id], b.def.radiusKm, b.radius)));
+      return [b.id, Math.max(b.radius * (b.ring ? 4.5 : 3.2), reach * 1.12)];
+    }),
+  );
+  const closeInfo = (id) => ({ position: system.bodies.get(id).group.position, radius: framing.get(id) });
   const sunMaterial = system.bodies.get("sun").mesh.material;
   const labels = createLabels({
     box: $("#labels"),
@@ -137,6 +156,7 @@ function start() {
     settings[key] = value;
     if (key === "speed") clock.synced = false;
     if (key === "photos") usePhotos(value);
+    if (key === "zoom") startGlide();
     save({ [key]: value });
     sync();
   }
@@ -153,6 +173,17 @@ function start() {
     b.dataset.speed = s.id;
     b.addEventListener("click", () => set("speed", s.id));
     speedBox.append(b);
+  }
+  const zoomBox = $("#zooms");
+  for (const z of ZOOMS) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.textContent = z.name;
+    b.dataset.zoom = String(z.id);
+    b.title = z.note;
+    b.addEventListener("click", () => set("zoom", z.id));
+    zoomBox.append(b);
   }
   const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "photos-on": "photos" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
@@ -174,6 +205,8 @@ function start() {
   const labelsBox = $("#labels");
   function sync() {
     for (const b of speedBox.children) b.setAttribute("aria-pressed", String(b.dataset.speed === settings.speed));
+    for (const b of zoomBox.children) b.setAttribute("aria-pressed", String(Number(b.dataset.zoom) === settings.zoom));
+    $("#zoom-note").textContent = zoomOf(settings.zoom).note;
     for (const [id, key] of Object.entries(toggles)) $(`#${id}`).checked = settings[key];
     menuButton.hidden = !settings.ui;
     if (!settings.ui) setOpen(false);
@@ -210,7 +243,7 @@ function start() {
 
   // --- Painting and the real maps ---
   // The Milky Way has no real map, so it is painted. With real maps on, the planets are painted only
-  // where a map is missing; with them off, all of them are. (Moons aren't drawn, so they get neither.)
+  // where a map is missing; with them off, all of them are. (A moon gets its map, or its painting, when it is first drawn.)
   const SURFACES = ["earth", "clouds", "milkyway", "jupiter", "saturn", "mars", "venus", "mercury", "uranus", "neptune", "pluto"];
   const painters = [];
   const painting = new Set(); // jobs given to a painter, so none is painted twice
@@ -246,7 +279,7 @@ function start() {
       busyUntil = performance.now() + 1000; // the last map may still be fading in (the fade is followed through, see `system.fading`)
       checkLoaded();
     },
-    onMissing: (id) => SURFACES.includes(id) && paintJobs([id]),
+    onMissing: (id) => (SURFACES.includes(id) || moonIds.has(id)) && paintJobs([id]),
   });
 
   /** Real maps on or off, from the menu. Off, whatever isn't painted yet gets painted. */
@@ -254,11 +287,11 @@ function start() {
     photos.setEnabled(on);
     busyUntil = performance.now() + 1000;
     if (!photos.enabled) {
-      paintJobs(SURFACES, () => {
+      paintJobs([...SURFACES, ...wantedMoons], () => {
         mapsDone = true;
         checkLoaded();
       });
-    }
+    } else photos.add([...wantedMoons]); // moons that were drawn while the real maps were off now get theirs
   }
 
   paintJobs(photos.enabled ? ["milkyway"] : SURFACES, () => {
@@ -272,31 +305,116 @@ function start() {
   let lastFrame = startTime;
   let lastLayout = -Infinity;
   let cameraTime = 0; // seconds the camera has been going round (it stands still while that is switched off)
+  const eye = { position: new Vector3(), target: new Vector3(), ready: false, settling: false }; // where the camera is now
+  const want = { position: new Vector3(), target: new Vector3() }; // where the zoom level says it should be
+  let glide = null; // a change of zoom: the camera eases from where it was to where it should be, { from: {position, target}, t, duration }
+  const wantedMoons = new Set(); // moons that have been drawn, so their maps have been asked for
   let photosStarted = false;
   let waiting = false; // a frame is on its way
   let timer = 0; // the wait before it (0 once the screen's next refresh is what is being waited for)
   let failed = false;
 
   /** Is anything on the picture moving? If not, once a second is all it needs. */
-  const still = (now) => !settings.drift && settings.speed === "live" && loadedShown && now >= busyUntil && !system.fading;
+  const still = (now) => !settings.drift && settings.speed === "live" && loadedShown && now >= busyUntil && !system.fading && !eye.settling;
   const frameGap = (now) => (still(now) ? LAYOUT_EVERY : 1000 / settings.fps);
 
   /** Moves the planets and the asteroids to the clock's date. */
   function layOut(now, date) {
     const dt = Math.min((now - Math.max(lastLayout, startTime)) / 1000, 1);
+    updateMoons(); // (before the move, so a moon that has just come into view is put in its place at once)
     system.update(date, dt, speedRate(settings.speed), camera, innerHeight * pixelRatio, settings.orbits, (now - startTime) / 1000);
     belts.update(A.MakeTime(date).tt, null);
     for (const p of belts.parts) p.visible = settings.belts;
+    updateDetail(now);
     lastLayout = now;
   }
 
-  /** Puts the camera on its path and draws. */
-  function draw() {
-    placeCamera(camera, cameraTime, undefined, planetSpots);
+  const pxPerUnit = () => (innerHeight * pixelRatio) / (2 * Math.tan((camera.fov * Math.PI) / 360)); // pixels across one unit, at distance 1
+
+  /** A moon is drawn once it is big enough to see, and gets its map when it is big enough to show one (asked for once). */
+  function updateMoons() {
+    if (!eye.ready) return; // (the camera isn't in place yet)
+    const scale = pxPerUnit();
+    for (const m of moons) {
+      const r = (m.radius * scale) / Math.max(camera.position.distanceTo(m.parent.group.position), 0.01);
+      const show = m.group.visible ? r >= MOON_HIDDEN_PX : r >= MOON_SHOWN_PX; // (two limits, so a moon on the edge doesn't flicker)
+      m.group.visible = show;
+      if (r >= MOON_MAP_PX && !wantedMoons.has(m.id)) wantMoon(m.id);
+    }
+  }
+
+  function wantMoon(id) {
+    wantedMoons.add(id);
+    if (!photos.enabled || photos.add([id]).length === 0) paintJobs([id]); // no real map to load: paint it
+  }
+
+  /** Finer spheres for planets that are big on screen, and (in the close-up) sharper maps for the one being visited. */
+  function updateDetail(now) {
+    if (!eye.ready) return;
+    const scale = pxPerUnit();
+    const sharp = [];
+    for (const b of planets) {
+      const r = (b.radius * scale) / Math.max(camera.position.distanceTo(b.group.position), 0.01);
+      const close = r > CLOSE_PX;
+      if (close !== Boolean(b.fine)) {
+        b.fine = close;
+        b.mesh.geometry = close ? spheres.fine : spheres.plain;
+        if (b.halo) b.halo.geometry = close ? spheres.fineHalo : spheres.halo;
+        if (b.clouds) b.clouds.geometry = close ? spheres.fine : spheres.plain;
+      }
+      if (settings.zoom === 4 && r > SHARP_PX) sharp.push(b.id);
+    }
+    if (settings.zoom === 4) {
+      const { from, to, blend } = tourAt(cameraTime);
+      const here = system.bodies.get(blend > 0.5 ? to : from);
+      photos.prefer([here.id, ...MOONS.filter((m) => m.parent === here.id).map((m) => m.id)]); // its maps first
+    } else photos.prefer([]);
+    photos.sharpen(sharp, now);
+  }
+
+  /** Works out where the zoom level has the camera and what it looks at. */
+  function wantView() {
+    const view = viewAt({ seconds: cameraTime, fov: camera.fov, aspect: camera.aspect, zoom: zoomOf(settings.zoom), planets: planetSpots, info: closeInfo });
+    want.position.fromArray(view.position);
+    want.target.fromArray(view.target);
+  }
+
+  /** A change of zoom: from here on the camera eases from where it is now to where the new level has it (and keeps going round on the way). */
+  function startGlide() {
+    if (!eye.ready) return;
+    wantView();
+    const far = eye.position.distanceTo(want.position);
+    glide = { from: { position: eye.position.clone(), target: eye.target.clone() }, t: 0, duration: Math.min(10, 3 + 0.07 * far) };
+  }
+
+  /** Puts the camera where the zoom level says it should be (or, during a glide, partway there). `snap`: at once. */
+  function aim(dt, snap = false) {
+    wantView();
+    if (snap || !eye.ready) glide = null;
+    if (glide) {
+      glide.t += dt;
+      const u = Math.min(1, glide.t / glide.duration);
+      const k = u * u * (3 - 2 * u); // slow to start, slow to arrive
+      eye.position.lerpVectors(glide.from.position, want.position, k);
+      eye.target.lerpVectors(glide.from.target, want.target, k);
+      if (u >= 1) glide = null;
+    } else {
+      eye.position.copy(want.position);
+      eye.target.copy(want.target);
+    }
+    eye.ready = true;
+    eye.settling = glide !== null;
+    camera.position.copy(eye.position);
+    camera.lookAt(eye.target);
+  }
+
+  /** Puts the camera where it goes and draws. */
+  function draw(dt = 0, snap = false) {
+    aim(dt, snap);
     sky.group.position.copy(camera.position);
     system.fitGlow(camera);
     renderer.render(scene, camera);
-    if (settings.labels) labels.update(camera, innerWidth, innerHeight);
+    if (settings.labels) labels.update(camera, innerWidth, innerHeight, { moons: settings.zoom === 4 });
   }
 
   function frame() {
@@ -315,7 +433,7 @@ function start() {
       sunMaterial.uniforms.time.value = (now - startTime) / 1000; // the Sun's surface keeps moving between layouts
       if (settings.drift) cameraTime += dt;
       for (const step of painters) step(10 / painters.length);
-      draw();
+      draw(dt);
 
       drawClock(now);
       photos.update(camera, now, elapsed, gap);
@@ -379,7 +497,7 @@ function start() {
     labels.invalidate();
     if (!document.hidden && loadedShown) {
       layOut(performance.now(), new Date(clock.time)); // (the markers' size is set when the planets are laid out)
-      draw(); // setSize clears the picture: draw it again now rather than leave it blank until the next frame
+      draw(0, true); // setSize clears the picture: draw it again now rather than leave it blank until the next frame
     }
     busyUntil = Math.max(busyUntil, performance.now() + 100);
   });
@@ -397,6 +515,7 @@ function start() {
       return;
     }
     if (name === "speed") value = SPEEDS[index(value)]?.id ?? value;
+    if (name === "zoom") value = typeof index(value) === "number" ? index(value) + 1 : value; // (a dropdown sends its position, from 0)
     if (name === "wallpaperFps") name = "fps"; // (the app's own "fps" setting is for Space Scope, which runs at 30 or 60)
     else if (name === "fps") return;
     if (name === "drift" && reducedMotion && value) return; // a saved "on" from the app must not undo the computer's own request for less motion
@@ -411,12 +530,17 @@ function start() {
   // Handy for poking at things from the browser console.
   window.solarWallpaper = {
     camera, settings, clock, system, sky, renderer, photos, set, labels,
-    seek: (seconds) => (cameraTime = seconds), // jump the camera along its path
+    seek: (seconds, snap = true) => {
+      cameraTime = seconds;
+      if (snap) eye.ready = false; // put the camera there at once (for testing)
+    }, // jump the camera along its path
   };
 
   // Put everything in place for the first frame, then go.
   layOut(performance.now(), new Date(clock.time));
+  draw(0, true); // (the camera is in place now, so the moons and detail can be settled)
+  layOut(performance.now(), new Date(clock.time));
   sync();
-  draw();
+  draw(0, true);
   schedule();
 }

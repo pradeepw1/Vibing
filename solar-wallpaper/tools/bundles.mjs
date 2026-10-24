@@ -62,10 +62,12 @@ export async function makeBundles() {
   // open, so a setting both pages have but want different values for (the frame rate) is two settings here.
   const { SPEEDS, VIEWS } = await import("../src/settings.js");
   const { DEFAULTS } = await import("../src/wallpaper-settings.js");
+  const { ZOOMS } = await import("../src/wallpaper-camera.js");
   const lookAt = VIEWS.filter((v) => !v.from);
   const lively = {
     mode: { type: "dropdown", value: 0, text: "Mode", items: ["Wallpaper (the planets, easy on battery)", "Space Scope (fly anywhere)"] },
     speed: { type: "dropdown", value: 0, text: "Speed", items: SPEEDS.map((s) => s.label) },
+    zoom: { type: "dropdown", value: DEFAULTS.zoom - 1, text: "Zoom (Wallpaper)", items: ZOOMS.map((z) => z.name) },
     view: { type: "dropdown", value: lookAt.findIndex((v) => v.id === "middle"), text: "Look at (Space Scope)", items: lookAt.map((v) => v.label) },
     from: { type: "dropdown", value: 0, text: "Look from (Space Scope)", items: ["Nothing", ...VIEWS.filter((v) => v.from).map((v) => v.label)] },
     labels: { type: "checkbox", value: true, text: "Show names" },
