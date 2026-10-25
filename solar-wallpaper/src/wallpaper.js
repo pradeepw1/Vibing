@@ -1,7 +1,6 @@
-// The Wallpaper: Saturn, with its rings and moons, and the Sun and the other planets where they
-// really are, under the real sky (the stars, our galaxy, the near galaxies and the black holes).
-// The camera swings slowly round Saturn at one fixed angle, as close as the zoom in the menu says
-// (see wallpaper-camera.js).
+// The Wallpaper: the Sun and the nine planets where they really are, under the real sky
+// (the stars, our galaxy, the near galaxies and the black holes), with the camera slowly
+// going round at one fixed angle, as close as the zoom in the menu says (see wallpaper-camera.js).
 // Made to cost as little battery as it can:
 //   - no clicking, dragging or scrolling does anything: there is no code for it here;
 //   - it draws about 20 times a second (and once a second when nothing is moving), at a
@@ -40,7 +39,6 @@ function start() {
   const MOON_HIDDEN_PX = 0.6;
   const MOON_MAP_PX = 4; // and gets its map once it is this big: before that it is a dot, and a map would only be memory
   const CLOSE_PX = 70; // a planet this big on screen gets a finer sphere
-  const SHARP_PX = 150; // and its sharper map
 
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const settings = loadSettings(location.search, reducedMotion);
@@ -78,8 +76,7 @@ function start() {
   const bodies = [...system.bodies.values()];
   const planets = bodies.filter((b) => b.kind === "planet");
   const moons = bodies.filter((b) => b.kind === "moon");
-  const saturn = system.bodies.get("saturn");
-  const saturnMoons = moons.filter((m) => m.parent === saturn).map((m) => m.group.position); // (the objects that move, so they stay current)
+  const planetSpots = planets.map((b) => b.group.position); // (the objects the planets move, so they stay current)
   // Far out a planet is a few dozen pixels across, so the fine spheres Space Scope uses for close-ups are wasted:
   // lighter ones draw the same picture with far fewer triangles; a planet that is big on screen gets a finer one (see
   // `updateDetail`). A moon is drawn only once it is big enough to see (`updateMoons`), and gets its map when it is
@@ -319,7 +316,7 @@ function start() {
     system.update(date, dt, speedRate(settings.speed), camera, innerHeight * pixelRatio, settings.orbits, (now - startTime) / 1000);
     belts.update(A.MakeTime(date).tt, null);
     for (const p of belts.parts) p.visible = settings.belts;
-    updateDetail(now);
+    updateDetail();
     lastLayout = now;
   }
 
@@ -342,35 +339,29 @@ function start() {
     if (!photos.enabled || photos.add([id]).length === 0) paintJobs([id]); // no real map to load: paint it
   }
 
-  /** Finer spheres, and the sharper map, for planets that are big on screen. */
-  function updateDetail(now) {
+  /** Finer spheres for planets that are big on screen. */
+  function updateDetail() {
     if (!eye.ready) return;
     const scale = pxPerUnit();
-    const sharp = [];
     for (const b of planets) {
-      const r = (b.radius * scale) / Math.max(camera.position.distanceTo(b.group.position), 0.01);
-      if (r > SHARP_PX) sharp.push(b.id);
-      const close = r > CLOSE_PX;
+      const close = (b.radius * scale) / Math.max(camera.position.distanceTo(b.group.position), 0.01) > CLOSE_PX;
       if (close === Boolean(b.fine)) continue;
       b.fine = close;
       b.mesh.geometry = close ? spheres.fine : spheres.plain;
       if (b.halo) b.halo.geometry = close ? spheres.fineHalo : spheres.halo;
       if (b.clouds) b.clouds.geometry = close ? spheres.fine : spheres.plain;
     }
-    photos.sharpen(sharp, now);
   }
 
-  /** Puts the camera on its way round Saturn, as close as the zoom (easing towards the one picked) has it. `snap`: at the picked zoom at once. */
+  /** Puts the camera on its way round the Sun, as close as the zoom (easing towards the one picked) has it. `snap`: at the picked zoom at once. */
   function aim(dt, snap = false) {
     if (snap || !eye.ready) Object.assign(zoomNow, zoomState(settings.zoom));
     // (At most a fifteenth of a second at a time: the first frame after a change can follow a long still spell, and
     // must not jump a fifth of the way at once.)
     eye.settling = stepZoom(zoomNow, settings.zoom, Math.min(dt, 1 / 15));
-    const center = saturn.group.position;
-    const maxDistance = 0.85 * center.length(); // (stay well this side of the Sun)
-    const view = orbitView({ seconds: cameraTime, fov: camera.fov, aspect: camera.aspect, reach: Math.exp(zoomNow.value), center, points: saturnMoons, maxDistance });
+    const view = orbitView({ seconds: cameraTime, fov: camera.fov, aspect: camera.aspect, reach: Math.exp(zoomNow.value), points: planetSpots });
     camera.position.fromArray(view.position);
-    camera.lookAt(...view.target);
+    camera.lookAt(0, 0, 0);
     eye.ready = true;
   }
 
@@ -380,7 +371,7 @@ function start() {
     sky.group.position.copy(camera.position);
     system.fitGlow(camera);
     renderer.render(scene, camera);
-    if (settings.labels) labels.update(camera, innerWidth, innerHeight, { moons: (m) => m.parent === saturn }); // (only Saturn's: the others are far-off dots)
+    if (settings.labels) labels.update(camera, innerWidth, innerHeight);
   }
 
   function frame() {

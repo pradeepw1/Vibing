@@ -85,10 +85,7 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
       dirty = true;
     },
 
-    /**
-     * Moves every name to where its thing is on the screen (or hides it). `moons`: name the moons that are drawn too
-     * (true), or those of them a function says yes to (given the moon).
-     */
+    /** Moves every name to where its thing is on the screen (or hides it). `moons`: name the moons that are drawn too. */
     update(camera, width, height, { moons = false } = {}) {
       if (dirty) measure();
       camera.getWorldDirection(camDir);
@@ -101,7 +98,7 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
       // The round bodies on screen: a name behind one is hidden, and no name is put on top of one.
       const discs = [];
       for (const l of names) {
-        l.wanted = l.body.kind !== "moon" || (Boolean(moons) && (moons === true || moons(l.body)) && l.body.group.visible);
+        l.wanted = l.body.kind !== "moon" || (moons && l.body.group.visible);
         v.copy(l.body.group.position);
         l.depth = v.clone().sub(camera.position).dot(camDir);
         l.r = (l.body.radius * l.body.group.scale.x * scale) / Math.max(l.depth, 0.01);
@@ -116,7 +113,7 @@ export function createLabels({ box, bodies, places, avoid = () => [] }) {
       for (const l of names) {
         let slot = null;
         const behind = !l.wanted || (l.depth > 0.01 && discs.some((d) => d.l !== l && d.l.depth < l.depth && Math.hypot(l.px - d.x, l.py - d.y) < d.r));
-        const obvious = l.r > BIG; // filling a good part of the screen: it needs no name, and one beside its rings would float off far away
+        const obvious = l.r > BIG; // filling a good part of the screen: it needs no name, and one beside it would float off far away
         if (l.depth > 0.01 && !behind && !obvious) {
           const off = Math.max(l.disc.r * 0.7, 4) + 4;
           // Right of it and below is the usual place; then left, then above, whichever is the first with room.

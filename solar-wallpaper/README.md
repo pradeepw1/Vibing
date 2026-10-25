@@ -12,24 +12,22 @@ It runs in any browser and works as a desktop wallpaper on Windows, macOS and Li
 | | Wallpaper | Space Scope |
 |---|---|---|
 | Page | `dist/index.html` | `dist/scope.html` |
-| What you get | Saturn, with its rings and moons, where it really is, under the real sky, with the camera slowly swinging round it, as close as you zoom it (below). The Sun and the other planets are where they really are too, behind it | Everything below: fly to any planet or moon, out to other galaxies, black holes, other stars' planets, strange sightings, the Gate |
+| What you get | The Sun and the nine planets where they really are, under the real sky (stars, the Milky Way, galaxies and a black hole, named), with the camera slowly going round, as close as you zoom it (below) | Everything below: fly to any planet or moon, out to other galaxies, black holes, other stars' planets, strange sightings, the Gate |
 | Clicking | Nothing on the picture reacts. Click, tap, drag, scroll, pinch or press keys: it never changes (only the menu button and its menu do anything) | Click a planet to see its sky, drag to look around, scroll to zoom |
 | Battery | As low as it can be (see below) | Much more. It draws all the time, at up to 60 frames a second |
 | Download | About 0.9 MB of code, plus 12 small planet maps (about 1.7 MB as files), and a moon's small map only once the moon is big enough on screen to show one | About 1.1 MB of code, plus up to 16 MB of planet maps |
 
 Wallpaper is what you get when you open `index.html`, and it's the one to leave running. Open the settings button, then pick **Space Scope** under *Mode* to fly about. Pick **Wallpaper** in the same place to come back. The wallpaper always starts in Wallpaper mode.
 
-### Saturn, and the zoom
+### Zoom
 
-![Wallpaper mode at four zooms: Saturn and its moons, then closer to its rings](docs/zoom-levels.jpg)
+![Wallpaper mode at four zooms, always at the same angle](docs/zoom-levels.jpg)
 
-Saturn is in the middle. The camera swings slowly to and fro round its sunny side (there and back every 10 minutes, up to 100 degrees either way), so Saturn is lit rather than a dark disc, at one fixed angle, 9 degrees above the planets. Saturn's own rings are tipped 27 degrees, so as the camera swings they open and close.
+The camera goes slowly round the Sun (a lap every 10 minutes) at one fixed angle, 9 degrees above the planets, so the orbits are wide ovals that fill a wide screen. How close it is is up to you: the **Zoom** slider in the menu (or its − and + buttons, a quarter at a time) goes from 1× (the whole system, out to Pluto) to 10× (the Sun and Mercury). It starts at 1×, so you see the Sun and all nine planets with the camera circling the lot. The menu says what the zoom takes in ("1.0× · The whole system"). A change eases in and out over about two seconds, it never jumps, and it is remembered. In the address it's `?zoom=1` to `?zoom=10`.
 
-How close it is is up to you: the **Zoom** slider in the menu (or its − and + buttons, a quarter at a time) goes from 1× (Saturn small, with Rhea, Titan and Iapetus round it) to 6× (its rings filling the screen and running off the sides). It starts at 2×, Saturn and its moons. The menu says what the zoom takes in ("2.0× · Saturn and its moons"). A change eases in and out over about two seconds, it never jumps, and it is remembered. In the address it's `?zoom=1` to `?zoom=6`. It goes no further out because the camera is on Saturn's sunny side: much further back and it would be behind the Sun. For the same reason a square or tall screen crops the sides a little at the widest zooms.
+Every planet inside the zoom stays in the picture, wherever it is on its orbit (Pluto's is tilted, so the camera allows for that too). Moons are drawn once they are about one pixel across, and get their maps once they are about four, so far out they are small dots and closer in they are worlds. At this angle the camera always looks at the same band of sky, so of the names on the sky only Sagittarius A* (the black hole in the middle of our galaxy), the Sagittarius Dwarf, and the Sculptor, Sombrero and Antennae galaxies come into view.
 
-Saturn's moons inside the zoom stay in the picture, and are named. Other moons and planets show where they really are in the background (a moon is drawn once it is about a pixel across, and gets its map once it is about four). Close up, Saturn gets its sharper map.
-
-To stop the camera moving, untick **Camera goes round**: the picture then holds still at that angle.
+To stop the camera going round, untick **Camera goes round**: the picture then holds still at that angle.
 
 **What keeps the battery use low.** I haven't measured it on a real laptop, so these are the things the page does, not a figure:
 
@@ -38,7 +36,7 @@ To stop the camera moving, untick **Camera goes round**: the picture then holds 
 - At real speed, the planets are moved once a second instead of every frame.
 - It never draws more than about 2.5 million pixels (a 1080p screen is 2.1 million), however big the screen is or becomes, and it smooths edges only on screens that aren't sharp enough to hide them. It asks the browser for an opaque drawing surface and for the low-power graphics chip.
 - A moon is drawn only once it is big enough to see, and gets its map only once it is big enough to show one. The planets are lighter spheres than Space Scope's close-up ones (about a fifth of the triangles in the widest view); a planet that is big on screen gets a finer one.
-- It loads the small planet maps, 12 of them, a moon's map when it is needed, and Saturn's sharp map only when it is big on screen. It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
+- It loads the small planet maps, 12 of them, and a moon's map when it is needed, never the sharp ones. It has no code for flying, picking, other stars' planets or sightings, so there is nothing to run and nothing to click.
 
 ## What's real
 
@@ -142,7 +140,7 @@ For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It 
 
 ## Settings
 
-These are Space Scope's settings; the Wallpaper has `zoom` (1 to 6, 2 unless you say otherwise), `speed`, `date`, `labels`, `orbits`, `belts`, `clock`, `drift` (the camera moving), `photos`, `ui`, `wallpaper` and `fps` (20 unless you say otherwise). Click the button in the top right, or add them to the address, like `scope.html?speed=day&view=earth`. Old addresses like `index.html?view=earth` still work: the Wallpaper page sees a setting only Space Scope has (`view`, `strange`, `reverse`, `paused`) and sends you on. The Wallpaper saves its own settings under its own name, so the two never mix.
+These are Space Scope's settings; the Wallpaper has `zoom` (1 to 10, 1 unless you say otherwise), `speed`, `date`, `labels`, `orbits`, `belts`, `clock`, `drift` (the camera moving), `photos`, `ui`, `wallpaper` and `fps` (20 unless you say otherwise). Click the button in the top right, or add them to the address, like `scope.html?speed=day&view=earth`. Old addresses like `index.html?view=earth` still work: the Wallpaper page sees a setting only Space Scope has (`view`, `strange`, `reverse`, `paused`) and sends you on. The Wallpaper saves its own settings under its own name, so the two never mix.
 
 | Setting | Values | Default |
 |---|---|---|
@@ -222,7 +220,7 @@ The built files are in git, but the originals are not.
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |
 | `dist/index.html`, `src/wallpaper.js` | Wallpaper mode: the page, and the lean program that draws the planets and sky with no click handling at all. It also sends old full-app addresses on to Space Scope |
-| `src/wallpaper-camera.js` | The camera: its swing round Saturn's sunny side at a fixed angle, the zoom and how it eases, and how far back to stand so Saturn and its moons fit any screen shape without going behind the Sun |
+| `src/wallpaper-camera.js` | The camera: its way round the Sun at a fixed angle, the zoom and how it eases, and how far back to stand so the orbits (and every planet inside the zoom, however Pluto's orbit lies) fit any screen shape |
 | `src/wallpaper-labels.js`, `src/wallpaper-settings.js` | The Wallpaper's names (not clickable) and its settings |
 | `src/options.js`, `src/skyplaces.js` | What both pages share: the time speeds and how a setting is cleaned up, and the black holes as names on the sky |
 | `dist/scope.html` | Space Scope: the full app, loads `solar.js` |

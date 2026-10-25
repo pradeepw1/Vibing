@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PerspectiveCamera, Vector3 } from "three";
-import { displayRadius, moonDistance, moonOffset, planetAxes, planetPosition } from "../src/ephemeris.js";
-import { MOONS, PLANETS } from "../src/bodies.js";
+import { auToScene, planetPosition } from "../src/ephemeris.js";
+import { PLANETS } from "../src/bodies.js";
 import * as A from "astronomy-engine";
 import { BLACK_HOLE_PLACES } from "../src/skyplaces.js";
-import { distanceFor, orbitView, PATH, pathAt, reachFor, stepZoom, sunwardOf, ZOOM, zoomLabel, zoomState } from "../src/wallpaper-camera.js";
+import { distanceFor, orbitView, PATH, pathAt, reachFor, stepZoom, ZOOM, zoomLabel, zoomState } from "../src/wallpaper-camera.js";
 import { createLabels } from "../src/wallpaper-labels.js";
 import { DEFAULTS, loadSettings, parse, save } from "../src/wallpaper-settings.js";
 
@@ -21,140 +21,93 @@ function cameraFor(view, aspect = 16 / 9) {
   return camera;
 }
 const SHAPES = [[1920, 1080], [2560, 1080], [3440, 1440], [1080, 1920], [390, 844], [1024, 1024]];
-const ZOOMS = [1, 1.5, 2, 3, 4, 6];
-const RINGS = 2.27 * displayRadius(58232); // Saturn's rings reach this far from its middle, as drawn
+const ZOOMS = [1, 1.3, 1.9, 2.5, 4, 6, 10];
 
-/** Saturn and its moons on a date, as the app lays them out (scene units). */
-function saturnOn(date) {
-  const time = A.MakeTime(new Date(date));
-  const axes = planetAxes(time);
-  const saturn = planetPosition(PLANETS.find((p) => p.id === "saturn"), time, new Vector3());
-  const moons = MOONS.filter((m) => m.parent === "saturn").map((m) => ({ id: m.id, at: moonOffset(m, time, axes, new Vector3()).add(saturn) }));
-  return { saturn, moons };
-}
-const DATES = ["2026-10-21", "2032-03-01", "2040-07-15", "2051-01-01"];
-
-test("the camera swings to and fro over Saturn's sunny side, at one fixed angle", () => {
-  for (const date of DATES) {
-    const { saturn } = saturnOn(date);
-    const sunward = sunwardOf(saturn);
-    for (let t = 0; t < 1300; t += 7) {
-      const p = pathAt(t, sunward);
-      assert.equal(p.elevation, PATH.elevation * DEG, "the angle never changes");
-      const off = Math.atan2(Math.sin(p.azimuth - sunward), Math.cos(p.azimuth - sunward)) / DEG;
-      assert.ok(Math.abs(off) <= PATH.swing + 1e-9, `never more than ${PATH.swing} degrees from the sunny side (${off.toFixed(1)})`);
-    }
-    // And the camera really is on the Sun's side of Saturn most of the time, so Saturn is lit.
-    let lit = 0;
-    for (let t = 0; t < PATH.period; t += 3) {
-      const v = orbitView({ seconds: t, fov: 45, aspect: 16 / 9, reach: reachFor(2), center: saturn });
-      const toCamera = new Vector3().fromArray(v.position).sub(saturn).normalize();
-      if (toCamera.dot(saturn.clone().negate().normalize()) > 0) lit++;
-    }
-    assert.ok(lit / (PATH.period / 3) > 0.7, `${date}: the sunny side is in view ${Math.round((300 * lit) / PATH.period)}% of the time`);
-  }
-  assert.equal(PATH.elevation, 9, "the angle that was picked");
-  assert.ok(PATH.period >= 300, "a swing takes minutes, not seconds");
-  // Smooth: no jump between moments a frame apart.
-  let last = pathAt(0, 1);
-  for (let t = 0.05; t < 700; t += 0.05) {
-    const p = pathAt(t, 1);
-    assert.ok(Math.abs(p.azimuth - last.azimuth) < 0.002, `smooth at ${t}`);
-    last = p;
-  }
-});
-
-test("the camera looks at Saturn, at that angle, at every zoom", () => {
-  const { saturn } = saturnOn(DATES[0]);
+test("the camera goes all the way round, slowly, at one fixed angle", () => {
+  const a = pathAt(0);
+  const b = pathAt(PATH.lap);
+  assert.ok(Math.abs(b.azimuth - a.azimuth - 2 * Math.PI) < 1e-9, "one lap takes PATH.lap seconds");
+  assert.ok(PATH.lap >= 300, "a lap takes minutes, not seconds");
+  for (let t = 0; t < 4000; t += 7) assert.equal(pathAt(t).elevation, PATH.elevation * DEG, "the angle never changes");
+  assert.equal(PATH.elevation, 9, "the angle of the picture that was picked");
+  // And the angle really is that, whatever the zoom.
   for (const zoom of ZOOMS) {
-    for (let t = 0; t < 600; t += 61) {
-      const view = orbitView({ seconds: t, fov: 45, aspect: 16 / 9, reach: reachFor(zoom), center: saturn });
-      const camera = cameraFor(view);
-      const middle = saturn.clone().project(camera);
-      assert.ok(Math.abs(middle.x) < 1e-6 && Math.abs(middle.y) < 1e-6, "Saturn in the middle");
-      const rel = new Vector3().fromArray(view.position).sub(saturn);
-      assert.ok(Math.abs(Math.asin(rel.y / rel.length()) / DEG - 9) < 1e-9, `${zoom}x at ${t}s: 9 degrees`);
-    }
+    const { position } = orbitView({ seconds: 123, fov: 45, aspect: 16 / 9, reach: reachFor(zoom) });
+    const v = new Vector3().fromArray(position);
+    assert.ok(Math.abs(Math.asin(v.y / v.length()) / DEG - 9) < 1e-9, `${zoom}x`);
   }
 });
 
-test("zoom runs from Saturn and its moons (1x) to its rings filling the screen (6x)", () => {
-  assert.equal(reachFor(ZOOM.min), ZOOM.whole);
-  assert.equal(reachFor(99), reachFor(ZOOM.max), "no closer than the most");
-  assert.equal(reachFor(0.1), reachFor(ZOOM.min), "no farther than the least");
-  const iapetus = moonDistance(3560820, 58232, displayRadius(58232));
-  assert.ok(reachFor(1) > iapetus, "1x takes in Iapetus, the farthest big moon");
-  assert.ok(reachFor(ZOOM.default) > iapetus, "and so does the default");
-  assert.ok(reachFor(ZOOM.max) < RINGS, "at the closest, the rings run off the screen");
-  assert.equal(zoomLabel(1), "Saturn, out past its moons");
-  assert.equal(zoomLabel(ZOOM.default), "Saturn and its moons");
-  assert.equal(zoomLabel(ZOOM.max), "Saturn's rings, up close");
-  const { saturn } = saturnOn(DATES[0]);
+test("zoom runs from the whole system (1x) to the Sun and Mercury (10x)", () => {
+  assert.equal(reachFor(1), ZOOM.whole);
+  assert.ok(ZOOM.whole >= auToScene(49.3), "1x holds Pluto at its farthest");
+  assert.ok(reachFor(10) >= auToScene(0.467) - 0.5, "10x still holds Mercury's orbit");
+  assert.equal(reachFor(50), reachFor(10), "no closer than 10x");
+  assert.equal(reachFor(0.1), reachFor(1), "no farther than 1x");
+  assert.equal(zoomLabel(1), "The whole system");
+  assert.equal(zoomLabel(ZOOM.default), "The whole system", "it opens on all nine planets");
+  assert.equal(zoomLabel(10), "Out to Mercury");
   let last = Infinity;
-  for (let z = ZOOM.min; z <= ZOOM.max; z += 0.05) {
-    const v = orbitView({ seconds: 0, fov: 45, aspect: 16 / 9, reach: reachFor(z), center: saturn });
-    const dist = new Vector3().fromArray(v.position).distanceTo(saturn);
-    assert.ok(dist < last, `zooming in always comes closer (${z.toFixed(2)}x)`);
+  for (let z = 1; z <= 10; z += 0.1) {
+    const d = orbitView({ seconds: 0, fov: 45, aspect: 16 / 9, reach: reachFor(z) }).position;
+    const dist = Math.hypot(...d);
+    assert.ok(dist < last, `zooming in always comes closer (${z.toFixed(1)}x)`);
     last = dist;
   }
 });
 
-/** The largest distance (in screen halves) any point of a flat disc of this radius round `center` reaches from the middle of the picture. */
-function discExtent(camera, center, reach) {
+test("the default zoom takes in all nine planets, out to Pluto", () => {
+  assert.equal(ZOOM.default, ZOOM.min, "it opens at the widest");
+  assert.ok(reachFor(ZOOM.default) >= auToScene(39.48), "Pluto's orbit is inside the reach");
+});
+
+/** The largest distance (in screen halves) any point of a flat disc of this radius reaches from the middle of the picture. */
+function discExtent(camera, reach) {
   let across = 0;
   let up = 0;
   const v = new Vector3();
   for (let i = 0; i < 360; i++) {
     const a = (i / 360) * 2 * Math.PI;
-    v.set(center.x + Math.cos(a) * reach, center.y, center.z + Math.sin(a) * reach).project(camera);
+    v.set(Math.cos(a) * reach, 0, Math.sin(a) * reach).project(camera);
     across = Math.max(across, Math.abs(v.x));
     up = Math.max(up, Math.abs(v.y));
   }
   return { across, up };
 }
 
-test("on a wide screen the disc the zoom promises fits, and not with room to waste (a square or tall one crops the sides at the widest zooms)", () => {
-  const { saturn } = saturnOn(DATES[0]);
+test("at every zoom the whole disc of orbits it promises fits the screen, on any screen shape, and not with room to waste", () => {
   for (const zoom of ZOOMS) {
     const reach = reachFor(zoom);
-    for (const [w, h] of SHAPES.filter(([w, h]) => w / h >= 1.5)) {
+    for (const [w, h] of SHAPES) {
       for (let t = 0; t < 600; t += 37) {
-        const camera = cameraFor(orbitView({ seconds: t, fov: 45, aspect: w / h, reach, center: saturn, maxDistance: 0.85 * saturn.length() }), w / h);
-        const { across, up } = discExtent(camera, saturn, reach);
+        const camera = cameraFor(orbitView({ seconds: t, fov: 45, aspect: w / h, reach }), w / h);
+        const { across, up } = discExtent(camera, reach);
         assert.ok(across <= 0.96 && up <= 0.96, `${zoom}x ${w}x${h} at ${t}s: disc reaches ${across.toFixed(2)} across, ${up.toFixed(2)} up`);
         assert.ok(Math.max(across, up) >= 0.9, `${zoom}x ${w}x${h} at ${t}s: the disc fills the screen (${Math.max(across, up).toFixed(2)})`);
+        assert.ok(camera.position.length() > reach, "stands outside the disc it is looking at");
+        const sun = new Vector3(0, 0, 0).project(camera);
+        assert.ok(Math.abs(sun.x) < 1e-6 && Math.abs(sun.y) < 1e-6, "looks at the Sun");
       }
     }
   }
 });
 
-test("the camera never stands behind the Sun, on any screen shape (a tall one crops the sides instead)", () => {
-  for (const date of DATES) {
-    const { saturn } = saturnOn(date);
-    for (const zoom of ZOOMS) {
-      for (const [w, h] of SHAPES) {
-        for (let t = 0; t < 600; t += 23) {
-          const view = orbitView({ seconds: t, fov: 45, aspect: w / h, reach: reachFor(zoom), center: saturn, maxDistance: 0.85 * saturn.length() });
-          const camera = new Vector3().fromArray(view.position);
-          assert.ok(camera.distanceTo(saturn) <= 0.85 * saturn.length() + 1e-9, `${date} ${zoom}x ${w}x${h}`);
-          assert.ok(camera.length() > 0.15 * saturn.length() - 1e-6, "well clear of the Sun");
-        }
-      }
-    }
-  }
-  assert.ok(distanceFor(10, 45, 9 / 16, 9 * DEG) > distanceFor(10, 45, 16 / 9, 9 * DEG), "(a thinner screen has to stand further back)");
+test("a thinner screen has to stand further back", () => {
+  assert.ok(distanceFor(59, 45, 9 / 16, 9 * DEG) > distanceFor(59, 45, 16 / 9, 9 * DEG));
 });
 
-test("Saturn's moons inside the zoom stay in the picture (on a wide screen), wherever they are on their orbits", () => {
-  for (const date of DATES) {
-    const { saturn, moons } = saturnOn(date);
+test("every planet inside the zoom's reach is in the picture, wherever Pluto is on its orbit", () => {
+  // Pluto's orbit is long, lopsided and tilted 17 degrees: 30 to 49 AU. Four dates: now, and out to its farthest (about 2114).
+  for (const date of ["2026-10-21", "2060-01-01", "2113-07-01", "2200-01-01"]) {
+    const time = A.MakeTime(new Date(date));
+    const planets = PLANETS.map((p) => ({ id: p.id, at: planetPosition(p, time, new Vector3()) }));
     for (const zoom of ZOOMS) {
       const reach = reachFor(zoom);
-      for (const [w, h] of SHAPES.filter(([w, h]) => w / h >= 1.5)) {
+      for (const [w, h] of SHAPES) {
         for (let t = 0; t < 600; t += 41) {
-          const camera = cameraFor(orbitView({ seconds: t, fov: 45, aspect: w / h, reach, center: saturn, points: moons.map((m) => m.at), maxDistance: 0.85 * saturn.length() }), w / h);
-          for (const { id, at } of moons) {
-            if (at.distanceTo(saturn) > reach) continue;
+          const camera = cameraFor(orbitView({ seconds: t, fov: 45, aspect: w / h, reach, points: planets.map((p) => p.at) }), w / h);
+          for (const { id, at } of planets) {
+            if (at.length() > reach) continue;
             const ndc = at.clone().project(camera);
             assert.ok(Math.abs(ndc.x) <= 0.97 && Math.abs(ndc.y) <= 0.97, `${date} ${zoom}x ${w}x${h} at ${t}s: ${id} is off the screen (${ndc.x.toFixed(2)}, ${ndc.y.toFixed(2)})`);
           }
@@ -165,7 +118,7 @@ test("Saturn's moons inside the zoom stay in the picture (on a wide screen), whe
 });
 
 test("a change of zoom eases in and out: a gentle start, no overshoot, all but there in about two seconds", () => {
-  for (const [from, to] of [[2, 6], [6, 1], [2, 2.5], [4, 3.2]]) {
+  for (const [from, to] of [[1.9, 10], [10, 1], [1.9, 2.4], [4, 3.2]]) {
     const state = zoomState(from);
     const target = Math.log(reachFor(to));
     const start = state.value;
@@ -188,22 +141,20 @@ test("a change of zoom eases in and out: a gentle start, no overshoot, all but t
     assert.ok(steps[0] < Math.max(...steps) * 0.5, `${from}x to ${to}x starts gently`);
   }
   // A slow frame (a quarter of a second) is taken in small steps, so it lands where many small frames would.
-  const a = zoomState(2);
-  const b = zoomState(2);
-  stepZoom(a, 5, 0.25);
-  for (let i = 0; i < 5; i++) stepZoom(b, 5, 0.05);
+  const a = zoomState(1.9);
+  const b = zoomState(1.9);
+  stepZoom(a, 6, 0.25);
+  for (let i = 0; i < 5; i++) stepZoom(b, 6, 0.05);
   assert.ok(Math.abs(a.value - b.value) < 0.02);
-  assert.equal(stepZoom(zoomState(3), 3, 0.05), false, "nothing to do: not moving");
-  // And a moon coming inside the reach while zooming never makes the camera jump.
-  const { saturn } = saturnOn(DATES[0]);
-  const tipped = saturn.clone().add(new Vector3(3, -2.5, 4)); // well below the plane, like a moon on Saturn's tipped orbits
+  // And the planets' own places never make the camera jump while zooming (a planet coming inside the reach).
+  const pluto = new Vector3(40, -18, 45); // well below the plane, like Pluto in some years
   let last = null;
-  for (let z = 1; z <= 4; z += 0.002) {
-    const v = orbitView({ seconds: 0, fov: 45, aspect: 16 / 9, reach: reachFor(z), center: saturn, points: [tipped] });
-    const d = new Vector3().fromArray(v.position).distanceTo(saturn);
-    if (last !== null) assert.ok(Math.abs(d - last) < 0.2, `no jump at ${z.toFixed(3)}x (${last.toFixed(2)} to ${d.toFixed(2)})`);
+  for (let z = 1; z <= 2.5; z += 0.002) {
+    const d = Math.hypot(...orbitView({ seconds: 0, fov: 45, aspect: 16 / 9, reach: reachFor(z), points: [pluto] }).position);
+    if (last !== null) assert.ok(Math.abs(d - last) < 0.5, `no jump at ${z.toFixed(3)}x (${last.toFixed(2)} to ${d.toFixed(2)})`);
     last = d;
   }
+  assert.equal(stepZoom(zoomState(3), 3, 0.05), false, "nothing to do: not moving");
 });
 
 test("the Wallpaper's settings: only the ones it has", () => {
@@ -211,12 +162,12 @@ test("the Wallpaper's settings: only the ones it has", () => {
   assert.equal(parse("speed", "day"), "day");
   assert.equal(parse("fps", "30"), 30);
   assert.equal(parse("labels", "0"), false);
-  assert.equal(DEFAULTS.zoom, 2);
-  for (const [given, kept] of [[1, 1], [2.5, 2.5], ["3.25", 3.25], [6, 6], [1.234, 1.23], [30, 6], [0.2, 1], [0, 1]]) assert.equal(parse("zoom", given), kept, `zoom ${given}`);
+  assert.equal(DEFAULTS.zoom, 1);
+  for (const [given, kept] of [[1, 1], [2.5, 2.5], ["3.25", 3.25], [10, 10], [1.234, 1.23], [30, 10], [0.2, 1], [0, 1]]) assert.equal(parse("zoom", given), kept, `zoom ${given}`);
   for (const bad of ["x", null, "", true, [2], "1e3", "-2", NaN, Infinity]) assert.equal(parse("zoom", bad), undefined, `zoom ${JSON.stringify(bad)}`);
   assert.equal(loadSettings("?zoom=4").zoom, 4);
-  assert.equal(loadSettings("?zoom=99").zoom, 6);
-  assert.equal(loadSettings("?zoom=nope").zoom, 2);
+  assert.equal(loadSettings("?zoom=99").zoom, 10);
+  assert.equal(loadSettings("?zoom=nope").zoom, 1);
   for (const key of ["view", "strange", "reverse", "paused", "from", "mode", "nonsense"]) assert.equal(parse(key, "1"), undefined, `${key} is not a Wallpaper setting`);
   const s = loadSettings("?speed=hour&labels=0&fps=10&view=mars");
   assert.equal(s.speed, "hour");

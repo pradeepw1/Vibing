@@ -11,7 +11,7 @@ export const DEFAULTS = {
   orbits: true,
   belts: true,
   clock: true,
-  zoom: ZOOM.default, // 1 to 6: how close the camera is to Saturn (see wallpaper-camera.js)
+  zoom: ZOOM.default, // 1 to 10: how close the camera is (see wallpaper-camera.js)
   drift: true, // the camera goes round the Sun
   photos: true, // real maps (NASA and others) instead of painted surfaces
   ui: true, // false hides the settings button completely
@@ -25,7 +25,7 @@ const SAVED = ["speed", "zoom", "labels", "orbits", "belts", "clock", "drift", "
 /** Cleans up one setting value, or returns undefined if the Wallpaper has no such setting or it isn't valid. */
 export function parse(key, value) {
   if (key === "zoom") {
-    // A number (or a number written as text), kept inside the zoom's limits, to two decimal places.
+    // A number (or a number written as text), kept between 1 and 10, to two decimal places.
     const n = typeof value === "number" || (typeof value === "string" && /^\s*\d+(\.\d+)?\s*$/.test(value)) ? Number(value) : NaN;
     return Number.isFinite(n) ? Math.round(clampZoom(n) * 100) / 100 : undefined;
   }

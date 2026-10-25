@@ -24,10 +24,10 @@
   },
   "zoom": {
     "type": "slider",
-    "value": 2,
-    "text": "Zoom (Wallpaper): 1 is Saturn and its moons, 6 its rings filling the screen",
+    "value": 1,
+    "text": "Zoom (Wallpaper): 1 is the whole system, 10 the Sun and Mercury",
     "min": 1,
-    "max": 6,
+    "max": 10,
     "step": 0.1
   },
   "view": {
