@@ -163,7 +163,7 @@ function set(key, value, how = {}) {
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "photos") usePhotos(value);
-  if (key === "fps") reschedule();
+  reschedule(); // (the pace may have changed: a new frame rate, the camera set going, a flight begun)
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
   store();
@@ -1269,6 +1269,17 @@ function mustLayOut(now) {
   );
 }
 
+/**
+ * Is anything on the picture moving? With the camera standing still and time at real speed (or stopped), nothing visibly
+ * is: a planet takes hours to move a pixel. Then a wallpaper draws once a second, which keeps the clock ticking.
+ */
+function still() {
+  return (
+    !(settings.drift && !reducedMotion) && (settings.paused || (settings.speed === "live" && !settings.reverse)) &&
+    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading
+  );
+}
+
 function frame(now) {
   if (!saver) {
     requestAnimationFrame(frame);
@@ -1288,7 +1299,8 @@ function frame(now) {
 function schedule() {
   if (waiting || document.hidden) return;
   waiting = true;
-  const wait = Math.max(0, 1000 / settings.fps - (performance.now() - lastFrame) - 8); // (8: about half a refresh at 60 Hz, which the screen adds)
+  const gap = still() ? LIMITS.layoutEvery : 1000 / settings.fps;
+  const wait = Math.max(0, gap - (performance.now() - lastFrame) - 8); // (8: about half a refresh at 60 Hz, which the screen adds)
   timer = setTimeout(() => {
     timer = 0;
     requestAnimationFrame(frame);

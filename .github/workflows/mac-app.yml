@@ -37,10 +37,10 @@ jobs:
           app="solar-wallpaper/mac/build/Solar System Live.app"
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
-          sleep 50
+          sleep 66
           screencapture -x screen.png || true
           if kill -0 "$pid" 2>/dev/null; then
-            echo "Still running after 50 seconds."
+            echo "Still running after 66 seconds."
             kill "$pid"
           else
             echo "It stopped by itself:"
@@ -61,6 +61,8 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"drawsWhileHushed":0'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'
+          # The Mac's own signals: the screen going to sleep, the Mac locking, the screen saver.
+          for reason in sleep locked screensaver; do check "hushed for $reason"; check "woken from $reason"; done
           # The frame rate for each situation.
           check 'frame rate scope, plugged in: 30'
           check 'frame rate scope, battery, save power: 20'

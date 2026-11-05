@@ -15,7 +15,10 @@ enum LaunchCheck {
         let pickZoom: (Double) -> Void
         let quiet: (Bool) -> Void
         let style: () -> String
+        let window: () -> NSWindow?
     }
+
+    private static var cover: NSWindow? // (an ordinary window laid over the whole desktop, for one of the checks)
 
     static let on: Bool = !(ProcessInfo.processInfo.environment["SSL_SNAPSHOT"] ?? "").isEmpty
 
@@ -117,7 +120,47 @@ enum LaunchCheck {
                 + "return JSON.stringify({seen:(window.__seen||[]).map(function(e){return e[1];}),drawsWhileHushed:n,drawsInAll:t.length,visibility:document.visibilityState});})(\(hushedAt),\(wokeAt))"
             ask(hooks, js, "while hushed, the page saw and drew:")
         }
-        at(46) { say("launch check: finished") }
+        // The Mac's own signals: the app hushes for each and wakes when it ends.
+        let workspace = NSWorkspace.shared.notificationCenter
+        let distributed = DistributedNotificationCenter.default()
+        let post = { (name: String) in
+            distributed.postNotificationName(NSNotification.Name(name), object: nil, userInfo: nil, deliverImmediately: true)
+        }
+        at(46) { workspace.post(name: NSWorkspace.screensDidSleepNotification, object: nil) }
+        at(47) { workspace.post(name: NSWorkspace.screensDidWakeNotification, object: nil) }
+        at(48) { post("com.apple.screenIsLocked") }
+        at(49) { post("com.apple.screenIsUnlocked") }
+        at(50) { post("com.apple.screensaver.didstart") }
+        at(51) { post("com.apple.screensaver.didstop") }
+
+        // Another window over the whole desktop: does the page stop drawing underneath?
+        var coveredAt = 0.0
+        var uncoveredAt = 0.0
+        at(53) {
+            guard let screen = NSScreen.screens.first else { return }
+            let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.level = .normal
+            window.backgroundColor = .gray
+            window.isOpaque = true
+            window.isReleasedWhenClosed = false
+            window.setFrame(screen.frame, display: true)
+            window.orderFrontRegardless()
+            cover = window
+            coveredAt = now()
+        }
+        at(57) {
+            let visible = hooks.window()?.occlusionState.contains(.visible)
+            say("launch check: covered, the wallpaper window is \(visible == nil ? "missing" : visible! ? "still visible" : "not visible")")
+            uncoveredAt = now()
+            cover?.orderOut(nil)
+            cover = nil
+        }
+        at(60) {
+            let js = "(function(a,b){var n=0,t=window.__draws||[];for(var i=0;i<t.length;i++)if(t[i]>a+700&&t[i]<b)n++;"
+                + "return JSON.stringify({drawsWhileCovered:n,secondsCovered:Math.round((b-a)/100)/10,drawsInAll:t.length});})(\(coveredAt),\(uncoveredAt))"
+            ask(hooks, js, "while another window covered the desktop, the page drew:")
+        }
+        at(62) { say("launch check: finished") }
     }
 
     /// The picture as 96 by 28 characters: the brightest spot in each cell, so a star or a planet still shows.

@@ -150,6 +150,7 @@ For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It 
 - 30 frames a second, not 60. It waits out the rest of a frame's time and then draws on the screen's next refresh, rather than being woken on every refresh (60 or 120 times a second) to do nothing. Hidden, it stops completely.
 - Lighter spheres (48 by 24 instead of 96 by 48 or 64 by 32) until a planet is big on screen, and a moon is only drawn, and only gets its map, once it is big enough to see. In the default view that took the triangles drawn from about 169 thousand to about 50 thousand; in the view of Jupiter, 33 thousand to 16 thousand.
 - At real speed the planets are moved once a second instead of every frame (the camera still moves every frame).
+- With the camera switched off (*Camera goes round*) and time at real speed, nothing on the picture moves, so it draws once a second, which keeps the clock ticking. It goes back to full speed at once for a flight to another view.
 - At most 2.5 million pixels are drawn, and edges are smoothed only on screens that aren't sharp enough to hide them (a Retina screen skips it).
 - The made-up sightings stay off unless asked for (`strange=1`), and nothing is remembered between runs: whatever starts the wallpaper says its settings each time.
 

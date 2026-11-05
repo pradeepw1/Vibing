@@ -222,7 +222,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             quiet: { [weak self] on in
                 if on { self?.hush("test") } else { self?.unhush("test") }
             },
-            style: { [weak self] in self?.settings.style.rawValue ?? "?" }))
+            style: { [weak self] in self?.settings.style.rawValue ?? "?" },
+            window: { [weak self] in self?.wallpapers.first?.window }))
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
