@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds "Solar System Live.app" from the web pages in ../dist and main.swift, on a Mac.
+# Builds "Solar System Live.app" from the web pages in ../dist and the .swift files here, on a Mac.
 #
 #   ./build.sh                 build the app into mac/build/
 #   ./build.sh install         build it, put it in /Applications (or ~/Applications) and open it
@@ -46,7 +46,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 echo "Compiling for: $archs"
 bins=()
 for arch in $archs; do
-  swiftc -O -target "$arch-apple-macos$target" -o "$out/SolarSystemLive-$arch" "$here/main.swift"
+  swiftc -O -target "$arch-apple-macos$target" -o "$out/SolarSystemLive-$arch" "$here"/*.swift
   bins+=("$out/SolarSystemLive-$arch")
 done
 if [ "${#bins[@]}" -gt 1 ]; then
