@@ -23,6 +23,7 @@ enum LaunchCheck {
     }
 
     private static var cover: NSWindow? // (an ordinary window laid over the whole desktop, for one of the checks)
+    private static var covers: [NSWindow] = [] // (and one on each screen, for another)
 
     static let on: Bool = !(ProcessInfo.processInfo.environment["SSL_SNAPSHOT"] ?? "").isEmpty
 
@@ -251,6 +252,40 @@ enum LaunchCheck {
                 + "seen:window.__seen||null,lost:window.__lost,back:window.__back,draws:window.__draws,texBefore:window.__tex,"
                 + "texNow:g?g.renderer.info.memory.textures:null});})()", "after other apps and Mission Control, the wallpaper page:")
         }))
+        // A page that starts with the desktop already covered (a window on its screen as the app starts): it has no refreshes
+        // to draw on, and used to stop dead, so uncovering it showed the page starting up. It has to load all the same.
+        steps.append((1, {
+            covers = NSScreen.screens.map { screen in
+                let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+                window.level = .normal
+                window.backgroundColor = .gray
+                window.isOpaque = true
+                window.isReleasedWhenClosed = false
+                window.setFrame(screen.frame, display: true)
+                window.orderFrontRegardless()
+                return window
+            }
+            say("launch check: covered every screen")
+        }))
+        steps.append((2, {
+            hooks.useStyle(.scope)
+            say("launch check: started the pictures again under the cover")
+        }))
+        let loadState = "(function(){var g=window.solarSystem,r=g&&g.renderer;return JSON.stringify({visibility:document.visibilityState,"
+            + "loaded:document.querySelector('#loading').classList.contains('done'),drawn:r?r.info.render.frame:0,"
+            + "programs:r?r.info.programs.length:0,textures:r?r.info.memory.textures:0});})()"
+        steps.append((60, {
+            ask(hooks, loadState, "started under a cover, a minute on, the page:")
+            // (Its picture has to be on the screen already, under the cover: then there is nothing to wait for when it is uncovered.)
+            func count(_ layer: CALayer) -> Int { 1 + (layer.sublayers ?? []).reduce(0) { $0 + count($1) } }
+            say("launch check: under the cover the page has \(hooks.web()?.layer.map(count) ?? 0) layers")
+        }))
+        steps.append((1, {
+            for window in covers { window.orderOut(nil) }
+            covers = []
+            say("launch check: took the cover away")
+        }))
+        steps.append((3, { ask(hooks, loadState, "uncovered, the page:") }))
         steps.append((3, { say("launch check: finished") }))
         run(steps)
     }

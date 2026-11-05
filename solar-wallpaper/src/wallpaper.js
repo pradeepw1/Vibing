@@ -16,6 +16,7 @@ import { createMaps } from "./maps.js";
 import { createModeGate, pageAddress, SCOPE_PAGE, scopeAddress, wantsScope } from "./modes.js";
 import { hostSearch, SPEEDS, speedRate } from "./options.js";
 import { startPainting } from "./painter.js";
+import { nextWait } from "./saver.js";
 import { createSky } from "./sky.js";
 import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
@@ -258,6 +259,7 @@ function start() {
     if (paintDone && mapsDone && !loadedShown) {
       loadedShown = true;
       $("#loading").classList.add("done");
+      window.webkit?.messageHandlers?.journal?.postMessage(`page: finished loading${document.hidden ? ", covered" : ""}`);
     }
   }
 
@@ -303,6 +305,7 @@ function start() {
   let photosStarted = false;
   let waiting = false; // a frame is on its way
   let timer = 0; // the wait before it (0 once the screen's next refresh is what is being waited for)
+  let nextRefresh = 0; // that refresh
   let failed = false;
 
   /** Is anything on the picture moving? If not, once a second is all it needs. */
@@ -409,17 +412,19 @@ function start() {
 
   /**
    * The next frame: wait out the rest of this one's time, then draw on the screen's next refresh. While the page is
-   * hidden the refresh never comes, so nothing runs until it is shown again.
+   * hidden the refresh never comes, so once it has loaded nothing runs until it is shown again (see `nextWait`).
    */
   function schedule() {
-    if (waiting || document.hidden) return;
-    waiting = true;
+    if (waiting) return;
     const now = performance.now();
-    const wait = Math.max(0, frameGap(now) - (now - lastFrame) - 8); // (8: about half a refresh at 60 Hz, which the screen adds)
+    const next = nextWait({ hidden: document.hidden, loaded: loadedShown && !system.fading, gap: frameGap(now), since: now - lastFrame });
+    if (!next) return;
+    waiting = true;
     timer = setTimeout(() => {
       timer = 0;
-      requestAnimationFrame(frame);
-    }, wait);
+      if (next.refresh) nextRefresh = requestAnimationFrame(frame);
+      else frame();
+    }, next.wait);
   }
 
   /** The pace changed (a setting): start the wait again with the new one. */
@@ -432,10 +437,16 @@ function start() {
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) return;
-    // Shown again: don't count the time away as one long frame.
-    lastTick = lastFrame = performance.now();
-    busyUntil = Math.max(busyUntil, lastFrame + 100);
+    if (!document.hidden) {
+      // Shown again: don't count the time away as one long frame.
+      lastTick = lastFrame = performance.now();
+      busyUntil = Math.max(busyUntil, lastFrame + 100);
+    }
+    // What a frame waits for has changed: a refresh that a hidden page won't get, or the clock it no longer needs.
+    clearTimeout(timer);
+    cancelAnimationFrame(nextRefresh);
+    timer = 0;
+    waiting = false;
     schedule();
   });
 

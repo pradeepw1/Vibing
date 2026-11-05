@@ -15,7 +15,7 @@ import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
 import { createMaps, nearestFor } from "./maps.js";
 import { createModeGate, pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
-import { createDetail, fitRatio, LIMITS, pixelsPerUnit, smoothsEdges } from "./saver.js";
+import { createDetail, fitRatio, LIMITS, nextWait, pixelsPerUnit, smoothsEdges } from "./saver.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 import { createElsewhere } from "./elsewhere.js";
@@ -1153,6 +1153,7 @@ function checkLoaded() {
   if (paintDone && mapsDone && !loadedShown) {
     loadedShown = true;
     ui.doneLoading();
+    window.webkit?.messageHandlers?.journal?.postMessage(`page: finished loading${document.hidden ? ", covered" : ""}`);
   }
 }
 
@@ -1255,9 +1256,10 @@ function settleSky(now, date, seconds) {
 }
 
 // A wallpaper doesn't want waking on every refresh of the screen (60 or 120 times a second) to draw 30 times: it waits
-// out the rest of a frame's time and then draws on the next refresh, and while the page is hidden nothing runs at all.
+// out the rest of a frame's time and then draws on the next refresh. Hidden, nothing runs at all once it has loaded (see `nextWait`).
 let waiting = false; // a frame is on its way
 let timer = 0; // the wait before it (0 once the screen's next refresh is what is being waited for)
+let nextRefresh = 0; // that refresh
 let sinceLayout = 0; // seconds since the planets were last moved (a wallpaper only)
 let lastLayoutAt = -Infinity;
 
@@ -1297,14 +1299,20 @@ function frame(now) {
 }
 
 function schedule() {
-  if (waiting || document.hidden) return;
+  if (waiting) return;
+  const next = nextWait({
+    hidden: document.hidden,
+    loaded: loadedShown && !system.fading,
+    gap: still() ? LIMITS.layoutEvery : 1000 / settings.fps,
+    since: performance.now() - lastFrame,
+  });
+  if (!next) return;
   waiting = true;
-  const gap = still() ? LIMITS.layoutEvery : 1000 / settings.fps;
-  const wait = Math.max(0, gap - (performance.now() - lastFrame) - 8); // (8: about half a refresh at 60 Hz, which the screen adds)
   timer = setTimeout(() => {
     timer = 0;
-    requestAnimationFrame(frame);
-  }, wait);
+    if (next.refresh) nextRefresh = requestAnimationFrame(frame);
+    else frame(performance.now());
+  }, next.wait);
 }
 
 /** The pace changed (a setting): start the wait again with the new one. */
@@ -1317,12 +1325,18 @@ function reschedule() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (!saver || document.hidden) return;
-  // Shown again: draw at once (not a second later, when nothing moves), and don't count the time away as one long frame.
-  lastTick = performance.now();
-  lastFrame = -Infinity;
-  if (timer) reschedule();
-  else schedule();
+  if (!saver) return;
+  if (!document.hidden) {
+    // Shown again: draw at once (not a second later, when nothing moves), and don't count the time away as one long frame.
+    lastTick = performance.now();
+    lastFrame = -Infinity;
+  }
+  // What a frame waits for has changed: a refresh that a hidden page won't get, or the clock it no longer needs.
+  clearTimeout(timer);
+  cancelAnimationFrame(nextRefresh);
+  timer = 0;
+  waiting = false;
+  schedule();
 });
 
 function drawFrame(now) {

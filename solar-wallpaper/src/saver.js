@@ -14,7 +14,22 @@ export const LIMITS = {
   moonHiddenPx: 0.6,
   moonMapPx: 4, // and gets its map once it is this big: before that it is a dot, and a map would only be memory
   closePx: 70, // a planet this big on screen gets a finer sphere
+  coveredEvery: 500, // ms between frames for a covered page that hasn't finished loading (macOS stretches it to a couple of seconds)
 };
+
+/**
+ * What a wallpaper waits for before its next frame: `wait` ms, then the screen's next refresh too if `refresh`.
+ * Null: nothing at all, until it is shown again.
+ *
+ * A hidden page gets no refreshes, so left to those it stops dead, and that is the saving once it has loaded. But everything
+ * that loads it happens in its frames. A page covered before it was done (a window already on its screen when it started)
+ * would never load, and whenever it was uncovered it would start up there and then, in front of whoever is looking. So until
+ * it has loaded it goes on by the clock, slowly. `gap`: ms a frame is meant to take; `since`: ms since the last one.
+ */
+export function nextWait({ hidden, loaded, gap, since }) {
+  if (hidden) return loaded ? null : { wait: LIMITS.coveredEvery, refresh: false };
+  return { wait: Math.max(0, gap - since - 8), refresh: true }; // (8: about half a refresh at 60 Hz, which the screen adds)
+}
 
 /** How much to scale the drawing: the screen's own sharpness, but never so many pixels that a big screen costs a lot more. */
 export const fitRatio = (deviceRatio, width, height, maxPixels = LIMITS.maxPixels) =>

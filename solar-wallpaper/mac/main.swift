@@ -324,6 +324,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         LaunchCheck.log("web view: made")
         web.autoresizingMask = [.width, .height]
         if #available(macOS 12.0, *) { web.underPageBackgroundColor = .black }
+        if web.responds(to: NSSelectorFromString("_setDrawsBackground:")) {
+            web.setValue(false, forKey: "drawsBackground") // (or it is white until the page first draws: black, like the window behind it)
+        }
         return web
     }
 
@@ -367,6 +370,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         }
         let which = wallpapers.first(where: { $0.web === message.webView }).map { "screen \($0.screen)" } ?? "the Space Scope window"
         Journal.note("\(which): \(text)")
+        if text.hasPrefix("page: finished loading"), let web = wallpapers.first(where: { $0.web === message.webView })?.web {
+            minding(covers: true, web)
+        }
     }
 
     private func screenID(_ screen: NSScreen) -> UInt32 {
@@ -418,6 +424,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         LaunchCheck.log("load asked for")
     }
 
+    /// Loads a wallpaper's page, on show as far as the page can tell even if windows cover it, until it has finished.
+    ///
+    /// macOS hides a covered page, and a hidden page puts nothing on the screen: it can load, but its picture only gets
+    /// there once it is uncovered, so the desktop would stay black for a second just when someone looks at it. A page that
+    /// has drawn once keeps that picture for when it is shown again, so it only needs to be allowed to draw once.
+    /// (If this macOS has no such setting, the page still loads while hidden, by itself: see `nextWait`.)
+    private func loadWallpaper(_ web: WKWebView, page: String) {
+        minding(covers: false, web)
+        load(web, page: page)
+        // (A page that never says it finished must not go on drawing under other windows for ever.)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self, weak web] in
+            if let web = web { self?.minding(covers: true, web) }
+        }
+    }
+
+    /// Whether macOS hides this page when other windows cover it.
+    private func minding(covers: Bool, _ web: WKWebView) {
+        let key = "windowOcclusionDetectionEnabled"
+        guard web.responds(to: NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")),
+              web.responds(to: NSSelectorFromString("_windowOcclusionDetectionEnabled")),
+              web.value(forKey: key) as? Bool != covers else { return }
+        web.setValue(covers, forKey: key)
+        // (Setting it doesn't make the page look again at whether it is covered. This does.)
+        web.isHidden = true
+        web.isHidden = false
+    }
+
     /// A borderless window just above the desktop picture but below the desktop icons, with the page in it.
     private func makeWallpaper(on screen: NSScreen, style: Style) -> (window: NSWindow, web: WKWebView, screen: UInt32) {
         LaunchCheck.log("making a window for a screen")
@@ -428,6 +461,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         window.isOpaque = true
         window.backgroundColor = .black
         window.hasShadow = false
+        // Not the way an app's window opens. That animation is run by the screen's refreshes, so with the screen asleep or
+        // the Mac locked it stops on its first frame and stays there: a wallpaper a little smaller than the screen.
+        window.animationBehavior = .none
         window.ignoresMouseEvents = true // clicks go through to the desktop
         window.isReleasedWhenClosed = false
         window.setFrame(screen.frame, display: false)
@@ -435,7 +471,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         web.navigationDelegate = self
         window.contentView?.addSubview(web)
         LaunchCheck.log("web view added to the window")
-        load(web, page: page(for: style))
+        loadWallpaper(web, page: page(for: style))
         LaunchCheck.log("page asked for")
         if quiet.isEmpty { window.orderFrontRegardless() }
         LaunchCheck.log("window shown")
@@ -551,7 +587,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         stops[id] = recent
         Journal.note("screen \(id): \(what) (\(recent.count) time\(recent.count == 1 ? "" : "s") in 10 minutes), showing \(style(for: id).rawValue)")
         guard recent.count >= 3 else {
-            if reload { load(webView, page: page(for: style(for: id))) }
+            if reload { loadWallpaper(webView, page: page(for: style(for: id))) }
             return
         }
         stops[id] = []

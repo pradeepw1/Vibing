@@ -1,9 +1,10 @@
 // Space Scope as a wallpaper (scope.html?wallpaper): the savings in src/saver.js, and how the flag reaches them.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { Group, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry, Vector3 } from "three";
 import { hostSearch } from "../src/options.js";
-import { createDetail, fitRatio, LIMITS, pixelsPerUnit, smoothsEdges } from "../src/saver.js";
+import { createDetail, fitRatio, LIMITS, nextWait, pixelsPerUnit, smoothsEdges } from "../src/saver.js";
 import { loadSettings } from "../src/settings.js";
 
 test("the drawing never has many more pixels than the cap, however big the screen", () => {
@@ -21,6 +22,27 @@ test("the drawing never has many more pixels than the cap, however big the scree
   assert.ok(fitRatio(1, 12000, 8000) >= 0.35);
   assert.equal(fitRatio(undefined, 1280, 720), 1);
   assert.equal(fitRatio(3, 800, 600), 2, "never sharper than twice");
+});
+
+test("a covered page finishes loading, and only then stops", () => {
+  // Shown: wait out the rest of the frame, then the screen's next refresh.
+  assert.deepEqual(nextWait({ hidden: false, loaded: true, gap: 50, since: 12 }), { wait: 30, refresh: true });
+  assert.deepEqual(nextWait({ hidden: false, loaded: false, gap: 50, since: 12 }), { wait: 30, refresh: true });
+  assert.deepEqual(nextWait({ hidden: false, loaded: true, gap: 50, since: 900 }), { wait: 0, refresh: true }, "a late frame doesn't wait");
+  assert.deepEqual(nextWait({ hidden: false, loaded: true, gap: 50, since: Infinity }), { wait: 0, refresh: true }, "shown again: at once");
+  // Covered and loaded: nothing runs at all, which is the saving.
+  assert.equal(nextWait({ hidden: true, loaded: true, gap: 50, since: 12 }), null);
+  // Covered before it was done: no refresh will come, so it goes on by the clock, whatever the frame rate is.
+  for (const gap of [33, 1000]) assert.deepEqual(nextWait({ hidden: true, loaded: false, gap, since: 0 }), { wait: LIMITS.coveredEvery, refresh: false });
+});
+
+test("both wallpaper pages pace their frames the same way", () => {
+  for (const name of ["main.js", "wallpaper.js"]) {
+    const source = readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8");
+    assert.match(source, /nextWait\(\{/, name);
+    assert.doesNotMatch(source, /if \(waiting \|\| document\.hidden\) return/, `${name}: a hidden page that hasn't loaded must not stop`);
+    assert.match(source, /cancelAnimationFrame\(nextRefresh\)/, `${name}: covered with a refresh on its way, it would wait for that for ever`);
+  }
 });
 
 test("edges are smoothed only where the screen isn't sharp enough to hide them", () => {
