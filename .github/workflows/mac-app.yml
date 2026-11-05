@@ -54,7 +54,8 @@ jobs:
             exit 1
           fi
           cat run.log
-          check() { grep -q "$1" run.log || { echo "MISSING in the log: $1"; failed=1; }; }
+          # (::error:: and ::notice:: lines show on the run's page, which anyone can read; its log takes signing in.)
+          check() { grep -q "$1" run.log || { echo "::error::MISSING in the log: $1"; failed=1; }; }
           failed=0
           # Space Scope is what the wallpaper shows when the app starts, as a wallpaper: the savings are on, no settings button.
           check 'page state (scope): .*"page":true.*"which":"scope".*"saver":true.*"settingsButton":false'
@@ -75,11 +76,15 @@ jobs:
           awk '/watching the wallpaper/{f=1} /after other apps and Mission Control/{print; f=0} f' run.log > apps.log
           cat apps.log
           check 'after other apps and Mission Control, the wallpaper page: {"samePage":true,.*"lost":0,"back":0'
-          if grep -q 'the page loaded\|the page stopped\|graphics were lost\|made again' apps.log; then echo "WRONG: the wallpaper restarted while other apps opened"; failed=1; fi
+          if grep -q 'the page loaded\|the page stopped\|graphics were lost\|made again' apps.log; then echo "::error::WRONG: the wallpaper restarted while other apps opened"; failed=1; fi
           # Started with the desktop already covered: the page still loads, hidden, so uncovering it shows the finished picture.
           check 'started under a cover, a minute on, the page: {"visibility":"hidden","loaded":true,"drawn":[1-9]'
-          check 'under the cover the page has [1-9][0-9] layers\|under the cover the page has [1-9][0-9][0-9] layers'
           check 'uncovered, the page: {"visibility":"visible","loaded":true,"drawn":[1-9]'
+          # It loaded on show, not hidden: a hidden page puts nothing on the screen, so only then is its picture ready under the cover.
+          awk '/started the pictures again under the cover/{f=1} /a minute on, the page/{f=0} f' run.log > covered.log
+          grep 'finished loading\|a minute on\|uncovered, the page' run.log | tail -6 | while read -r line; do echo "::notice::$line"; done
+          grep -q 'page: finished loading' covered.log || { echo "::error::WRONG: the page didn't finish loading under the cover"; failed=1; }
+          if grep -q 'finished loading, covered' covered.log; then echo "::error::WRONG: the page was hidden while it loaded under the cover"; failed=1; fi
           # The Low Power Mode signal comes on a background thread: the app takes it on the main one, and doesn't crash.
           check 'the Low Power Mode setting changed'
           # A page that keeps stopping: after three times the screen gets the lean picture, instead of reloading for ever.
@@ -89,8 +94,8 @@ jobs:
           # Told five times that the screens changed when nothing did: one quiet note, nothing made again, nothing reloaded.
           awk '/told the app five times that the screens changed/{f=1} /four seconds after/{f=0} f' run.log > screens.log
           cat screens.log
-          [ "$(grep -c 'nothing about them did' screens.log)" = 1 ] || { echo "WRONG: expected one quiet note about the screens"; failed=1; }
-          if grep -q 'the page loaded\|made again\|making a window' screens.log; then echo "WRONG: the wallpapers were made again or reloaded"; failed=1; fi
+          [ "$(grep -c 'nothing about them did' screens.log)" = 1 ] || { echo "::error::WRONG: expected one quiet note about the screens"; failed=1; }
+          if grep -q 'the page loaded\|made again\|making a window' screens.log; then echo "::error::WRONG: the wallpapers were made again or reloaded"; failed=1; fi
           # Another window over the whole desktop: the page is told it is hidden, draws nothing, and draws again after.
           check 'while another window covered the desktop, the page drew: .*"drawsWhileCovered":0,"seenWhileCovered":\["hidden","visible"\],"msCovered":[1-9][0-9][0-9][0-9],"drawsAfter":[1-9]'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'

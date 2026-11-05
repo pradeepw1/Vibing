@@ -274,12 +274,7 @@ enum LaunchCheck {
         let loadState = "(function(){var g=window.solarSystem,r=g&&g.renderer;return JSON.stringify({visibility:document.visibilityState,"
             + "loaded:document.querySelector('#loading').classList.contains('done'),drawn:r?r.info.render.frame:0,"
             + "programs:r?r.info.programs.length:0,textures:r?r.info.memory.textures:0});})()"
-        steps.append((60, {
-            ask(hooks, loadState, "started under a cover, a minute on, the page:")
-            // (Its picture has to be on the screen already, under the cover: then there is nothing to wait for when it is uncovered.)
-            func count(_ layer: CALayer) -> Int { 1 + (layer.sublayers ?? []).reduce(0) { $0 + count($1) } }
-            say("launch check: under the cover the page has \(hooks.web()?.layer.map(count) ?? 0) layers")
-        }))
+        steps.append((60, { ask(hooks, loadState, "started under a cover, a minute on, the page:") }))
         steps.append((1, {
             for window in covers { window.orderOut(nil) }
             covers = []
