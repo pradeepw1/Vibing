@@ -27,8 +27,12 @@ enum LaunchCheck {
         if on { say("launch check: \(text)") }
     }
 
+    private static let started = Date()
+
+    /// A line for the log, with how many seconds after start-up it was written (so a late step shows).
     static func say(_ text: String) {
-        FileHandle.standardError.write((text + "\n").data(using: .utf8) ?? Data())
+        let line = text + String(format: "   [%.1f s]", Date().timeIntervalSince(started))
+        FileHandle.standardError.write((line + "\n").data(using: .utf8) ?? Data())
     }
 
     private static func at(_ seconds: Double, _ block: @escaping () -> Void) {
@@ -110,10 +114,12 @@ enum LaunchCheck {
             ask(hooks, "document.querySelector('#zoom-note').textContent", "after picking 4x in the menu the page says:")
             hushedAt = now()
             hooks.quiet(true)
+            say("launch check: hushed the windows")
         }
         at(41) {
             wokeAt = now()
             hooks.quiet(false)
+            say("launch check: woke the windows, \(Int(wokeAt - hushedAt)) ms after hushing them")
         }
         at(44) {
             let js = "(function(a,b){var n=0,t=window.__draws||[];for(var i=0;i<t.length;i++)if(t[i]>a+500&&t[i]<b)n++;"
@@ -147,20 +153,26 @@ enum LaunchCheck {
             window.orderFrontRegardless()
             cover = window
             coveredAt = now()
+            say("launch check: laid a window over the desktop")
         }
-        at(57) {
+        at(55) {
+            let visible = hooks.window()?.occlusionState.contains(.visible)
+            say("launch check: 2 s covered, the wallpaper window is \(visible == nil ? "missing" : visible! ? "still visible" : "not visible")")
+        }
+        at(58) {
             let visible = hooks.window()?.occlusionState.contains(.visible)
             say("launch check: covered, the wallpaper window is \(visible == nil ? "missing" : visible! ? "still visible" : "not visible")")
             uncoveredAt = now()
             cover?.orderOut(nil)
             cover = nil
+            say("launch check: took the window away, \(Int(uncoveredAt - coveredAt)) ms after laying it")
         }
-        at(60) {
+        at(61) {
             let js = "(function(a,b){var n=0,t=window.__draws||[];for(var i=0;i<t.length;i++)if(t[i]>a+700&&t[i]<b)n++;"
                 + "return JSON.stringify({drawsWhileCovered:n,secondsCovered:Math.round((b-a)/100)/10,drawsInAll:t.length});})(\(coveredAt),\(uncoveredAt))"
             ask(hooks, js, "while another window covered the desktop, the page drew:")
         }
-        at(62) { say("launch check: finished") }
+        at(63) { say("launch check: finished") }
     }
 
     /// The picture as 96 by 28 characters: the brightest spot in each cell, so a star or a planet still shows.
