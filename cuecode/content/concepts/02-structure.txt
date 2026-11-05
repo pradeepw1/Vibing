@@ -1,0 +1,804 @@
+%%concept records
+%%title Grouping data
+%%group Structure
+%%blurb Keep related values together as one thing.
+%%docs class object struct group-item
+%%explain
+A customer has a name and a balance. Keeping them in two loose variables falls apart fast, so you group them into one thing.
+
+Modern languages give you a class or struct: a template for data, plus functions that belong to it, called methods.
+%%mainframe
+A COBOL record is a layout of bytes, written with level numbers. `01` is the whole record, and `05` is a field inside it. There are no methods: the data sits in one place and paragraphs act on it. That layout is usually kept in a copybook and shared by every program touching the file. `REDEFINES` lets the same bytes be read two different ways.
+
+%%lang python
+%%note `@dataclass` writes the boring setup code for you.
+%%code
+from dataclasses import dataclass
+
+@dataclass
+class Customer:
+    name: str
+    balance: float
+
+    def deposit(self, amount):
+        self.balance += amount
+
+c = Customer("Asha", 100.0)
+c.deposit(50.0)
+print(c.name, c.balance)
+%%output
+Asha 150.0
+
+%%lang swift
+%%note A `struct` is copied when passed around, so changing it needs `mutating`.
+%%code
+struct Customer {
+    let name: String
+    var balance: Double
+
+    mutating func deposit(_ amount: Double) {
+        balance += amount
+    }
+}
+
+var c = Customer(name: "Asha", balance: 100)
+c.deposit(50)
+print(c.name, c.balance)
+%%output
+Asha 150.0
+
+%%lang java
+%%note Fields, a constructor, then methods. Java likes to spell things out.
+%%code
+public class Main {
+    static class Customer {
+        final String name;
+        double balance;
+
+        Customer(String name, double balance) {
+            this.name = name;
+            this.balance = balance;
+        }
+
+        void deposit(double amount) {
+            balance += amount;
+        }
+    }
+
+    public static void main(String[] args) {
+        Customer c = new Customer("Asha", 100.0);
+        c.deposit(50.0);
+        System.out.println(c.name + " " + c.balance);
+    }
+}
+%%output
+Asha 150.0
+
+%%lang cobol
+%%note `01` is the record, `05` the fields inside. It's a map of bytes.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. RECORDS1.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-CUSTOMER.
+           05  CUST-NAME     PIC X(10)    VALUE "Asha".
+           05  CUST-BALANCE  PIC 9(5)V99  VALUE 100.00.
+       01  WS-AMOUNT         PIC 9(5)V99  VALUE 50.00.
+       01  WS-OUT            PIC ZZ,ZZ9.99.
+       PROCEDURE DIVISION.
+           ADD WS-AMOUNT TO CUST-BALANCE.
+           MOVE CUST-BALANCE TO WS-OUT.
+           DISPLAY CUST-NAME WS-OUT.
+           STOP RUN.
+%%output
+Asha         150.00
+
+%%lang js
+%%note Or skip the class and write a plain object: `{ name: "Asha", balance: 100 }`.
+%%code
+class Customer {
+  constructor(name, balance) {
+    this.name = name;
+    this.balance = balance;
+  }
+
+  deposit(amount) {
+    this.balance += amount;
+  }
+}
+
+const c = new Customer("Asha", 100);
+c.deposit(50);
+console.log(c.name, c.balance);
+%%output
+Asha 150
+
+%%lang ts
+%%note `interface` describes a shape, and any object of that shape fits.
+%%code
+interface Customer {
+  name: string;
+  balance: number;
+}
+
+function deposit(customer: Customer, amount: number): Customer {
+  return { ...customer, balance: customer.balance + amount };
+}
+
+const c = deposit({ name: "Asha", balance: 100 }, 50);
+console.log(c.name, c.balance);
+%%output
+Asha 150
+
+%%lang html
+%%note HTML groups by nesting. `class` is a label that CSS and JavaScript can find.
+%%run live
+%%code
+<article class="customer">
+  <h2>Asha</h2>
+  <p>Balance: 150</p>
+</article>
+
+%%lang css
+%%note A class name groups elements so they share a style.
+%%run live
+%%demo <article class="customer"><h2>Asha</h2><p>Balance: 150</p></article>
+%%code
+.customer {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+%%concept missing
+%%title When there's nothing there
+%%group Structure
+%%blurb Handle a value that might not exist.
+%%docs null optional
+%%explain
+Sometimes the answer is "nothing": no such customer, no nickname, no reply. Most languages have a value for that, called `null`, `nil` or `None`. Using it as if it were real is one of the most common crashes in programming.
+
+Swift and TypeScript make this safer: the type says a value might be missing, and you have to deal with it before the code will compile.
+%%mainframe
+COBOL has no null. A field always holds bytes, so you agree on a meaning for "nothing": usually `SPACES` for text, zero for numbers, or `LOW-VALUES`. An 88 level names that meaning. Db2 does have NULL, so programs pair a field with an indicator variable, and a negative indicator means null.
+
+%%lang python
+%%note `None` is the nothing value. Test it with `is None`.
+%%code
+nicknames = {"asha": "Ash"}
+nickname = nicknames.get("ravi")
+
+if nickname is None:
+    print("No nickname")
+else:
+    print(nickname.upper())
+%%output
+No nickname
+
+%%lang swift
+%%note `String?` might be nil. `if let` opens it safely, `??` gives a fallback.
+%%code
+let nicknames = ["asha": "Ash"]
+let nickname: String? = nicknames["ravi"]
+
+if let nick = nickname {
+    print(nick.uppercased())
+} else {
+    print("No nickname")
+}
+print(nickname ?? "none")
+%%output
+No nickname
+none
+
+%%lang java
+%%note `Optional` wraps a maybe-missing value, so you can't forget to check.
+%%code
+import java.util.Map;
+import java.util.Optional;
+
+public class Main {
+    public static void main(String[] args) {
+        Map<String, String> nicknames = Map.of("asha", "Ash");
+        Optional<String> nickname = Optional.ofNullable(nicknames.get("ravi"));
+
+        System.out.println(nickname.map(String::toUpperCase).orElse("No nickname"));
+    }
+}
+%%output
+No nickname
+
+%%lang cobol
+%%note No null here. An 88 level gives a name to "the field is blank".
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. MISSING1.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NICK        PIC X(10)  VALUE SPACES.
+           88  NO-NICK               VALUE SPACES.
+       PROCEDURE DIVISION.
+           IF NO-NICK
+               DISPLAY "No nickname"
+           ELSE
+               DISPLAY WS-NICK
+           END-IF.
+           STOP RUN.
+%%output
+No nickname
+
+%%lang js
+%%note There are two nothings: `undefined` and `null`. `?.` stops at either one.
+%%code
+const nicknames = { asha: "Ash" };
+const nickname = nicknames["ravi"];
+
+console.log(nickname);
+console.log(nickname?.toUpperCase() ?? "No nickname");
+%%output
+undefined
+No nickname
+
+%%lang ts
+%%note `string | undefined` forces the check. Skip it and this won't compile.
+%%code
+const nicknames: Record<string, string | undefined> = { asha: "Ash" };
+const nickname = nicknames["ravi"];
+
+if (nickname === undefined) {
+  console.log("No nickname");
+} else {
+  console.log(nickname.toUpperCase());
+}
+%%output
+No nickname
+
+%%lang html
+%%skip Nothing to handle: an empty element just shows nothing.
+
+%%lang css
+%%note `:empty` can style an element with nothing in it.
+%%run live
+%%demo <p class="note"></p><p class="note">I have text.</p>
+%%code
+.note {
+  padding: 8px;
+  background: #fde68a;
+}
+
+.note:empty {
+  display: none;
+}
+
+%%concept errors
+%%title When things go wrong
+%%group Structure
+%%blurb Catch problems instead of crashing.
+%%docs exception abend
+%%explain
+Files go missing, networks drop, people type letters where numbers should go. Good programs expect that.
+
+The usual pattern is `try` and `catch`: try the risky thing, and if it throws an error, catch it and decide what to do. Notice that JavaScript doesn't treat dividing by zero as an error at all.
+%%mainframe
+COBOL doesn't throw exceptions. You check after each risky step: `ON SIZE ERROR` for arithmetic, `FILE STATUS` for files, `SQLCODE` for Db2. If nobody checks, the job can ABEND (abnormal end). S0C7 means bad data in a number field, and it's the most famous one. Jobs also leave a return code: 0 is fine, 4 is a warning, and 8 or more means trouble.
+
+%%lang python
+%%note Name the error you expect. A bare `except` hides real bugs.
+%%code
+def safe_divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        print("Can't divide by zero")
+        return None
+
+print(safe_divide(10, 2))
+print(safe_divide(10, 0))
+%%output
+5.0
+Can't divide by zero
+None
+
+%%lang swift
+%%note A function marked `throws` must be called with `try`.
+%%code
+enum MathError: Error {
+    case divideByZero
+}
+
+func divide(_ a: Int, by b: Int) throws -> Int {
+    guard b != 0 else { throw MathError.divideByZero }
+    return a / b
+}
+
+do {
+    print(try divide(10, by: 2))
+    print(try divide(10, by: 0))
+} catch {
+    print("Can't divide by zero")
+}
+%%output
+5
+Can't divide by zero
+
+%%lang java
+%%note Some exceptions must be caught, or the code won't compile.
+%%code
+public class Main {
+    static int divide(int a, int b) {
+        return a / b;
+    }
+
+    public static void main(String[] args) {
+        try {
+            System.out.println(divide(10, 2));
+            System.out.println(divide(10, 0));
+        } catch (ArithmeticException e) {
+            System.out.println("Can't divide by zero");
+        }
+    }
+}
+%%output
+5
+Can't divide by zero
+
+%%lang cobol
+%%note Check right at the statement that could fail.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ERRORS1.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-A      PIC 9(3)  VALUE 10.
+       01  WS-B      PIC 9(3)  VALUE 0.
+       01  WS-R      PIC 9(3)  VALUE 0.
+       PROCEDURE DIVISION.
+           DIVIDE WS-A BY WS-B GIVING WS-R
+               ON SIZE ERROR
+                   DISPLAY "Can't divide by zero"
+               NOT ON SIZE ERROR
+                   DISPLAY WS-R
+           END-DIVIDE.
+           STOP RUN.
+%%output
+Can't divide by zero
+
+%%lang js
+%%note Dividing by zero gives `Infinity`, with no error. Bad JSON does throw.
+%%code
+console.log(10 / 0);
+
+try {
+  JSON.parse("not json");
+} catch (err) {
+  console.log("Bad JSON:", err.name);
+}
+%%output
+Infinity
+Bad JSON: SyntaxError
+
+%%lang ts
+%%note In a `catch`, the error's type is `unknown`, so you check it first.
+%%code
+console.log(10 / 0);
+
+try {
+  JSON.parse("not json");
+} catch (err) {
+  if (err instanceof Error) {
+    console.log("Bad JSON:", err.name);
+  }
+}
+%%output
+Infinity
+Bad JSON: SyntaxError
+
+%%lang html
+%%note Browsers forgive bad HTML and keep going. `alt` covers a failed image.
+%%run live
+%%code
+<img src="missing.png" alt="A photo of the shop">
+
+%%lang css
+%%note A browser skips rules it doesn't understand, so fallbacks go first.
+%%run live
+%%demo <p class="box">The second colour wins if the browser knows it.</p>
+%%code
+.box {
+  background: #fde68a;
+  background: color-mix(in srgb, gold, white 60%);
+  padding: 8px;
+}
+
+%%concept files
+%%title Reading a file
+%%group Structure
+%%blurb Go through a file one line at a time.
+%%docs file dataset
+%%explain
+Reading a file is the start of most real programs. You open it, go through it, and close it.
+
+The tidy forms close the file for you, even if something fails. These all read `names.txt`, which holds three names.
+%%mainframe
+This is what COBOL was made for. The program doesn't name a real file. `ASSIGN TO NAMES` is a nickname, and the JCL says what it means: `//NAMES DD DSN=PROD.CUST.NAMES,DISP=SHR`. So the same program can read test or production data with no code change. The pattern never changes: open, read until end of file, close. On z/OS you'd leave out `LINE SEQUENTIAL`, because mainframe records are fixed length with no line endings.
+
+%%lang python
+%%note `with` closes the file for you, even after an error.
+%%code
+with open("names.txt") as f:
+    for line in f:
+        print(line.strip().upper())
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang swift
+%%note Reads the whole file at once, then splits it into lines.
+%%code
+import Foundation
+
+let text = try String(contentsOfFile: "names.txt", encoding: .utf8)
+for line in text.split(separator: "\n") {
+    print(line.uppercased())
+}
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang java
+%%note `throws Exception` passes file errors up, so you don't handle them here.
+%%code
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        for (String line : Files.readAllLines(Path.of("names.txt"))) {
+            System.out.println(line.toUpperCase());
+        }
+    }
+}
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang cobol
+%%note The pattern at the heart of mainframe batch work.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. READFILE.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT NAMES-FILE ASSIGN TO NAMES
+               ORGANIZATION IS LINE SEQUENTIAL
+               FILE STATUS IS WS-STATUS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  NAMES-FILE.
+       01  NAME-RECORD      PIC X(20).
+       WORKING-STORAGE SECTION.
+       01  WS-STATUS        PIC XX.
+       01  WS-EOF           PIC X   VALUE "N".
+           88  END-OF-FILE          VALUE "Y".
+       PROCEDURE DIVISION.
+           OPEN INPUT NAMES-FILE.
+           PERFORM UNTIL END-OF-FILE
+               READ NAMES-FILE
+                   AT END SET END-OF-FILE TO TRUE
+                   NOT AT END
+                       DISPLAY FUNCTION UPPER-CASE(NAME-RECORD)
+               END-READ
+           END-PERFORM.
+           CLOSE NAMES-FILE.
+           STOP RUN.
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang js
+%%note This is Node. A web page can't read your disk unless you pick a file.
+%%play no
+%%code
+const fs = require("node:fs");
+
+const lines = fs.readFileSync("names.txt", "utf8").trim().split("\n");
+for (const line of lines) {
+  console.log(line.toUpperCase());
+}
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang ts
+%%note `import` is the modern way to bring in Node's file tools.
+%%code
+import { readFileSync } from "node:fs";
+
+const lines: string[] = readFileSync("names.txt", "utf8").trim().split("\n");
+for (const line of lines) {
+  console.log(line.toUpperCase());
+}
+%%output
+ASHA
+RAVI
+MEI
+
+%%lang html
+%%note A web page only gets a file when the person picks it.
+%%run live
+%%code
+<label>
+  Pick a file:
+  <input type="file" accept=".txt">
+</label>
+
+%%lang css
+%%skip CSS doesn't read files, though it can load fonts and images.
+
+%%lang jcl
+%%note How the mainframe connects `ASSIGN TO NAMES` to a real dataset.
+%%run none: JCL needs a mainframe to run
+%%code
+//READJOB  JOB (ACCT),'READ NAMES',CLASS=A,MSGCLASS=X
+//STEP1    EXEC PGM=READFILE
+//STEPLIB  DD DSN=PROD.LOADLIB,DISP=SHR
+//NAMES    DD DSN=PROD.CUST.NAMES,DISP=SHR
+//SYSOUT   DD SYSOUT=*
+
+%%concept sort
+%%title Sorting and filtering
+%%group Structure
+%%blurb Put things in order and keep only what you want.
+%%docs lambda sort-step
+%%explain
+Most work on data comes down to three moves: sort it, keep the bits you want, add it up.
+
+Modern languages let you say what you want in one line, by passing a small function to `filter`. That's a lot easier to read than writing the loop yourself.
+%%mainframe
+On a mainframe, you often don't sort in COBOL at all. You add a DFSORT step to the JCL, and it sorts, filters and even sums huge files with no code. Run it before your program, so the program only ever sees clean, sorted input. Batch logic usually depends on that sorted order.
+
+%%lang python
+%%note `[x for x in list if ...]` is called a list comprehension.
+%%code
+prices = [30, 5, 18, 42]
+
+print(sorted(prices))
+print([p for p in prices if p > 10])
+print(sum(prices))
+%%output
+[5, 18, 30, 42]
+[30, 18, 42]
+95
+
+%%lang swift
+%%note `$0` means "the first thing passed in".
+%%code
+let prices = [30, 5, 18, 42]
+
+print(prices.sorted())
+print(prices.filter { $0 > 10 })
+print(prices.reduce(0, +))
+%%output
+[5, 18, 30, 42]
+[30, 18, 42]
+95
+
+%%lang java
+%%note Streams chain steps together. `p -> p > 10` is a lambda.
+%%code
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> prices = List.of(30, 5, 18, 42);
+
+        System.out.println(prices.stream().sorted().toList());
+        System.out.println(prices.stream().filter(p -> p > 10).toList());
+        System.out.println(prices.stream().mapToInt(Integer::intValue).sum());
+    }
+}
+%%output
+[5, 18, 30, 42]
+[30, 18, 42]
+95
+
+%%lang cobol
+%%note Only GnuCOBOL and newer compilers sort a table. Most shops use a DFSORT step.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. SORTIT.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-TABLE.
+           05  WS-PRICE  PIC 9(3)  OCCURS 4 TIMES.
+       01  WS-I          PIC 9.
+       01  WS-TOTAL      PIC 9(3)  VALUE 0.
+       PROCEDURE DIVISION.
+           MOVE 30 TO WS-PRICE(1).
+           MOVE 5  TO WS-PRICE(2).
+           MOVE 18 TO WS-PRICE(3).
+           MOVE 42 TO WS-PRICE(4).
+           SORT WS-PRICE ASCENDING KEY WS-PRICE.
+           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > 4
+               ADD WS-PRICE(WS-I) TO WS-TOTAL
+               IF WS-PRICE(WS-I) > 10
+                   DISPLAY WS-PRICE(WS-I)
+               END-IF
+           END-PERFORM.
+           DISPLAY WS-TOTAL.
+           STOP RUN.
+%%output
+018
+030
+042
+095
+
+%%lang js
+%%note Careful: plain `.sort()` compares as text, so 18 comes before 5.
+%%code
+const prices = [30, 5, 18, 42];
+
+console.log([...prices].sort((a, b) => a - b).join(", "));
+console.log(prices.filter((p) => p > 10).join(", "));
+console.log(prices.reduce((sum, p) => sum + p, 0));
+%%output
+5, 18, 30, 42
+30, 18, 42
+95
+
+%%lang ts
+%%note Same as JavaScript, and `p` is known to be a number here.
+%%code
+const prices: number[] = [30, 5, 18, 42];
+
+console.log([...prices].sort((a, b) => a - b).join(", "));
+console.log(prices.filter((p) => p > 10).join(", "));
+console.log(prices.reduce((sum, p) => sum + p, 0));
+%%output
+5, 18, 30, 42
+30, 18, 42
+95
+
+%%lang html
+%%skip HTML shows things in the order they're written.
+
+%%lang css
+%%note `order` moves things around on screen, without changing the HTML.
+%%run live
+%%demo <div class="row"><span>first</span><span class="last">moved</span><span>third</span></div>
+%%code
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.last {
+  order: -1;
+  font-weight: bold;
+}
+
+%%lang jcl
+%%note The usual mainframe way: no COBOL, just a sort step.
+%%run none: JCL needs a mainframe to run
+%%code
+//SORTSTEP EXEC PGM=SORT
+//SYSOUT   DD SYSOUT=*
+//SORTIN   DD DSN=PROD.PRICES.DAILY,DISP=SHR
+//SORTOUT  DD DSN=PROD.PRICES.SORTED,DISP=(NEW,CATLG),
+//            SPACE=(CYL,(5,5)),RECFM=FB,LRECL=80
+//SYSIN    DD *
+  SORT FIELDS=(1,3,CH,A)
+  INCLUDE COND=(1,3,CH,GT,C'010')
+/*
+
+%%concept modules
+%%title Using other people's code
+%%group Structure
+%%blurb Bring in code from another file or library.
+%%docs library package copybook
+%%explain
+Nobody writes everything from scratch. Each language has a way to pull in code from elsewhere: your own files, the built-in standard library, or packages other people have shared.
+
+The word changes: `import`, `require`, `COPY`. The idea stays the same.
+%%mainframe
+`COPY` pastes a copybook into your program when it compiles. It's plain text inclusion, and it's how every program agrees on a record layout. Change a copybook and all programs using it must be recompiled, or they'll read the bytes wrongly. Compiled programs live in a load library, and JCL's `STEPLIB` says where to find them.
+
+%%lang python
+%%note Standard tools come with Python. Add others with `pip install`.
+%%code
+import math
+from statistics import mean
+
+print(math.sqrt(16))
+print(mean([2, 4, 9]))
+%%output
+4.0
+5
+
+%%lang swift
+%%note `Foundation` comes with Apple's tools. Others come via Swift Package Manager.
+%%code
+import Foundation
+
+print(sqrt(16.0))
+print(floor(2.7))
+%%output
+4.0
+2.0
+
+%%lang java
+%%note `java.*` comes with Java. Libraries come through Maven or Gradle.
+%%code
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println(Math.sqrt(16));
+        System.out.println(List.of(2, 4, 9).size());
+    }
+}
+%%output
+4.0
+3
+
+%%lang cobol
+%%note `CUSTREC.cpy` holds a record layout, shared by every program.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. USECOPY.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY CUSTREC.
+       PROCEDURE DIVISION.
+           MOVE "Asha" TO CUST-NAME.
+           DISPLAY CUST-NAME.
+           STOP RUN.
+%%output
+Asha
+
+%%lang js
+%%note `node:` means built into Node. Others come through `npm install`.
+%%play no
+%%code
+import { basename } from "node:path";
+
+console.log(basename("/home/asha/report.txt"));
+console.log(Math.sqrt(16));
+%%output
+report.txt
+4
+
+%%lang ts
+%%note Same as JavaScript. Many packages also ship their own types.
+%%code
+import { basename } from "node:path";
+
+console.log(basename("/home/asha/report.txt"));
+console.log(Math.sqrt(16));
+%%output
+report.txt
+4
+
+%%lang html
+%%note HTML pulls in the rest: `link` for styles, `script` for code.
+%%run live
+%%code
+<link rel="stylesheet" href="styles.css">
+<script src="app.js" defer></script>
+
+%%lang css
+%%note One stylesheet can load another.
+%%run live
+%%code
+@import url("theme.css");
+
+body {
+  margin: 0;
+}

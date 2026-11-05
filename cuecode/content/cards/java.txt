@@ -1,0 +1,165 @@
+%%card jv-int-div
+%%deck java
+%%kind predict
+%%ask What does this print?
+%%code java
+System.out.println(7 / 2);
+%%answer
+3
+%%why
+Two `int`s give an `int`, so the .5 is dropped. Use `7.0 / 2` for 3.5.
+
+%%card jv-string-plus
+%%deck java
+%%kind predict
+%%ask What does this print?
+%%code java
+System.out.println("Total: " + 1 + 2);
+%%answer
+Total: 12
+%%why
+It works left to right. Once there's text, `+` joins text. Use brackets: `(1 + 2)`.
+
+%%card jv-string-plus-2
+%%deck java
+%%kind predict
+%%ask What does this print?
+%%code java
+System.out.println(1 + 2 + " total");
+%%answer
+3 total
+%%why
+Left to right again: `1 + 2` is number maths, and then it joins the text.
+
+%%card jv-string-equals
+%%deck java
+%%kind predict
+%%ask A classic trap. What does this print?
+%%code java
+String a = new String("hi");
+String b = new String("hi");
+System.out.println(a == b);
+System.out.println(a.equals(b));
+%%answer
+false
+true
+%%why
+`==` checks whether they're the same object. `.equals` compares the text. Always use `.equals` for strings.
+
+%%card jv-increment
+%%deck java
+%%kind predict
+%%ask What does this print?
+%%code java
+int n = 5;
+System.out.println(n++);
+System.out.println(n);
+%%answer
+5
+6
+%%why
+`n++` gives the old value first, then adds one.
+
+%%card jv-char-math
+%%deck java
+%%kind predict
+%%ask What does this print?
+%%code java
+System.out.println('a' + 1);
+%%answer
+98
+%%why
+A `char` is a number underneath, and `'a'` is 97.
+
+%%card jv-for-each
+%%deck java
+%%kind fill
+%%ask Fill the gap to go through every name.
+%%code java
+import java.util.List;
+List<String> names = List.of("Asha", "Ravi");
+for (String name ____ names) {
+    System.out.println(name);
+}
+%%answer
+:
+%%why
+Read the `:` as "in".
+
+%%card jv-record
+%%deck java
+%%kind fill
+%%ask Fill the gap to make a small data class in one line.
+%%code java
+____ Point(int x, int y) {}
+System.out.println(new Point(1, 2));
+%%answer
+record
+%%why
+A `record` writes the constructor, getters, `equals` and `toString` for you.
+
+%%card jv-stream
+%%deck java
+%%kind write
+%%ask Using a stream, make a list of only the names longer than 3 letters.
+%%code java
+import java.util.List;
+List<String> names = List.of("Asha", "Mei", "Ravi");
+%%answer java
+import java.util.List;
+List<String> names = List.of("Asha", "Mei", "Ravi");
+List<String> longer = names.stream().filter(n -> n.length() > 3).toList();
+%%why
+`filter` keeps the matches, and `toList` collects them.
+
+%%card jv-interface
+%%deck java
+%%kind explain
+%%ask What's an interface for?
+%%answer
+It lists what a class promises to do, without saying how. Code can then work with anything that keeps the promise.
+
+%%card jv-checked
+%%deck java
+%%kind explain
+%%ask What's a checked exception?
+%%answer
+One the compiler makes you deal with, such as `IOException`. You must catch it or declare `throws`.
+
+%%card jv-primitive
+%%deck java
+%%kind explain
+%%ask What's the difference between `int` and `Integer`?
+%%answer
+`int` is a plain number. `Integer` is an object that wraps one. Collections like `List` need the object version.
+
+%%card jv-jvm
+%%deck java
+%%kind explain
+%%ask What does `javac` make, and what runs it?
+%%answer
+`javac` makes bytecode in `.class` files. The JVM runs that bytecode on any machine.
+
+%%card jv-static
+%%deck java
+%%kind explain
+%%ask What does `static` mean?
+%%answer
+It belongs to the class itself, not to one object. You can use it without creating an object.
+
+%%card jv-fix-equals
+%%deck java
+%%kind fix
+%%ask This compiles, but can give the wrong answer. Fix it.
+%%code java
+String input = new String("yes");
+if (input == "yes") {
+    System.out.println("Confirmed");
+}
+%%answer java
+String input = new String("yes");
+if ("yes".equals(input)) {
+    System.out.println("Confirmed");
+}
+%%why
+`==` compares objects, not text. Writing `"yes".equals(input)` also survives a null `input`.

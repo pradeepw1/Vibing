@@ -1,0 +1,1154 @@
+%%concept hello
+%%title Say hello
+%%group Basics
+%%blurb Make the computer show a line of text.
+%%docs compiler interpreter
+%%explain
+Every language has a way to put text in front of you. It's the first thing to learn because it's how you see what your program is doing.
+
+Look at how much each language asks for before it will say one word. Python and JavaScript need one line. Java wants a class and a `main` method. COBOL wants a whole structure.
+%%mainframe
+`DISPLAY` doesn't go to a screen. A batch job has no screen. The text lands in the job's output (SYSOUT), and you read it later in SDSF. COBOL's layout also comes from punched cards: code starts at column 8, and nothing past column 72 counts.
+
+%%lang python
+%%note One line. Nothing else needed.
+%%code
+print("Hello, world!")
+%%output
+Hello, world!
+
+%%lang swift
+%%note One line too, when it's a script.
+%%code
+print("Hello, world!")
+%%output
+Hello, world!
+
+%%lang java
+%%note Everything lives in a class, and the program starts at `main`.
+%%code
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, world!");
+    }
+}
+%%output
+Hello, world!
+
+%%lang cobol
+%%note Divisions come first. The dots end sentences, and they matter.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. HELLO.
+       PROCEDURE DIVISION.
+           DISPLAY "Hello, world!".
+           STOP RUN.
+%%output
+Hello, world!
+
+%%lang js
+%%note In a browser, this shows up in the developer console, not on the page.
+%%code
+console.log("Hello, world!");
+%%output
+Hello, world!
+
+%%lang ts
+%%note JavaScript plus labels that say what kind of thing each value is.
+%%code
+const message: string = "Hello, world!";
+console.log(message);
+%%output
+Hello, world!
+
+%%lang html
+%%note HTML doesn't run. It describes what's on the page.
+%%run live
+%%code
+<!doctype html>
+<title>Hello</title>
+<h1>Hello, world!</h1>
+
+%%lang css
+%%note CSS can't say anything itself. It styles what HTML already put there.
+%%run live
+%%demo <h1>Hello, world!</h1>
+%%code
+h1 {
+  color: tomato;
+  font-family: Georgia, serif;
+}
+
+%%concept variables
+%%title Variables and types
+%%group Basics
+%%blurb Give a value a name so you can use it later.
+%%docs variable type constant
+%%explain
+A variable is a labelled box. You put a value in, and use the label to get it back.
+
+The big difference is how strict each language is about what goes in the box. Python and JavaScript let you put anything in. Swift, Java and TypeScript fix the type, so a mistake shows up before the program runs. COBOL goes further: you say exactly how many characters or digits the box holds.
+%%mainframe
+A COBOL variable is a picture of bytes in memory, not an idea of a value. `PIC X(10)` is exactly 10 characters, always, padded with spaces. `PIC 9(3)V99` is 5 digits with an invisible decimal point. Names usually start with `WS-` for Working-Storage. An 88 level gives a yes/no name to a value, so `IF IS-ACTIVE` reads like English.
+
+%%lang python
+%%note No types written down. The value decides.
+%%code
+name = "Asha"
+age = 34
+price = 19.99
+active = True
+
+age = age + 1
+print(name, age, price, active)
+%%output
+Asha 35 19.99 True
+
+%%lang swift
+%%note `let` can't change, `var` can. Swift works out the type for you.
+%%code
+let name = "Asha"
+var age = 34
+let price = 19.99
+let active = true
+
+age = age + 1
+print(name, age, price, active)
+%%output
+Asha 35 19.99 true
+
+%%lang java
+%%note The type comes first, every time.
+%%code
+public class Main {
+    public static void main(String[] args) {
+        String name = "Asha";
+        int age = 34;
+        double price = 19.99;
+        boolean active = true;
+
+        age = age + 1;
+        System.out.println(name + " " + age + " " + price + " " + active);
+    }
+}
+%%output
+Asha 35 19.99 true
+
+%%lang cobol
+%%note The output shows the real size of each box: padded name, 035 with its zero.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. VARS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NAME      PIC X(10)    VALUE "Asha".
+       01  WS-AGE       PIC 9(3)     VALUE 34.
+       01  WS-PRICE     PIC 9(3)V99  VALUE 19.99.
+       01  WS-ACTIVE    PIC X        VALUE "Y".
+           88  IS-ACTIVE             VALUE "Y".
+       01  WS-PRICE-OUT PIC ZZ9.99.
+       PROCEDURE DIVISION.
+           ADD 1 TO WS-AGE.
+           MOVE WS-PRICE TO WS-PRICE-OUT.
+           DISPLAY WS-NAME " " WS-AGE " " WS-PRICE-OUT " " WS-ACTIVE.
+           STOP RUN.
+%%output
+Asha       035  19.99 Y
+
+%%lang js
+%%note `const` can't be reassigned, `let` can. Avoid the old `var`.
+%%code
+const name = "Asha";
+let age = 34;
+const price = 19.99;
+const active = true;
+
+age = age + 1;
+console.log(name, age, price, active);
+%%output
+Asha 35 19.99 true
+
+%%lang ts
+%%note The same as JavaScript, with types after a colon. They vanish when it runs.
+%%code
+const name: string = "Asha";
+let age: number = 34;
+const price: number = 19.99;
+const active: boolean = true;
+
+age = age + 1;
+console.log(name, age, price, active);
+%%output
+Asha 35 19.99 true
+
+%%lang html
+%%skip HTML holds content, not values you can change.
+
+%%lang css
+%%note CSS has variables too. They always start with two dashes.
+%%run live
+%%demo <h1>Hello</h1>
+%%code
+:root {
+  --brand: tomato;
+}
+
+h1 {
+  color: var(--brand);
+}
+
+%%concept text
+%%title Working with text
+%%group Basics
+%%blurb Join text, change its case, measure it, search it.
+%%docs string
+%%explain
+Text is called a string: a string of characters. Almost every program joins strings, changes them and looks inside them.
+
+Most languages hand you these as one-word tools. Dropping a value into text is called interpolation, and it's the tidy way to build a sentence.
+%%mainframe
+COBOL has no growing strings. Every field has a fixed size and gets padded with spaces, so finding the "real" length takes work. `STRING` joins fields and `DELIMITED BY SPACE` stops at the padding. Counting trailing spaces with `FUNCTION REVERSE` is a trick you'll see in real code. Mainframe text is also EBCDIC, not ASCII, so sort order and file transfers can surprise you.
+
+%%lang python
+%%note `f"..."` drops values straight into text.
+%%code
+first = "Grace"
+last = "Hopper"
+full = first + " " + last
+
+print(full.upper())
+print(len(full))
+print("Hop" in full)
+print(f"Hello, {first}!")
+%%output
+GRACE HOPPER
+12
+True
+Hello, Grace!
+
+%%lang swift
+%%note `\(value)` drops values into text. `count` counts real characters, even emoji.
+%%code
+let first = "Grace"
+let last = "Hopper"
+let full = first + " " + last
+
+print(full.uppercased())
+print(full.count)
+print(full.contains("Hop"))
+print("Hello, \(first)!")
+%%output
+GRACE HOPPER
+12
+true
+Hello, Grace!
+
+%%lang java
+%%note Strings never change. `toUpperCase` hands you a new one.
+%%code
+public class Main {
+    public static void main(String[] args) {
+        String first = "Grace";
+        String last = "Hopper";
+        String full = first + " " + last;
+
+        System.out.println(full.toUpperCase());
+        System.out.println(full.length());
+        System.out.println(full.contains("Hop"));
+        System.out.println("Hello, %s!".formatted(first));
+    }
+}
+%%output
+GRACE HOPPER
+12
+true
+Hello, Grace!
+
+%%lang cobol
+%%note Fixed boxes, so "how long is it?" needs real work.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TEXTS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-FIRST    PIC X(10)  VALUE "Grace".
+       01  WS-LAST     PIC X(10)  VALUE "Hopper".
+       01  WS-FULL     PIC X(21)  VALUE SPACES.
+       01  WS-PAD      PIC 9(2)   VALUE 0.
+       01  WS-LEN      PIC 9(2)   VALUE 0.
+       01  WS-HITS     PIC 9(2)   VALUE 0.
+       PROCEDURE DIVISION.
+           STRING WS-FIRST DELIMITED BY SPACE
+                  " "      DELIMITED BY SIZE
+                  WS-LAST  DELIMITED BY SPACE
+                  INTO WS-FULL
+           END-STRING.
+           DISPLAY FUNCTION UPPER-CASE(WS-FULL).
+           INSPECT FUNCTION REVERSE(WS-FULL)
+               TALLYING WS-PAD FOR LEADING SPACES.
+           COMPUTE WS-LEN = FUNCTION LENGTH(WS-FULL) - WS-PAD.
+           DISPLAY WS-LEN.
+           INSPECT WS-FULL TALLYING WS-HITS FOR ALL "Hop".
+           DISPLAY WS-HITS.
+           STOP RUN.
+%%output
+GRACE HOPPER
+12
+01
+
+%%lang js
+%%note Backticks make a template string, and `${}` drops values in.
+%%code
+const first = "Grace";
+const last = "Hopper";
+const full = first + " " + last;
+
+console.log(full.toUpperCase());
+console.log(full.length);
+console.log(full.includes("Hop"));
+console.log(`Hello, ${first}!`);
+%%output
+GRACE HOPPER
+12
+true
+Hello, Grace!
+
+%%lang ts
+%%note Same tools as JavaScript. Here `full.length()` would be caught before running.
+%%code
+const first: string = "Grace";
+const last: string = "Hopper";
+const full: string = first + " " + last;
+
+console.log(full.toUpperCase());
+console.log(full.length);
+console.log(full.includes("Hop"));
+console.log(`Hello, ${first}!`);
+%%output
+GRACE HOPPER
+12
+true
+Hello, Grace!
+
+%%lang html
+%%skip HTML shows text. It can't change it.
+
+%%lang css
+%%note CSS can change how text looks, but the text underneath stays the same.
+%%run live
+%%demo <p class="name">Grace Hopper</p>
+%%code
+.name {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+%%concept numbers
+%%title Numbers and money
+%%group Basics
+%%blurb Why 0.1 + 0.2 isn't 0.3, and how to count money safely.
+%%docs floating-point decimal-type comp-3
+%%explain
+Computers store most decimals in binary, and binary can't hold 0.1 exactly, just as 1/3 can't be written exactly in decimal. So `0.1 + 0.2` gives 0.30000000000000004 in nearly every language.
+
+That's fine for a game and wrong for a bank. For money you use an exact decimal type, or count in whole cents.
+
+Dividing whole numbers also differs: some languages drop the remainder, so `7 / 2` can give 3.
+%%mainframe
+This is why banks still run COBOL. Packed decimal (`COMP-3`) stores money as exact digits, so 0.10 + 0.20 is exactly 0.30, and the hardware does this arithmetic directly. `PIC S9(5)V99` means signed, 5 digits, an implied decimal point, 2 digits. Display fields like `ZZ,ZZ9.99` are only for printing: leading zeros become spaces.
+
+%%lang python
+%%note `/` always gives a decimal, `//` drops the remainder.
+%%code
+from decimal import Decimal
+
+print(0.1 + 0.2)
+print(Decimal("0.10") + Decimal("0.20"))
+print(7 / 2, 7 // 2, 7 % 2)
+%%output
+0.30000000000000004
+0.30
+3.5 3 1
+
+%%lang swift
+%%note Two whole numbers stay whole, so `7 / 2` is 3.
+%%code
+import Foundation
+
+print(0.1 + 0.2)
+let a = Decimal(string: "0.10")!
+let b = Decimal(string: "0.20")!
+print(a + b)
+print(7.0 / 2.0, 7 / 2, 7 % 2)
+%%output
+0.30000000000000004
+0.3
+3.5 3 1
+
+%%lang java
+%%note Build `BigDecimal` from text. From a double, it's already wrong.
+%%code
+import java.math.BigDecimal;
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println(0.1 + 0.2);
+        System.out.println(new BigDecimal("0.10").add(new BigDecimal("0.20")));
+        System.out.println(7.0 / 2 + " " + 7 / 2 + " " + 7 % 2);
+    }
+}
+%%output
+0.30000000000000004
+0.30
+3.5 3 1
+
+%%lang cobol
+%%note Exact by default. `COMP-3` is packed decimal, built for money.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. NUMBERS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-A      PIC S9(5)V99 COMP-3 VALUE 0.10.
+       01  WS-B      PIC S9(5)V99 COMP-3 VALUE 0.20.
+       01  WS-SUM    PIC S9(5)V99 COMP-3.
+       01  WS-OUT    PIC ZZ,ZZ9.99.
+       01  WS-Q      PIC 9(3).
+       01  WS-R      PIC 9(3).
+       PROCEDURE DIVISION.
+           ADD WS-A TO WS-B GIVING WS-SUM.
+           MOVE WS-SUM TO WS-OUT.
+           DISPLAY WS-OUT.
+           DIVIDE 7 BY 2 GIVING WS-Q REMAINDER WS-R.
+           DISPLAY WS-Q " " WS-R.
+           STOP RUN.
+%%output
+     0.30
+003 001
+
+%%lang js
+%%note There's only one number type. Keep money in whole cents.
+%%code
+console.log(0.1 + 0.2);
+
+const cents = 10 + 20;
+console.log((cents / 100).toFixed(2));
+console.log(7 / 2, Math.floor(7 / 2), 7 % 2);
+%%output
+0.30000000000000004
+0.30
+3.5 3 1
+
+%%lang ts
+%%note Types don't change the maths. It's the same as JavaScript.
+%%code
+const cents: number = 10 + 20;
+
+console.log(0.1 + 0.2);
+console.log((cents / 100).toFixed(2));
+console.log(7 / 2, Math.floor(7 / 2), 7 % 2);
+%%output
+0.30000000000000004
+0.30
+3.5 3 1
+
+%%lang html
+%%skip HTML has no arithmetic.
+
+%%lang css
+%%note `calc()` does sums for sizes, and can mix units.
+%%run live
+%%demo <div class="bar">Almost full width</div>
+%%code
+.bar {
+  width: calc(100% - 40px);
+  padding: 8px;
+  background: #fde68a;
+}
+
+%%concept if
+%%title Making decisions
+%%group Basics
+%%blurb Do one thing or another, depending on a value.
+%%docs condition boolean
+%%explain
+A program needs to choose. `if` asks a yes/no question and runs a block when the answer is yes.
+
+Checks run top to bottom and the first match wins. That's why this example asks about 80 before 50.
+%%mainframe
+`EVALUATE TRUE` is COBOL's clean form of if / else if, and you'll see it everywhere. Always close with `END-IF` or `END-EVALUATE`. In old code a single full stop ends every open `IF`, and a stray full stop has caused real production bugs.
+
+%%lang python
+%%note Indentation is the structure. `elif` means else-if.
+%%code
+score = 72
+
+if score >= 80:
+    print("Great")
+elif score >= 50:
+    print("Pass")
+else:
+    print("Try again")
+%%output
+Pass
+
+%%lang swift
+%%note No round brackets needed around the check.
+%%code
+let score = 72
+
+if score >= 80 {
+    print("Great")
+} else if score >= 50 {
+    print("Pass")
+} else {
+    print("Try again")
+}
+%%output
+Pass
+
+%%lang java
+%%note Round brackets are required.
+%%code
+public class Main {
+    public static void main(String[] args) {
+        int score = 72;
+
+        if (score >= 80) {
+            System.out.println("Great");
+        } else if (score >= 50) {
+            System.out.println("Pass");
+        } else {
+            System.out.println("Try again");
+        }
+    }
+}
+%%output
+Pass
+
+%%lang cobol
+%%note `EVALUATE TRUE` reads like a list of cases.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. DECIDE.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-SCORE    PIC 9(3)  VALUE 72.
+       PROCEDURE DIVISION.
+           EVALUATE TRUE
+               WHEN WS-SCORE >= 80
+                   DISPLAY "Great"
+               WHEN WS-SCORE >= 50
+                   DISPLAY "Pass"
+               WHEN OTHER
+                   DISPLAY "Try again"
+           END-EVALUATE.
+           STOP RUN.
+%%output
+Pass
+
+%%lang js
+%%note Use `===` to compare. `==` quietly converts types first.
+%%code
+const score = 72;
+
+if (score >= 80) {
+  console.log("Great");
+} else if (score >= 50) {
+  console.log("Pass");
+} else {
+  console.log("Try again");
+}
+%%output
+Pass
+
+%%lang ts
+%%note The same as JavaScript, but comparing a number to text is caught early.
+%%code
+const score: number = 72;
+
+if (score >= 80) {
+  console.log("Great");
+} else if (score >= 50) {
+  console.log("Pass");
+} else {
+  console.log("Try again");
+}
+%%output
+Pass
+
+%%lang html
+%%skip HTML can't choose. It shows what's written.
+
+%%lang css
+%%note The nearest thing CSS has to `if`: apply these rules only on wide screens.
+%%run live
+%%demo <p class="tip">Resize the window to change my colour.</p>
+%%code
+.tip {
+  color: tomato;
+}
+
+@media (min-width: 600px) {
+  .tip {
+    color: seagreen;
+  }
+}
+
+%%concept loops
+%%title Repeating
+%%group Basics
+%%blurb Do the same thing again without writing it twice.
+%%docs loop
+%%explain
+A loop runs a block more than once. There are two kinds you'll use all the time.
+
+One goes through a known set of steps: "for each of these". The other keeps going while something is true: "until the total reaches 10". Pick the first when you know how many times, and the second when you don't.
+%%mainframe
+The classic mainframe loop reads a file: `PERFORM UNTIL END-OF-FILE`, one record at a time. Watch the field size. With `PIC 9`, a counter can't go past 9, so `UNTIL WS-N > 9` never comes true and the job loops until the operator cancels it.
+
+%%lang python
+%%note `range(1, 4)` stops before 4, giving 1, 2, 3.
+%%code
+for n in range(1, 4):
+    print("Step", n)
+
+total = 0
+while total < 10:
+    total += 4
+print(total)
+%%output
+Step 1
+Step 2
+Step 3
+12
+
+%%lang swift
+%%note `1...3` includes the 3. `1..<3` doesn't.
+%%code
+for n in 1...3 {
+    print("Step", n)
+}
+
+var total = 0
+while total < 10 {
+    total += 4
+}
+print(total)
+%%output
+Step 1
+Step 2
+Step 3
+12
+
+%%lang java
+%%note The classic three-part `for`: start, keep-going check, step.
+%%code
+public class Main {
+    public static void main(String[] args) {
+        for (int n = 1; n <= 3; n++) {
+            System.out.println("Step " + n);
+        }
+
+        int total = 0;
+        while (total < 10) {
+            total += 4;
+        }
+        System.out.println(total);
+    }
+}
+%%output
+Step 1
+Step 2
+Step 3
+12
+
+%%lang cobol
+%%note `PERFORM` is the only loop. `VARYING` counts, `UNTIL` waits.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. LOOPS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-N      PIC 9(2)  VALUE 0.
+       01  WS-TOTAL  PIC 9(2)  VALUE 0.
+       PROCEDURE DIVISION.
+           PERFORM VARYING WS-N FROM 1 BY 1 UNTIL WS-N > 3
+               DISPLAY "Step " WS-N
+           END-PERFORM.
+           PERFORM UNTIL WS-TOTAL >= 10
+               ADD 4 TO WS-TOTAL
+           END-PERFORM.
+           DISPLAY WS-TOTAL.
+           STOP RUN.
+%%output
+Step 01
+Step 02
+Step 03
+12
+
+%%lang js
+%%note `for...of` is the clean way to walk through a list.
+%%code
+for (let n = 1; n <= 3; n++) {
+  console.log("Step", n);
+}
+
+let total = 0;
+while (total < 10) {
+  total += 4;
+}
+console.log(total);
+%%output
+Step 1
+Step 2
+Step 3
+12
+
+%%lang ts
+%%note Same as JavaScript. The loop counter's type is worked out for you.
+%%code
+for (let n = 1; n <= 3; n++) {
+  console.log("Step", n);
+}
+
+let total: number = 0;
+while (total < 10) {
+  total += 4;
+}
+console.log(total);
+%%output
+Step 1
+Step 2
+Step 3
+12
+
+%%lang html
+%%skip HTML has no loops. To repeat something on a page, JavaScript builds it.
+
+%%lang css
+%%skip CSS has no loops. One rule already applies to every match.
+
+%%concept lists
+%%title Lists
+%%group Basics
+%%blurb Keep many values in order under one name.
+%%docs array index
+%%explain
+A list, also called an array, holds values in order. You reach into it by position, called an index.
+
+Nearly every language counts from 0, so the first item is `[0]`. Lists can usually grow as you add things.
+%%mainframe
+A COBOL table (`OCCURS`) is a fixed number of slots set at compile time, and it counts from 1. Using slot 0, or one past the end, overwrites whatever is next to it in memory. Real shops compile with `SSRANGE` on during testing to catch that. You keep your own count of how many slots are in use.
+
+%%lang python
+%%note `fruits[-1]` also works: it's the last item.
+%%code
+fruits = ["apple", "pear", "plum"]
+fruits.append("fig")
+
+print(fruits[0])
+print(len(fruits))
+for fruit in fruits:
+    print(fruit)
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang swift
+%%note `var` makes the list changeable. With `let`, `append` won't compile.
+%%code
+var fruits = ["apple", "pear", "plum"]
+fruits.append("fig")
+
+print(fruits[0])
+print(fruits.count)
+for fruit in fruits {
+    print(fruit)
+}
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang java
+%%note Plain arrays can't grow, so most code uses `ArrayList`.
+%%code
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> fruits = new ArrayList<>(List.of("apple", "pear", "plum"));
+        fruits.add("fig");
+
+        System.out.println(fruits.get(0));
+        System.out.println(fruits.size());
+        for (String fruit : fruits) {
+            System.out.println(fruit);
+        }
+    }
+}
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang cobol
+%%note Fixed size, counted from 1, and you track how many are in use.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. LISTS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-FRUITS.
+           05  WS-FRUIT  PIC X(10)  OCCURS 4 TIMES.
+       01  WS-COUNT      PIC 9      VALUE 3.
+       01  WS-I          PIC 9.
+       PROCEDURE DIVISION.
+           MOVE "apple" TO WS-FRUIT(1).
+           MOVE "pear"  TO WS-FRUIT(2).
+           MOVE "plum"  TO WS-FRUIT(3).
+           ADD 1 TO WS-COUNT.
+           MOVE "fig"   TO WS-FRUIT(WS-COUNT).
+
+           DISPLAY WS-FRUIT(1).
+           DISPLAY WS-COUNT.
+           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > WS-COUNT
+               DISPLAY WS-FRUIT(WS-I)
+           END-PERFORM.
+           STOP RUN.
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang js
+%%note `length` is a value, not a function: no brackets.
+%%code
+const fruits = ["apple", "pear", "plum"];
+fruits.push("fig");
+
+console.log(fruits[0]);
+console.log(fruits.length);
+for (const fruit of fruits) {
+  console.log(fruit);
+}
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang ts
+%%note `string[]` means every item must be text.
+%%code
+const fruits: string[] = ["apple", "pear", "plum"];
+fruits.push("fig");
+
+console.log(fruits[0]);
+console.log(fruits.length);
+for (const fruit of fruits) {
+  console.log(fruit);
+}
+%%output
+apple
+4
+apple
+pear
+plum
+fig
+
+%%lang html
+%%note A list on the page: `ul` for bullets, `ol` for numbers.
+%%run live
+%%code
+<ul>
+  <li>apple</li>
+  <li>pear</li>
+  <li>plum</li>
+  <li>fig</li>
+</ul>
+
+%%lang css
+%%skip CSS can style a list, but it can't hold one.
+
+%%concept maps
+%%title Looking things up
+%%group Basics
+%%blurb Find a value by its name instead of its position.
+%%docs map hash-table
+%%explain
+A map stores pairs: a key and its value, like a word and its meaning in a dictionary. You ask for the key and get the value straight away, without searching.
+
+Different languages call it a dictionary, a map, or an object. Always decide what happens when the key isn't there.
+%%mainframe
+COBOL has no built-in map. For a small table in memory you use `SEARCH`, or `SEARCH ALL` for a fast binary search on a sorted table. For real data the mainframe answer is a VSAM KSDS file: you read a record straight by its key, with billions of records.
+
+%%lang python
+%%note `.get` gives a fallback. `stock["kiwi"]` would crash.
+%%code
+stock = {"apple": 5, "pear": 0}
+stock["plum"] = 12
+
+print(stock["apple"])
+print(stock.get("kiwi", 0))
+for name, count in stock.items():
+    print(name, count)
+%%output
+5
+0
+apple 5
+pear 0
+plum 12
+
+%%lang swift
+%%note Dictionaries have no fixed order, so this sorts before printing.
+%%code
+var stock = ["apple": 5, "pear": 0]
+stock["plum"] = 12
+
+print(stock["apple"] ?? 0)
+print(stock["kiwi"] ?? 0)
+for (name, count) in stock.sorted(by: { $0.key < $1.key }) {
+    print(name, count)
+}
+%%output
+5
+0
+apple 5
+pear 0
+plum 12
+
+%%lang java
+%%note `LinkedHashMap` keeps the order you added things.
+%%code
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public class Main {
+    public static void main(String[] args) {
+        Map<String, Integer> stock = new LinkedHashMap<>();
+        stock.put("apple", 5);
+        stock.put("pear", 0);
+        stock.put("plum", 12);
+
+        System.out.println(stock.get("apple"));
+        System.out.println(stock.getOrDefault("kiwi", 0));
+        stock.forEach((name, count) -> System.out.println(name + " " + count));
+    }
+}
+%%output
+5
+0
+apple 5
+pear 0
+plum 12
+
+%%lang cobol
+%%note Walk the table with `SEARCH`. `IX` is an index, a fast position marker.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. LOOKUP.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-STOCK.
+           05  WS-ITEM   OCCURS 3 TIMES INDEXED BY IX.
+               10  WS-KEY    PIC X(8).
+               10  WS-QTY    PIC 9(3).
+       PROCEDURE DIVISION.
+           MOVE "apple" TO WS-KEY(1).
+           MOVE 5       TO WS-QTY(1).
+           MOVE "pear"  TO WS-KEY(2).
+           MOVE 0       TO WS-QTY(2).
+           MOVE "plum"  TO WS-KEY(3).
+           MOVE 12      TO WS-QTY(3).
+
+           SET IX TO 1.
+           SEARCH WS-ITEM
+               AT END DISPLAY "none"
+               WHEN WS-KEY(IX) = "plum"
+                   DISPLAY WS-QTY(IX)
+           END-SEARCH.
+           STOP RUN.
+%%output
+012
+
+%%lang js
+%%note A plain object works for simple data. `??` gives a fallback.
+%%code
+const stock = { apple: 5, pear: 0 };
+stock.plum = 12;
+
+console.log(stock.apple);
+console.log(stock.kiwi ?? 0);
+for (const [name, count] of Object.entries(stock)) {
+  console.log(name, count);
+}
+%%output
+5
+0
+apple 5
+pear 0
+plum 12
+
+%%lang ts
+%%note `Record<string, number>` says: text keys, number values.
+%%code
+const stock: Record<string, number> = { apple: 5, pear: 0 };
+stock.plum = 12;
+
+console.log(stock.apple);
+console.log(stock.kiwi ?? 0);
+for (const [name, count] of Object.entries(stock)) {
+  console.log(name, count);
+}
+%%output
+5
+0
+apple 5
+pear 0
+plum 12
+
+%%lang html
+%%skip HTML has no lookups, though `<dl>` can show word-and-meaning pairs.
+
+%%lang css
+%%skip CSS can't look values up.
+
+%%concept functions
+%%title Functions
+%%group Basics
+%%blurb Name a piece of work, then reuse it anywhere.
+%%docs function parameter return-value
+%%explain
+A function is a small named machine. Values go in as parameters, it does its work, and a value comes back.
+
+It stops you repeating yourself, and gives a job a name, so the code that uses it reads clearly.
+%%mainframe
+A paragraph is a named block of code that you run with `PERFORM`. It takes no parameters and returns nothing: every paragraph shares the same Working-Storage, which is why you set `WS-RATE` first. For real parameters you write a separate program and `CALL` it with `USING`, and it receives them in its `LINKAGE SECTION`.
+
+%%lang python
+%%note `rate=0.2` is a default, used when you leave it out.
+%%code
+def add_tax(price, rate=0.2):
+    return price * (1 + rate)
+
+print(add_tax(100))
+print(add_tax(100, 0.05))
+%%output
+120.0
+105.0
+
+%%lang swift
+%%note The label `rate:` is part of the call. `_` means no label.
+%%code
+func addTax(_ price: Double, rate: Double = 0.2) -> Double {
+    return price * (1 + rate)
+}
+
+print(addTax(100))
+print(addTax(100, rate: 0.05))
+%%output
+120.0
+105.0
+
+%%lang java
+%%note No default values. You write a second method with the same name instead.
+%%code
+public class Main {
+    static double addTax(double price, double rate) {
+        return price * (1 + rate);
+    }
+
+    static double addTax(double price) {
+        return addTax(price, 0.2);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(addTax(100));
+        System.out.println(addTax(100, 0.05));
+    }
+}
+%%output
+120.0
+105.0
+
+%%lang cobol
+%%note `PERFORM` runs a paragraph, and values are shared, not passed.
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TAXES.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-PRICE   PIC 9(5)V99  VALUE 100.
+       01  WS-RATE    PIC 9V99     VALUE 0.20.
+       01  WS-RESULT  PIC 9(5)V99.
+       01  WS-OUT     PIC ZZ,ZZ9.99.
+       PROCEDURE DIVISION.
+       MAIN-PARA.
+           PERFORM ADD-TAX.
+           MOVE 0.05 TO WS-RATE.
+           PERFORM ADD-TAX.
+           STOP RUN.
+       ADD-TAX.
+           COMPUTE WS-RESULT = WS-PRICE * (1 + WS-RATE).
+           MOVE WS-RESULT TO WS-OUT.
+           DISPLAY WS-OUT.
+%%output
+   120.00
+   105.00
+
+%%lang js
+%%note Arrow functions, `(a) => ...`, are a shorter way to write the same thing.
+%%code
+function addTax(price, rate = 0.2) {
+  return price * (1 + rate);
+}
+
+console.log(addTax(100));
+console.log(addTax(100, 0.05));
+%%output
+120
+105
+
+%%lang ts
+%%note Types on the way in and the way out. A wrong call won't compile.
+%%code
+function addTax(price: number, rate: number = 0.2): number {
+  return price * (1 + rate);
+}
+
+console.log(addTax(100));
+console.log(addTax(100, 0.05));
+%%output
+120
+105
+
+%%lang html
+%%skip HTML has no functions. Web components come close, but they need JavaScript.
+
+%%lang css
+%%note CSS has built-in functions like `calc()`, and `:is()` can reuse a rule.
+%%run live
+%%demo <h1>Title</h1><h2>Subtitle</h2>
+%%code
+:is(h1, h2) {
+  color: seagreen;
+  font-family: Georgia, serif;
+}

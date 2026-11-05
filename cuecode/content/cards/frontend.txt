@@ -1,0 +1,204 @@
+%%card fe-sort-trap
+%%deck frontend
+%%kind predict
+%%ask A classic JavaScript trap. What does this print?
+%%code js
+console.log([10, 5, 1].sort().join(" "));
+%%answer
+1 10 5
+%%why
+By default `sort` compares as text, and "10" comes before "5". Pass `(a, b) => a - b` for numbers.
+
+%%card fe-equality
+%%deck frontend
+%%kind predict
+%%ask What does this print?
+%%code js
+console.log(1 == "1");
+console.log(1 === "1");
+%%answer
+true
+false
+%%why
+`==` converts types first. `===` doesn't. Always use `===`.
+
+%%card fe-plus
+%%deck frontend
+%%kind predict
+%%ask What does this print?
+%%code js
+console.log("5" + 1);
+console.log("5" - 1);
+%%answer
+51
+4
+%%why
+`+` with text joins. `-` can only do maths, so it converts the text to a number.
+
+%%card fe-falsy
+%%deck frontend
+%%kind predict
+%%ask What does this print?
+%%code js
+const count = 0;
+console.log(count || 10);
+console.log(count ?? 10);
+%%answer
+10
+0
+%%why
+`||` falls back on anything falsy, including 0. `??` only falls back on null or undefined.
+
+%%card fe-const-object
+%%deck frontend
+%%kind predict
+%%ask Will this crash? What does it print?
+%%code js
+const user = { name: "Asha" };
+user.name = "Ravi";
+console.log(user.name);
+%%answer
+Ravi
+%%why
+`const` fixes the variable, not the object. The object's insides can still change.
+
+%%card fe-map
+%%deck frontend
+%%kind predict
+%%ask What does this print?
+%%code js
+console.log([1, 2, 3].map((n) => n * 2).join(","));
+%%answer
+2,4,6
+%%why
+`map` makes a new list with each item changed.
+
+%%card fe-await
+%%deck frontend
+%%kind fill
+%%ask Fill the gap so `data` holds the result, not a promise.
+%%code js
+async function load() {
+  const res = ____ fetch("/api/items");
+  return res.json();
+}
+%%answer
+await
+%%why
+`await` pauses the function until the promise finishes.
+
+%%card fe-flex
+%%deck frontend
+%%kind fill
+%%ask Fill the gap to line these children up in a row.
+%%code css
+.row {
+  display: ____;
+  gap: 12px;
+}
+%%answer
+flex
+%%why
+`display: flex` puts direct children in a row.
+
+%%card fe-center
+%%deck frontend
+%%kind write
+%%ask Write the CSS to centre a child in the middle of its parent, both ways.
+%%code css
+.parent {
+  /* your CSS */
+}
+%%answer css
+.parent {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+%%why
+`justify-content` works along the row, and `align-items` across it. The parent needs some height for this to show.
+
+%%card fe-ts-union
+%%deck frontend
+%%kind write
+%%ask Write a TypeScript type `Status` that can only be "active" or "closed".
+%%code ts
+const s: Status = "active";
+%%answer ts
+type Status = "active" | "closed";
+const s: Status = "active";
+%%why
+A union type limits a value to a set list, and typos are caught for you.
+
+%%card fe-box-model
+%%deck frontend
+%%kind explain
+%%ask What's the difference between padding and margin?
+%%answer
+Padding is space inside the border. Margin is space outside it.
+
+%%card fe-semantic
+%%deck frontend
+%%kind explain
+%%ask Why use `<button>` rather than a clickable `<div>`?
+%%answer
+A real button works with the keyboard and screen readers, with no extra work.
+
+%%card fe-alt
+%%deck frontend
+%%kind explain
+%%ask What's the `alt` attribute on an image for?
+%%answer
+It describes the image for screen readers, and shows if the image can't load.
+
+%%card fe-specificity
+%%deck frontend
+%%kind explain
+%%ask Two CSS rules target one element, and the wrong one wins. Why?
+%%answer
+Specificity. An id beats a class, and a class beats a tag. When they tie, the later rule wins.
+
+%%card fe-dom
+%%deck frontend
+%%kind explain
+%%ask What's the DOM?
+%%answer
+The browser's live model of the page. JavaScript changes what you see by changing the DOM.
+
+%%card fe-ts-runtime
+%%deck frontend
+%%kind explain
+%%ask Does TypeScript check types while the app is running?
+%%answer
+No. Types are removed before it runs, so data from a server still needs checking.
+
+%%card fe-fix-event
+%%deck frontend
+%%kind fix
+%%ask The form reloads the page on submit. Fix it.
+%%code js
+form.addEventListener("submit", () => {
+  save();
+});
+%%answer js
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  save();
+});
+%%why
+A form's default action reloads the page. `preventDefault` stops that.
+
+%%card fe-fix-sum
+%%deck frontend
+%%kind fix
+%%ask This should show 3. It shows "12". Fix it.
+%%code js
+const a = "1";
+const b = "2";
+console.log(a + b);
+%%answer js
+const a = "1";
+const b = "2";
+console.log(Number(a) + Number(b));
+%%why
+Values from inputs and URLs are always text. Convert them first.

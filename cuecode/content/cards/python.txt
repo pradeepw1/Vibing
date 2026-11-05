@@ -1,0 +1,169 @@
+%%card py-slice
+%%deck python
+%%kind predict
+%%ask What does this print?
+%%code python
+nums = [10, 20, 30, 40]
+print(nums[1:3])
+%%answer
+[20, 30]
+%%why
+A slice starts at the first position and stops before the second one.
+
+%%card py-negative-index
+%%deck python
+%%kind predict
+%%ask What does this print?
+%%code python
+letters = ["a", "b", "c"]
+print(letters[-1])
+%%answer
+c
+%%why
+Negative positions count from the end, so -1 is the last item.
+
+%%card py-range
+%%deck python
+%%kind predict
+%%ask What does this print?
+%%code python
+print(list(range(2, 5)))
+%%answer
+[2, 3, 4]
+%%why
+`range` stops before the end number.
+
+%%card py-int-div
+%%deck python
+%%kind predict
+%%ask What does this print?
+%%code python
+print(7 // 2, 7 % 2)
+%%answer
+3 1
+%%why
+`//` drops the remainder, and `%` gives just the remainder.
+
+%%card py-mutable-default
+%%deck python
+%%kind predict
+%%ask A classic trap. What does this print?
+%%code python
+def add(item, bag=[]):
+    bag.append(item)
+    return bag
+
+add("a")
+print(add("b"))
+%%answer
+['a', 'b']
+%%why
+A default value is made once, not on each call, so both calls share one list. Use `bag=None` and make a new list inside.
+
+%%card py-list-alias
+%%deck python
+%%kind predict
+%%ask What does this print?
+%%code python
+a = [1, 2]
+b = a
+b.append(3)
+print(a)
+%%answer
+[1, 2, 3]
+%%why
+`b = a` doesn't copy anything. Both names point to the same list.
+
+%%card py-fstring
+%%deck python
+%%kind fill
+%%ask Fill the gap so this prints `Hi Asha`.
+%%code python
+name = "Asha"
+print(____"Hi {name}")
+%%answer
+f
+%%why
+An `f` before the quote turns on `{}` replacement.
+
+%%card py-dict-get
+%%deck python
+%%kind fill
+%%ask Fill the gap so a missing key gives 0, not a crash.
+%%code python
+stock = {"apple": 5}
+print(stock.____("kiwi", 0))
+%%answer
+get
+%%why
+`.get(key, fallback)` is the safe way to read a dictionary.
+
+%%card py-comprehension
+%%deck python
+%%kind write
+%%ask Write one line that makes `evens`: the even numbers from `nums`.
+%%code python
+nums = [1, 2, 3, 4]
+%%answer python
+nums = [1, 2, 3, 4]
+evens = [n for n in nums if n % 2 == 0]
+%%why
+A list comprehension: what you want, where from, and which ones.
+
+%%card py-with
+%%deck python
+%%kind explain
+%%ask Why use `with open(...)` rather than plain `open(...)`?
+%%answer
+It closes the file for you when the block ends, even if an error happens.
+
+%%card py-venv
+%%deck python
+%%kind explain
+%%ask Why make a virtual environment for each project?
+%%answer
+Each project gets its own libraries and versions, so one project can't break another.
+
+%%card py-is
+%%deck python
+%%kind explain
+%%ask What's the difference between `==` and `is`?
+%%answer
+`==` asks whether two values are equal. `is` asks whether they're the same object. Use `is` for `None`.
+
+%%card py-tuple
+%%deck python
+%%kind explain
+%%ask What's the difference between a list and a tuple?
+%%answer
+A list can change. A tuple can't. Use a tuple for a fixed group, such as a point `(x, y)`.
+
+%%card py-fix-indent
+%%deck python
+%%kind fix
+%%ask This should print the total once, at the end. It prints a running total. Fix it.
+%%code python
+total = 0
+for n in [1, 2, 3]:
+    total += n
+    print(total)
+%%answer python
+total = 0
+for n in [1, 2, 3]:
+    total += n
+print(total)
+%%why
+Indentation is structure in Python. The `print` was inside the loop.
+
+%%card py-fix-string-number
+%%deck python
+%%kind fix
+%%ask This crashes. Fix it so it prints `Age: 34`.
+%%code python
+age = 34
+print("Age: " + age)
+%%answer python
+age = 34
+print(f"Age: {age}")
+%%why
+Python won't add text to a number. An f-string does the conversion.

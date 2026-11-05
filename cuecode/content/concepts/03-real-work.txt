@@ -1,0 +1,330 @@
+%%concept run
+%%title Running your program
+%%group Real work
+%%blurb How the code you wrote actually gets to run.
+%%docs compiler interpreter jcl jvm
+%%explain
+Some languages are run line by line by an interpreter. Others are compiled first: translated into something the machine can run.
+
+Here's what you type for each one. On a mainframe you don't type a command at all: you submit a job, and it runs when its turn comes.
+%%mainframe
+JCL is a set of instructions for the operating system: which program to run, and which datasets to give it. Each `EXEC` is a step, and each `DD` connects a file to the program. You submit the job, it waits in a queue, and you read the result in SDSF. Compiling is a job too. Production work runs overnight under a scheduler, and step return codes decide what runs next.
+
+%%lang python
+%%hl bash
+%%run none: This is a command, not a program
+%%note Run directly, with no compile step you can see.
+%%code
+python3 app.py
+
+%%lang swift
+%%hl bash
+%%run none: This is a command, not a program
+%%note Run it as a script, or compile a program you can keep.
+%%code
+swift app.swift
+
+swiftc app.swift -o app
+./app
+
+%%lang java
+%%hl bash
+%%run none: This is a command, not a program
+%%note Compiles to bytecode, and the JVM runs that.
+%%code
+javac Main.java
+java Main
+
+%%lang cobol
+%%hl bash
+%%run none: This is a command, not a program
+%%note GnuCOBOL on your Mac. `-x` means make a program you can run.
+%%code
+cobc -x app.cob
+./app
+
+%%lang js
+%%hl bash
+%%run none: This is a command, not a program
+%%note In Node, or load it in a web page with a script tag.
+%%code
+node app.js
+
+%%lang ts
+%%hl bash
+%%run none: This is a command, not a program
+%%note Browsers can't run TypeScript. `tsc` turns it into JavaScript first.
+%%code
+npx tsc app.ts
+node app.js
+
+%%lang html
+%%hl bash
+%%run none: This is a command, not a program
+%%note Nothing to compile. The browser reads it, so just open the file.
+%%code
+open index.html
+
+%%lang css
+%%skip CSS isn't run. It loads along with the HTML page.
+
+%%lang jcl
+%%note A real mainframe job: one step, with its files connected.
+%%run none: JCL needs a mainframe to run
+%%code
+//PAYROLL  JOB (ACCT),'NIGHTLY PAY',CLASS=A,MSGCLASS=X
+//STEP1    EXEC PGM=PAYCALC
+//STEPLIB  DD DSN=PROD.LOADLIB,DISP=SHR
+//EMPLOYEE DD DSN=PROD.EMPLOYEE.MASTER,DISP=SHR
+//REPORT   DD SYSOUT=*
+
+%%concept database
+%%title Talking to a database
+%%group Real work
+%%blurb Save data that outlives your program, and ask questions of it.
+%%docs database sql sql-injection db2
+%%explain
+A database keeps data safe and lets you ask for exactly what you need. SQL is the language nearly all of them speak, and it looks the same from every language below.
+
+One rule matters everywhere: never paste a person's input into SQL. Use a `?` or `:name` placeholder, so input can only ever be data. Pasting it in is how SQL injection attacks happen.
+%%mainframe
+In COBOL, SQL sits right inside the program between `EXEC SQL` and `END-EXEC`. A precompiler swaps it for real calls, and a BIND step prepares the plan. `:WS-NAME` is a host variable, your COBOL field. After every statement you check `SQLCODE`: 0 is fine, 100 means not found, and a negative number is an error.
+
+%%lang python
+%%note `sqlite3` comes with Python. This one lives in memory and needs no setup.
+%%code
+import sqlite3
+
+db = sqlite3.connect(":memory:")
+db.execute("CREATE TABLE customer (name TEXT, balance REAL)")
+db.execute("INSERT INTO customer VALUES (?, ?)", ("Asha", 150.0))
+
+query = "SELECT name, balance FROM customer WHERE balance > ?"
+for row in db.execute(query, (100,)):
+    print(row)
+%%output
+('Asha', 150.0)
+
+%%lang swift
+%%note SwiftData saves your types, and writes the SQL for you.
+%%run none: SwiftData's @Model needs full Xcode
+%%code
+import SwiftData
+
+@Model
+class Customer {
+    var name: String
+    var balance: Double
+
+    init(name: String, balance: Double) {
+        self.name = name
+        self.balance = balance
+    }
+}
+
+%%lang java
+%%note JDBC is the standard way in. `?` keeps input safe.
+%%run compile
+%%code
+import java.sql.DriverManager;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        String sql = "SELECT name, balance FROM customer WHERE balance > ?";
+        try (var db = DriverManager.getConnection("jdbc:postgresql://localhost/shop");
+             var query = db.prepareStatement(sql)) {
+            query.setInt(1, 100);
+            var rows = query.executeQuery();
+            while (rows.next()) {
+                System.out.println(rows.getString("name"));
+            }
+        }
+    }
+}
+
+%%lang cobol
+%%note This piece needs Db2's precompiler, so it can't run on your Mac.
+%%run none: Needs Db2 and its precompiler
+%%code
+           EXEC SQL
+               SELECT NAME, BALANCE
+                 INTO :WS-NAME, :WS-BALANCE
+                 FROM CUSTOMER
+                WHERE CUST_ID = :WS-ID
+           END-EXEC.
+           EVALUATE SQLCODE
+               WHEN 0
+                   DISPLAY WS-NAME
+               WHEN 100
+                   DISPLAY "Not found"
+               WHEN OTHER
+                   DISPLAY "Db2 error " SQLCODE
+           END-EVALUATE.
+
+%%lang js
+%%note A web page never touches the database. It asks your server.
+%%run compile
+%%play no
+%%code
+const res = await fetch("/api/customers?minBalance=100");
+const customers = await res.json();
+
+for (const customer of customers) {
+  console.log(customer.name);
+}
+
+%%lang ts
+%%note A type describes what the server sends back.
+%%run compile
+%%code
+interface Customer {
+  name: string;
+  balance: number;
+}
+
+const res = await fetch("/api/customers?minBalance=100");
+const customers = (await res.json()) as Customer[];
+
+for (const customer of customers) {
+  console.log(customer.name);
+}
+
+%%lang html
+%%skip HTML can't reach a database. A server sends the data, and the page shows it.
+
+%%lang css
+%%skip CSS has nothing to do with data.
+
+%%concept async
+%%title Doing several things at once
+%%group Real work
+%%blurb Start slow jobs together, instead of waiting for each in turn.
+%%docs async thread
+%%explain
+Fetching from the network is slow. If you wait for one thing, then the next, the whole app freezes up. Async code lets you start the work, get on with other things, and pick up the result when it's ready.
+
+`await` means "pause this function until the answer is here". These examples start two jobs at once, then collect both answers.
+%%mainframe
+COBOL has no async. Batch programs run top to bottom on one track. Speed comes from outside the program: the scheduler runs jobs side by side, and big files are split so several jobs can each take a part. Online, CICS runs many transactions at once, each a separate short task. Parallel Sysplex and Db2 data sharing spread that over several machines.
+
+%%lang python
+%%note `gather` runs them together and returns the answers in order.
+%%code
+import asyncio
+
+async def fetch_price(name, delay):
+    await asyncio.sleep(delay)
+    return f"{name}: ok"
+
+async def main():
+    results = await asyncio.gather(
+        fetch_price("apple", 0.2),
+        fetch_price("pear", 0.1),
+    )
+    print(results)
+
+asyncio.run(main())
+%%output
+['apple: ok', 'pear: ok']
+
+%%lang swift
+%%note `async let` starts the work. `await` collects it.
+%%code
+func fetchPrice(_ name: String, delay: UInt64) async -> String {
+    try? await Task.sleep(nanoseconds: delay)
+    return "\(name): ok"
+}
+
+async let apple = fetchPrice("apple", delay: 200_000_000)
+async let pear = fetchPrice("pear", delay: 100_000_000)
+print(await [apple, pear])
+%%output
+["apple: ok", "pear: ok"]
+
+%%lang java
+%%note `supplyAsync` runs work on another thread. `join` waits for the answer.
+%%code
+import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    static String fetchPrice(String name, long delay) {
+        try {
+            Thread.sleep(delay);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return name + ": ok";
+    }
+
+    public static void main(String[] args) {
+        var apple = CompletableFuture.supplyAsync(() -> fetchPrice("apple", 200));
+        var pear = CompletableFuture.supplyAsync(() -> fetchPrice("pear", 100));
+        System.out.println(apple.join() + ", " + pear.join());
+    }
+}
+%%output
+apple: ok, pear: ok
+
+%%lang cobol
+%%skip COBOL runs one step at a time. Doing things at once is the scheduler's job.
+
+%%lang js
+%%note JavaScript is built around this. `Promise.all` waits for every answer.
+%%code
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchPrice(name, delay) {
+  await wait(delay);
+  return `${name}: ok`;
+}
+
+const results = await Promise.all([
+  fetchPrice("apple", 200),
+  fetchPrice("pear", 100),
+]);
+console.log(results.join(", "));
+%%output
+apple: ok, pear: ok
+
+%%lang ts
+%%note `Promise<string>` means "a string, later".
+%%code
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchPrice(name: string, delay: number): Promise<string> {
+  await wait(delay);
+  return `${name}: ok`;
+}
+
+const results = await Promise.all([
+  fetchPrice("apple", 200),
+  fetchPrice("pear", 100),
+]);
+console.log(results.join(", "));
+%%output
+apple: ok, pear: ok
+
+%%lang html
+%%note `defer` and `lazy` load things without holding up the page.
+%%run live
+%%code
+<script src="app.js" defer></script>
+<img src="photo.jpg" alt="Shop front" loading="lazy">
+
+%%lang css
+%%note CSS animates by itself, without blocking your JavaScript.
+%%run live
+%%demo <div class="dot"></div>
+%%code
+.dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: tomato;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  to { transform: scale(1.6); }
+}

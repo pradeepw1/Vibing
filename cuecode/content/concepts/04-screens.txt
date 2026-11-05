@@ -1,0 +1,507 @@
+%%concept page
+%%title Putting things on screen
+%%group Screens
+%%blurb Show a title, some text and a link.
+%%docs dom swiftui component bms
+%%explain
+Each platform draws screens in its own way. The web describes a page in HTML, and the browser draws it. Apple's SwiftUI describes a view in Swift code. Older desktop tools build the window piece by piece.
+
+The modern trend is the same everywhere: describe what should be on screen, and let the system work out how to draw it.
+%%mainframe
+The classic mainframe screen is a 3270 terminal: 24 lines of 80 characters, usually green. A BMS map defines where the fields sit, and CICS sends it. A program doesn't sit waiting for you. It sends the screen and ends, and CICS starts it again when you press Enter. That's called pseudo-conversational, and it's how one machine serves thousands of users.
+
+%%lang python
+%%note `tkinter` comes with Python. For the web you'd use Django or Flask.
+%%run compile
+%%code
+import tkinter as tk
+
+window = tk.Tk()
+window.title("My shop")
+tk.Label(window, text="My shop", font=("Helvetica", 24)).pack()
+tk.Label(window, text="Open today until 6pm.").pack()
+window.mainloop()
+
+%%lang swift
+%%note SwiftUI describes the screen. Modifiers like `.padding()` adjust it.
+%%run compile
+%%code
+import SwiftUI
+
+struct ShopView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("My shop").font(.largeTitle)
+            Text("Open today until 6pm.")
+            Link("See the menu", destination: URL(string: "https://example.com")!)
+        }
+        .padding()
+    }
+}
+
+%%lang java
+%%note Swing is built into Java. Most Java screens today are web pages or Android.
+%%run compile
+%%code
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+
+public class Main {
+    public static void main(String[] args) {
+        JFrame window = new JFrame("My shop");
+        window.add(new JLabel("Open today until 6pm."));
+        window.setSize(300, 120);
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.setVisible(true);
+    }
+}
+
+%%lang cobol
+%%note CICS sends a screen, then the program ends and waits for the next Enter.
+%%run none: Needs CICS on a mainframe
+%%code
+           MOVE "OPEN TODAY UNTIL 6PM" TO MSGO.
+           EXEC CICS SEND MAP('SHOPMAP') MAPSET('SHOPSET')
+                ERASE
+           END-EXEC.
+           EXEC CICS RETURN TRANSID('SHOP')
+                COMMAREA(WS-STATE)
+           END-EXEC.
+
+%%lang js
+%%note JavaScript changes the page through the DOM, the browser's live copy of it.
+%%run compile
+%%code
+const title = document.createElement("h1");
+title.textContent = "My shop";
+document.body.append(title);
+
+%%lang ts
+%%note The type says exactly which kind of element you've got.
+%%run compile
+%%code
+const title: HTMLHeadingElement = document.createElement("h1");
+title.textContent = "My shop";
+document.body.append(title);
+
+%%lang html
+%%note Tags say what each thing is: a heading, a paragraph, a link.
+%%run live
+%%code
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>My shop</title>
+  </head>
+  <body>
+    <h1>My shop</h1>
+    <p>Open today until <strong>6pm</strong>.</p>
+    <a href="#menu">See the menu</a>
+  </body>
+</html>
+
+%%lang css
+%%note CSS handles how it looks. The content stays in the HTML.
+%%run live
+%%demo <h1>My shop</h1><p>Open today until <strong>6pm</strong>.</p><a href="#menu">See the menu</a>
+%%code
+body {
+  font-family: Georgia, serif;
+  max-width: 30rem;
+  margin: 2rem auto;
+}
+
+h1 {
+  color: seagreen;
+}
+
+%%concept layout
+%%title Laying things out
+%%group Screens
+%%blurb Put two boxes side by side, with a gap and some colour.
+%%docs flexbox box-model responsive
+%%explain
+Layout means saying where things go. Modern tools work in rows and columns: put these in a row, add a gap, share the space.
+
+On the web that's CSS flexbox and grid. SwiftUI has `HStack` and `VStack`, which work almost the same way. Learn one and the other makes sense straight away.
+%%mainframe
+There's no layout engine on a 3270 screen. Each field has an exact position, `POS=(line,column)`, in a grid of 24 by 80. That's what BMS maps describe, so a screen never moves or wraps. These are assembler macros, which is why they look so different from COBOL.
+
+%%lang python
+%%note `side="left"` lines things up in a row.
+%%run compile
+%%code
+import tkinter as tk
+
+window = tk.Tk()
+tk.Label(window, text="Left", bg="khaki").pack(side="left", padx=6)
+tk.Label(window, text="Right", bg="khaki").pack(side="left", padx=6)
+window.mainloop()
+
+%%lang swift
+%%note `HStack` is a row. `.frame(maxWidth: .infinity)` shares the space.
+%%run compile
+%%code
+import SwiftUI
+
+struct RowView: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("Left")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.yellow, in: .rect(cornerRadius: 8))
+            Text("Right")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.yellow, in: .rect(cornerRadius: 8))
+        }
+    }
+}
+
+%%lang java
+%%note `GridLayout(1, 2, ...)` means one row of two cells.
+%%run compile
+%%code
+import java.awt.GridLayout;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+public class Main {
+    public static void main(String[] args) {
+        JPanel row = new JPanel(new GridLayout(1, 2, 12, 0));
+        row.add(new JLabel("Left"));
+        row.add(new JLabel("Right"));
+
+        JFrame window = new JFrame();
+        window.add(row);
+        window.pack();
+        window.setVisible(true);
+    }
+}
+
+%%lang cobol
+%%hl text
+%%note A BMS map. `POS` is line and column, and `ATTRB` sets the field's behaviour.
+%%run none: BMS maps need CICS on a mainframe
+%%code
+LEFTFLD  DFHMDF POS=(5,10),LENGTH=4,ATTRB=(ASKIP,BRT),INITIAL='LEFT'
+RIGHTFLD DFHMDF POS=(5,50),LENGTH=5,ATTRB=(ASKIP,BRT),INITIAL='RIGHT'
+
+%%lang js
+%%note Add a class and let CSS do the work, rather than setting styles in JS.
+%%run compile
+%%code
+const row = document.querySelector(".row");
+row.classList.add("is-wide");
+
+%%lang ts
+%%note `querySelector` might find nothing, so TypeScript makes you check.
+%%run compile
+%%code
+const row = document.querySelector<HTMLDivElement>(".row");
+if (row) {
+  row.classList.add("is-wide");
+}
+
+%%lang html
+%%note HTML only lists the boxes. Where they sit is CSS's job.
+%%run live
+%%code
+<div class="row">
+  <div class="box">Left</div>
+  <div class="box">Right</div>
+</div>
+
+%%lang css
+%%note `display: flex` turns the children into a row. `flex: 1` shares the space.
+%%run live
+%%demo <div class="row"><div class="box">Left</div><div class="box">Right</div></div>
+%%code
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.box {
+  flex: 1;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fde68a;
+}
+
+%%concept click
+%%title Reacting to a click
+%%group Screens
+%%blurb A button that counts how many times it's pressed.
+%%docs event state
+%%explain
+Screens wait. Nothing happens until someone clicks, and then your code runs. A function that runs in reply is called an event handler.
+
+State is what the app remembers between clicks, such as the count. In SwiftUI and React you change the state, and the screen updates by itself. With plain JavaScript or Swing, you update the screen yourself.
+%%mainframe
+A 3270 has no clicks. You fill in fields and press Enter or a PF key, and the whole screen goes back at once. `EIBAID` tells the program which key it was: PF3 usually means exit. Nothing stays in memory between screens, so state goes in the COMMAREA, which CICS hands to the next run.
+
+%%lang python
+%%note `command=` gives the button a function to call.
+%%run compile
+%%code
+import tkinter as tk
+
+window = tk.Tk()
+count = 0
+
+def clicked():
+    global count
+    count += 1
+    button.config(text=f"Clicked {count} times")
+
+button = tk.Button(window, text="Clicked 0 times", command=clicked)
+button.pack()
+window.mainloop()
+
+%%lang swift
+%%note Change `@State` and SwiftUI redraws the view for you.
+%%run none: SwiftUI's @State needs full Xcode
+%%code
+import SwiftUI
+
+struct CounterView: View {
+    @State private var count = 0
+
+    var body: some View {
+        Button("Clicked \(count) times") {
+            count += 1
+        }
+    }
+}
+
+%%lang java
+%%note The lambda is the code that runs on each click.
+%%run compile
+%%code
+import javax.swing.JButton;
+import javax.swing.JFrame;
+
+public class Main {
+    static int count = 0;
+
+    public static void main(String[] args) {
+        JButton button = new JButton("Clicked 0 times");
+        button.addActionListener(e -> {
+            count++;
+            button.setText("Clicked " + count + " times");
+        });
+
+        JFrame window = new JFrame();
+        window.add(button);
+        window.pack();
+        window.setVisible(true);
+    }
+}
+
+%%lang cobol
+%%note A key press comes in as `EIBAID`. State lives in the COMMAREA.
+%%run none: Needs CICS on a mainframe
+%%code
+           EVALUATE EIBAID
+               WHEN DFHENTER
+                   ADD 1 TO WS-COUNT
+                   PERFORM SEND-SCREEN
+               WHEN DFHPF3
+                   EXEC CICS RETURN END-EXEC
+               WHEN OTHER
+                   PERFORM SEND-SCREEN
+           END-EVALUATE.
+
+%%lang js
+%%note Find the element, then listen for its click.
+%%run compile
+%%demo <button id="btn">Clicked 0 times</button>
+%%code
+let count = 0;
+const btn = document.querySelector("#btn");
+
+btn.addEventListener("click", () => {
+  count += 1;
+  btn.textContent = `Clicked ${count} times`;
+});
+
+%%lang ts
+%%note The `!` tells TypeScript "I know this exists". If you're wrong, it crashes.
+%%run compile
+%%code
+let count: number = 0;
+const btn = document.querySelector<HTMLButtonElement>("#btn")!;
+
+btn.addEventListener("click", () => {
+  count += 1;
+  btn.textContent = `Clicked ${count} times`;
+});
+
+%%lang html
+%%note A script inside the page makes the button work. Try clicking it.
+%%run live
+%%code
+<button id="btn">Clicked 0 times</button>
+<script>
+  let count = 0;
+  const btn = document.querySelector("#btn");
+  btn.addEventListener("click", () => {
+    count += 1;
+    btn.textContent = `Clicked ${count} times`;
+  });
+</script>
+
+%%lang css
+%%note CSS reacts without code: `:hover` and `:active` follow the mouse.
+%%run live
+%%demo <button class="btn">Press me</button>
+%%code
+.btn {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: seagreen;
+  color: white;
+}
+
+.btn:hover {
+  background: tomato;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+%%concept input
+%%title Asking for input
+%%group Screens
+%%blurb Get a name from a person, and use it.
+%%docs validation
+%%explain
+Programs get interesting when people can tell them things. On a command line you read what someone types. On a web page you use a form.
+
+Never trust what you get. People make typos, and attackers type code on purpose. Check input before using it.
+%%mainframe
+`ACCEPT` reads from SYSIN, and in batch nobody's typing: the input comes from cards in the JCL, under `//SYSIN DD *`. It's how you pass settings like a run date into a job. Online, input arrives as the fields of a BMS map through `EXEC CICS RECEIVE MAP`.
+
+%%lang python
+%%note `input` always gives you text. Use `int()` to turn it into a number.
+%%stdin Asha
+%%code
+name = input("Your name? ")
+print(f"Hello, {name}!")
+%%output
+Your name? Hello, Asha!
+
+%%lang swift
+%%note `readLine` might give nil, so `??` adds a fallback.
+%%stdin Asha
+%%code
+print("Your name?")
+let name = readLine() ?? "friend"
+print("Hello, \(name)!")
+%%output
+Your name?
+Hello, Asha!
+
+%%lang java
+%%note `Scanner` reads what's typed, a line at a time.
+%%stdin Asha
+%%code
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner in = new Scanner(System.in);
+        System.out.println("Your name?");
+        String name = in.nextLine();
+        System.out.println("Hello, " + name + "!");
+    }
+}
+%%output
+Your name?
+Hello, Asha!
+
+%%lang cobol
+%%note In a batch job, `ACCEPT` reads a card from `SYSIN`, not a person.
+%%stdin Asha
+%%code
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. GREET.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NAME   PIC X(10).
+       PROCEDURE DIVISION.
+           DISPLAY "Your name?".
+           ACCEPT WS-NAME.
+           DISPLAY "Hello, " FUNCTION TRIM(WS-NAME) "!".
+           STOP RUN.
+%%output
+Your name?
+Hello, Asha!
+
+%%lang js
+%%note In Node. On a web page you'd read a form's input instead.
+%%play no
+%%stdin Asha
+%%code
+import { createInterface } from "node:readline/promises";
+
+const rl = createInterface({ input: process.stdin, output: process.stdout });
+const name = await rl.question("Your name? ");
+rl.close();
+console.log(`Hello, ${name}!`);
+%%output
+Your name? Hello, Asha!
+
+%%lang ts
+%%note On a web page: read the input's `.value`. It's always text.
+%%run compile
+%%code
+const field = document.querySelector<HTMLInputElement>("#name")!;
+const form = document.querySelector<HTMLFormElement>("form")!;
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  alert(`Hello, ${field.value}!`);
+});
+
+%%lang html
+%%note `required` and `type` give you free checks, with no code.
+%%run live
+%%code
+<form>
+  <label>
+    Your name
+    <input name="name" required>
+  </label>
+  <button>Say hello</button>
+</form>
+
+%%lang css
+%%note `:invalid` styles a field until it's filled in properly.
+%%run live
+%%demo <form><input required placeholder="Your name"></form>
+%%code
+input {
+  padding: 8px;
+  border: 2px solid seagreen;
+  border-radius: 6px;
+}
+
+input:invalid {
+  border-color: tomato;
+}
+
+%%lang jcl
+%%note Batch input: the cards under `SYSIN DD *` are what `ACCEPT` reads.
+%%run none: JCL needs a mainframe to run
+%%code
+//STEP1    EXEC PGM=GREET
+//SYSOUT   DD SYSOUT=*
+//SYSIN    DD *
+Asha
+/*

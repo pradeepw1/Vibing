@@ -1,0 +1,347 @@
+%%doc variable
+%%title Variable
+%%area basics
+%%aka var, let, const
+%%simple A named box that holds a value.
+%%like A labelled jar on a shelf. The label stays the same, and what's inside can change.
+%%see variables
+%%example python
+age = 34
+age = age + 1
+
+%%doc type
+%%title Type
+%%area basics
+%%aka data type, static typing, dynamic typing
+%%simple What kind of thing a value is: a whole number, a decimal, text, true or false.
+%%like A power plug shape. A value only fits where the shape matches.
+%%more Static languages (Swift, Java, TypeScript) check types before running. Dynamic ones (Python, JavaScript) find out while running.
+%%see variables
+
+%%doc constant
+%%title Constant
+%%area basics
+%%aka const, let, final, immutable
+%%simple A value that can't change after you set it.
+%%like A name carved in stone. Writing it once means nobody can overwrite it by accident.
+%%more Use constants by default. It makes code easier to trust, because you know the value stays put.
+%%see variables
+
+%%doc string
+%%title String
+%%area basics
+%%aka text, interpolation, f-string, template literal
+%%simple A piece of text.
+%%like Beads on a string: characters kept in order.
+%%more Interpolation means dropping a value into text, such as Python's `f"Hi {name}"`.
+%%see text
+
+%%doc floating-point
+%%title Floating point
+%%area basics
+%%aka float, double, 0.1 + 0.2
+%%simple The fast, slightly inexact way computers store decimals.
+%%like Writing 1/3 as 0.333. Useful, but never quite right.
+%%more Fine for graphics and science. Not for money.
+%%see numbers
+
+%%doc decimal-type
+%%title Exact decimals
+%%area basics
+%%aka Decimal, BigDecimal, money
+%%simple A number type that keeps every digit exactly, used for money.
+%%like Counting coins rather than estimating the weight of the pile.
+%%see numbers
+
+%%doc boolean
+%%title Boolean
+%%area basics
+%%aka bool, true, false
+%%simple A value that's only ever true or false.
+%%like A light switch.
+%%see if
+
+%%doc condition
+%%title Condition
+%%area basics
+%%aka if, else, switch
+%%simple A yes/no question your code asks before choosing what to do.
+%%like A fork in the road, with a sign that says which way to go.
+%%see if
+
+%%doc loop
+%%title Loop
+%%area basics
+%%aka for, while, iteration, PERFORM
+%%simple Code that runs again and again until told to stop.
+%%like Doing laps until the coach blows the whistle.
+%%more If the stop condition never comes true, you've got an infinite loop.
+%%see loops
+
+%%doc array
+%%title Array or list
+%%area basics
+%%aka list, array, table, OCCURS
+%%simple Many values kept in order under one name.
+%%like A row of numbered lockers.
+%%see lists
+
+%%doc index
+%%title Index
+%%area basics
+%%aka position, zero-based, subscript
+%%simple A value's position in a list. Most languages start at 0.
+%%like Floors in a European lift: the ground floor is 0.
+%%more COBOL starts at 1, and calls it a subscript.
+%%see lists
+
+%%doc map
+%%title Map or dictionary
+%%area basics
+%%aka dict, dictionary, hash map, object, key-value
+%%simple Pairs of a key and a value, so you can look things up by name.
+%%like A phone book: look up the name, get the number.
+%%see maps
+
+%%doc hash-table
+%%title Hash table
+%%area basics
+%%aka hashing
+%%simple The trick behind maps: turn a key into a slot number, so finding it is instant.
+%%like A cloakroom ticket. The number takes you straight to your coat.
+%%see maps
+
+%%doc function
+%%title Function
+%%area basics
+%%aka method, procedure, subroutine, paragraph
+%%simple A named piece of work you can run whenever you need it.
+%%like A recipe. Write it once, cook it any time.
+%%more A function that belongs to a class is called a method.
+%%see functions
+
+%%doc parameter
+%%title Parameter
+%%area basics
+%%aka argument, input
+%%simple A value you hand to a function.
+%%like The ingredients you pass to the recipe.
+%%see functions
+
+%%doc return-value
+%%title Return value
+%%area basics
+%%aka return, output
+%%simple What a function hands back when it finishes.
+%%like The finished dish.
+%%see functions
+
+%%doc class
+%%title Class
+%%area basics
+%%aka OOP, object-oriented
+%%simple A template for making things that have both data and behaviour.
+%%like A cookie cutter. The cookies are the objects.
+%%see records
+
+%%doc object
+%%title Object
+%%area basics
+%%aka instance
+%%simple One thing made from a class, with its own values.
+%%like One cookie. Same shape as the rest, with its own icing.
+%%see records
+
+%%doc struct
+%%title Struct
+%%area swift
+%%aka value type, record
+%%simple A lightweight group of values. In Swift, passing one around makes a copy.
+%%like A photocopy: changing yours doesn't touch mine.
+%%more Swift's default choice. Use a class when several parts of the app must share the same copy.
+%%see records
+%%link Swift book | https://docs.swift.org/swift-book/documentation/the-swift-programming-language/classesandstructures/
+
+%%doc null
+%%title Null
+%%area basics
+%%aka nil, None, undefined, NullPointerException
+%%simple A special value that means "nothing here".
+%%like An empty parking space with a number on it.
+%%more Using it as if it were a real value is one of the most common crashes.
+%%see missing
+
+%%doc exception
+%%title Exception
+%%area basics
+%%aka error, throw, try, catch, stack trace
+%%simple An error that stops normal work and jumps to code that can handle it.
+%%like A fire alarm. Everyone stops, and the people trained for it take over.
+%%more A stack trace is the list of function calls that led there. Read it from the most recent call.
+%%see errors
+
+%%doc file
+%%title File
+%%area basics
+%%aka read, write, path
+%%simple Data saved on disk with a name, which stays when your program ends.
+%%like A paper in a filing cabinet.
+%%see files
+
+%%doc lambda
+%%title Lambda
+%%area basics
+%%aka closure, arrow function, anonymous function
+%%simple A small function with no name, written right where it's needed.
+%%like A sticky note with a quick instruction, rather than a whole manual.
+%%more A closure is a lambda that remembers variables from around it.
+%%see sort
+
+%%doc library
+%%title Library
+%%area basics
+%%aka dependency, SDK
+%%simple Code someone else wrote that your program can use.
+%%like Buying ready-made pastry rather than making your own.
+%%more A framework is a bigger kind: it sets the structure and calls your code.
+%%see modules
+
+%%doc package
+%%title Package manager
+%%area basics
+%%aka pip, npm, Maven, Gradle, Swift Package Manager
+%%simple A tool that fetches libraries and keeps their versions straight.
+%%like An app store for code.
+%%more Python has pip, JavaScript has npm, Java has Maven and Gradle, and Swift has Swift Package Manager.
+%%see modules
+
+%%doc compiler
+%%title Compiler
+%%area basics
+%%aka compile, build, javac, cobc, swiftc
+%%simple A program that translates your code into something a machine can run, ahead of time.
+%%like Translating a whole book before anyone reads it.
+%%more It catches many mistakes before the program ever starts.
+%%see run
+
+%%doc interpreter
+%%title Interpreter
+%%area basics
+%%aka runtime, script
+%%simple A program that reads your code and runs it as it goes.
+%%like A live translator, working sentence by sentence.
+%%see run
+
+%%doc async
+%%title Async
+%%area basics
+%%aka await, promise, future, concurrency
+%%simple Starting slow work without freezing everything while you wait.
+%%like Ordering at a cafe, and sitting down until your name is called.
+%%see async
+
+%%doc thread
+%%title Thread
+%%area basics
+%%aka parallel, multithreading, race condition
+%%simple One line of work inside a program. Several can run at the same time.
+%%like Several cooks in one kitchen. Faster, until two reach for the same pan.
+%%more That clash is called a race condition.
+%%see async
+
+%%doc database
+%%title Database
+%%area basics
+%%aka table, row, Postgres, SQLite, MySQL
+%%simple Software that stores data safely and answers questions about it.
+%%like A very fast librarian who never loses anything.
+%%see database
+
+%%doc sql
+%%title SQL
+%%area basics
+%%aka query, SELECT, JOIN
+%%simple The language for asking a database for data.
+%%like Filling in a very precise request form.
+%%see database
+%%example sql
+SELECT name, balance
+FROM customer
+WHERE balance > 100
+ORDER BY name;
+
+%%doc sql-injection
+%%title SQL injection
+%%area basics
+%%aka parameterized query, placeholder
+%%simple An attack where someone types SQL into a form, and your program runs it.
+%%like A note saying "and also give me the safe", which the clerk obeys.
+%%more The fix is simple: always use placeholders, never paste input into SQL.
+%%see database
+
+%%doc validation
+%%title Validation
+%%area basics
+%%aka input checking, sanitize
+%%simple Checking that what someone gave you is sensible before you use it.
+%%like A bouncer checking IDs at the door.
+%%see input
+
+%%doc api
+%%title API
+%%area web
+%%aka interface, endpoint, REST
+%%simple A way for one program to ask another for something.
+%%like A waiter. You don't go into the kitchen: you order, and the food comes back.
+
+%%doc http
+%%title HTTP
+%%area web
+%%aka GET, POST, status code, 404, HTTPS
+%%simple The language web browsers and servers use to talk.
+%%like Posting a letter and getting one back. Each has a status: 200 is fine, 404 is not found.
+
+%%doc json
+%%title JSON
+%%area web
+%%aka data format
+%%simple A plain-text way to write down data, used by nearly every API.
+%%like A form anyone can read, in any language.
+%%example json
+{ "name": "Asha", "balance": 150 }
+
+%%doc frontend-backend
+%%title Frontend and backend
+%%area web
+%%aka client, server, full stack
+%%simple The frontend is what you see in the browser. The backend runs on a server behind it.
+%%like A restaurant: the dining room, and the kitchen behind the wall.
+
+%%doc git
+%%title Git
+%%area web
+%%aka version control, commit, branch, GitHub
+%%simple A tool that saves the history of your code, so you can go back and work safely.
+%%like Save points in a game. Branches let you try a risky path.
+
+%%doc unit-test
+%%title Unit test
+%%area basics
+%%aka test, pytest, JUnit, XCTest
+%%simple A small piece of code that checks another piece works.
+%%like A smoke alarm test. It takes a second, and you only care when it fails.
+
+%%doc env-var
+%%title Environment variable
+%%area web
+%%aka .env, secret, API key
+%%simple A setting that lives outside your code, often a password or key.
+%%like A key under the mat, not written on the front door.
+%%more Never put secrets in your code or commit them to Git.
+
+%%doc terminal
+%%title Terminal
+%%area web
+%%aka command line, shell, bash, zsh
+%%simple A window where you type commands instead of clicking.
+%%like Talking to your computer rather than pointing at things.

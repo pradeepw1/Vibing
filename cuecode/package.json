@@ -1,0 +1,15 @@
+{
+  "name": "cuecode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Learn to code with cue cards, side-by-side languages, plain-word docs and a stack finder.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "verify": "node tools/verify.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  }
+}

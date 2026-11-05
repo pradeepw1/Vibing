@@ -1,0 +1,177 @@
+%%card sw-range
+%%deck swift
+%%kind predict
+%%ask What does this print?
+%%code swift
+print(Array(1..<4))
+%%answer
+[1, 2, 3]
+%%why
+`..<` stops before the end. `...` includes it.
+
+%%card sw-closed-range
+%%deck swift
+%%kind predict
+%%ask What does this print?
+%%code swift
+print(Array(1...3).count)
+%%answer
+3
+%%why
+`...` is a closed range, so it includes the 3.
+
+%%card sw-nil-coalesce
+%%deck swift
+%%kind predict
+%%ask What does this print?
+%%code swift
+let name: String? = nil
+print(name ?? "guest")
+%%answer
+guest
+%%why
+`??` gives a fallback when the optional is nil.
+
+%%card sw-struct-copy
+%%deck swift
+%%kind predict
+%%ask Structs are copied. What does this print?
+%%code swift
+struct Point { var x: Int }
+
+var a = Point(x: 1)
+var b = a
+b.x = 9
+print(a.x)
+%%answer
+1
+%%why
+`b` is a separate copy, so changing it leaves `a` alone.
+
+%%card sw-class-ref
+%%deck swift
+%%kind predict
+%%ask Classes are shared. What does this print?
+%%code swift
+class Point {
+    var x: Int
+    init(x: Int) { self.x = x }
+}
+
+let a = Point(x: 1)
+let b = a
+b.x = 9
+print(a.x)
+%%answer
+9
+%%why
+Both names point to one object. And `let` only fixes which object, not what's inside it.
+
+%%card sw-int-div
+%%deck swift
+%%kind predict
+%%ask What does this print?
+%%code swift
+print(7 / 2)
+%%answer
+3
+%%why
+Two whole numbers give a whole number. Use `7.0 / 2.0` for 3.5.
+
+%%card sw-closure
+%%deck swift
+%%kind predict
+%%ask What does this print?
+%%code swift
+print([1, 2, 3].map { $0 * 2 })
+%%answer
+[2, 4, 6]
+%%why
+`map` makes a new list. `$0` is the current item.
+
+%%card sw-if-let
+%%deck swift
+%%kind fill
+%%ask Fill the gap to safely open this optional.
+%%code swift
+let nickname: String? = "Ash"
+if ____ nick = nickname {
+    print(nick)
+}
+%%answer
+let
+%%why
+`if let` runs the block only when there's a value, and gives it a safe name.
+
+%%card sw-mutating
+%%deck swift
+%%kind fill
+%%ask Fill the gap so a struct can change itself.
+%%code swift
+struct Counter {
+    var value = 0
+    ____ func increase() {
+        value += 1
+    }
+}
+%%answer
+mutating
+%%why
+Struct methods can't change the struct unless they're marked `mutating`.
+
+%%card sw-guard
+%%deck swift
+%%kind write
+%%ask Write a function `greet` that takes a `String?`. If it's nil, return "Hi stranger". Otherwise return "Hi" and the name. Use `guard`.
+%%code swift
+print(greet(nil))
+%%answer swift
+func greet(_ name: String?) -> String {
+    guard let name else { return "Hi stranger" }
+    return "Hi \(name)"
+}
+%%why
+`guard` handles the bad case first and leaves early, which keeps the main path flat.
+
+%%card sw-let-var
+%%deck swift
+%%kind explain
+%%ask When do you use `let` and when `var`?
+%%answer
+Use `let` by default. Change it to `var` only when the value really has to change.
+
+%%card sw-force
+%%deck swift
+%%kind explain
+%%ask What does `!` do on an optional, and why be careful?
+%%answer
+It force-opens the optional. If the value is nil, the app crashes.
+
+%%card sw-struct-class
+%%deck swift
+%%kind explain
+%%ask When would you pick a class over a struct?
+%%answer
+When several parts of the app need to share one copy, or for things like view models. Otherwise, default to a struct.
+
+%%card sw-state
+%%deck swift
+%%kind explain
+%%ask What does `@State` do in SwiftUI?
+%%answer
+It stores a value for the view. When the value changes, SwiftUI redraws the view by itself.
+
+%%card sw-fix-let
+%%deck swift
+%%kind fix
+%%ask This won't compile. Fix it.
+%%code swift
+let count = 0
+count += 1
+print(count)
+%%answer swift
+var count = 0
+count += 1
+print(count)
+%%why
+`let` can't change. `var` can.

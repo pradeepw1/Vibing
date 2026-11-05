@@ -1,0 +1,178 @@
+%%doc list-comprehension
+%%title List comprehension
+%%area python
+%%simple A one-line way to build a list from another list.
+%%like Saying "the red ones from that pile" rather than sorting by hand.
+%%example python
+big = [p for p in prices if p > 10]
+%%see sort
+%%link Python tutorial | https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions
+
+%%doc venv
+%%title Virtual environment
+%%area python
+%%aka venv, pip install
+%%simple A private folder of libraries for one project.
+%%like A separate toolbox per job, so tools don't get mixed up.
+%%example bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install requests
+%%link Python docs | https://docs.python.org/3/library/venv.html
+
+%%doc decorator
+%%title Decorator
+%%area python
+%%aka @
+%%simple A line starting with `@` that wraps extra behaviour around a function or class.
+%%like Gift wrap. Same thing inside, with something added around it.
+%%link Python glossary | https://docs.python.org/3/glossary.html#term-decorator
+
+%%doc optional
+%%title Optional
+%%area swift
+%%aka ?, if let, guard let, !, unwrap
+%%simple A type that says "this might be nil", so you must check before using it.
+%%like A wrapped box that might be empty. You open it before you use what's inside.
+%%more `!` force-opens the box, and crashes if it's empty. Use it rarely.
+%%see missing
+%%link Swift book | https://docs.swift.org/swift-book/documentation/the-swift-programming-language/thebasics/#Optionals
+
+%%doc swiftui
+%%title SwiftUI
+%%area swift
+%%aka View, body, modifier
+%%simple Apple's way to build screens by describing them in Swift.
+%%like Telling a designer what you want, rather than drawing it yourself.
+%%see page
+%%link Apple docs | https://developer.apple.com/documentation/swiftui
+
+%%doc protocol
+%%title Protocol
+%%area swift
+%%aka interface, conformance
+%%simple A list of what a type promises to be able to do. Java and TypeScript call it an interface.
+%%like A job description. Anyone who meets it can do the job.
+%%link Swift book | https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/
+
+%%doc xcode
+%%title Xcode
+%%area swift
+%%aka simulator, iOS
+%%simple Apple's app for building iPhone and Mac apps. You need it for full SwiftUI work.
+%%like The workshop that holds every tool for Apple apps.
+%%link Apple developer | https://developer.apple.com/xcode/
+
+%%doc jvm
+%%title JVM
+%%area java
+%%aka Java Virtual Machine, bytecode, JDK
+%%simple The program that runs Java. Java compiles to bytecode, and the JVM runs that anywhere.
+%%like A universal adapter, so one plug works in any country.
+%%see run
+%%link Learn Java | https://dev.java/learn/
+
+%%doc generics
+%%title Generics
+%%area java
+%%aka <T>, List<String>
+%%simple A way to say "a list of what?", so the compiler can check what goes in.
+%%like A labelled bin: "paper only".
+%%more The same idea appears in Swift and TypeScript.
+%%link Learn Java | https://dev.java/learn/generics/
+
+%%doc maven
+%%title Maven and Gradle
+%%area java
+%%aka pom.xml, build.gradle
+%%simple Java's tools for fetching libraries and building your project.
+%%like A project manager who collects the parts and runs the assembly line.
+%%link Maven | https://maven.apache.org/
+
+%%doc spring
+%%title Spring Boot
+%%area java
+%%aka Spring, framework
+%%simple The most popular way to build Java web services.
+%%like A fully fitted kitchen, rather than bare walls.
+%%link Spring Boot | https://spring.io/projects/spring-boot
+
+%%doc dom
+%%title DOM
+%%area frontend
+%%aka document, querySelector
+%%simple The browser's live model of the page. JavaScript changes the page by changing it.
+%%like A family tree of everything on the page.
+%%see page
+%%link MDN | https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model
+
+%%doc event
+%%title Event
+%%area frontend
+%%aka click, addEventListener, handler
+%%simple A signal that something happened, such as a click.
+%%like A doorbell. Your code is the person who answers.
+%%see click
+%%link MDN | https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Events
+
+%%doc state
+%%title State
+%%area frontend
+%%aka useState, @State
+%%simple What your app remembers right now.
+%%like A scoreboard. Change the numbers and everyone sees the new score.
+%%see click
+
+%%doc component
+%%title Component
+%%area frontend
+%%aka React, Vue, Svelte, View
+%%simple A reusable piece of screen, with its own look and logic.
+%%like A Lego brick.
+%%see page
+%%link React docs | https://react.dev/learn
+
+%%doc box-model
+%%title Box model
+%%area frontend
+%%aka margin, padding, border
+%%simple Every element is a box: content, then padding, then border, then margin.
+%%like A framed picture: the picture, the mount, the frame, and the gap on the wall.
+%%see layout
+%%link MDN | https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Styling_basics/Box_model
+
+%%doc flexbox
+%%title Flexbox
+%%area frontend
+%%aka display flex, gap, grid
+%%simple CSS for lining things up in a row or column.
+%%like Books on a shelf that shuffle along to fit.
+%%more Use flexbox for a line of things, and CSS grid for rows and columns together.
+%%see layout
+%%link MDN | https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/CSS_layout/Flexbox
+
+%%doc responsive
+%%title Responsive design
+%%area frontend
+%%aka media query, mobile
+%%simple Making one page look right on any screen size.
+%%like Water taking the shape of its glass.
+%%see layout
+%%link MDN | https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/CSS_layout/Responsive_Design
+
+%%doc npm
+%%title npm
+%%area frontend
+%%aka node_modules, package.json, bundler, Vite
+%%simple JavaScript's package manager. `package.json` lists what a project needs.
+%%like A shopping list, with a shop that delivers.
+%%link npm docs | https://docs.npmjs.com/
+
+%%doc typescript
+%%title TypeScript
+%%area frontend
+%%aka tsc, types
+%%simple JavaScript with types added. It catches mistakes before the code runs.
+%%like Spell-check for your code.
+%%more The types are removed when it runs, so browsers just see JavaScript.
+%%link TypeScript handbook | https://www.typescriptlang.org/docs/handbook/intro.html

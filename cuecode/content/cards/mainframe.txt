@@ -1,0 +1,165 @@
+%%card mf-s0c7
+%%deck mainframe
+%%kind explain
+%%ask A batch job dies with S0C7. What happened, and where do you look first?
+%%answer
+Bad data in a number field: spaces or letters reached arithmetic on a packed or zoned field. Find the failing statement and the input record, usually from a field that was never set up.
+
+%%card mf-s0c4
+%%deck mainframe
+%%kind explain
+%%ask What does S0C4 mean?
+%%answer
+The program touched memory it shouldn't, often from a bad table subscript or a CALL with mismatched parameters.
+
+%%card mf-s322
+%%deck mainframe
+%%kind explain
+%%ask What does S322 mean?
+%%answer
+The job ran out of CPU time. Often it's a loop that never ends.
+
+%%card mf-s806
+%%deck mainframe
+%%kind explain
+%%ask What does S806 mean?
+%%answer
+The program wasn't found. Check the program name and the `STEPLIB`.
+
+%%card mf-s0c7-vs-rc
+%%deck mainframe
+%%kind explain
+%%ask What's the difference between an ABEND and a non-zero return code?
+%%answer
+A return code means the step finished and is reporting how it went. An ABEND means it crashed and never finished.
+
+%%card mf-rc
+%%deck mainframe
+%%kind explain
+%%ask What do return codes 0, 4, 8 and 12 usually mean?
+%%answer
+0 is fine. 4 is a warning. 8 is an error. 12 or more is a serious error. Each shop has its own conventions.
+
+%%card mf-jcl-three
+%%deck mainframe
+%%kind explain
+%%ask What are the three main JCL statements?
+%%answer
+`JOB` names the job, `EXEC` runs a program, and `DD` connects a dataset.
+
+%%card mf-disp-shr
+%%deck mainframe
+%%kind fill
+%%ask Fill the gap so this step reads a dataset that others can read too.
+%%run none
+%%code jcl
+//INPUT    DD DSN=PROD.CUST.MASTER,DISP=____
+%%answer
+SHR
+%%why
+`SHR` shares the dataset. `OLD` asks for it alone.
+
+%%card mf-disp-new
+%%deck mainframe
+%%kind explain
+%%ask What does `DISP=(NEW,CATLG,DELETE)` mean?
+%%answer
+Create it. If the step ends well, record it in the catalog. If the step abends, delete it.
+
+%%card mf-assign
+%%deck mainframe
+%%kind explain
+%%ask Why does a COBOL program say `ASSIGN TO NAMES`, not a real file name?
+%%answer
+`NAMES` is a nickname. JCL's `//NAMES DD` says which dataset it means, so the same program can run on test or production data with no change.
+
+%%card mf-sysin
+%%deck mainframe
+%%kind fill
+%%ask Fill the gap: which DD name does `ACCEPT` read from in batch?
+%%run none
+%%code jcl
+//____    DD *
+20261105
+/*
+%%answer
+SYSIN
+%%why
+Lines under `SYSIN DD *` are in-stream data. It's a common way to pass a run date.
+
+%%card mf-file-status
+%%deck mainframe
+%%kind explain
+%%ask What do FILE STATUS codes 00, 10, 23 and 35 mean?
+%%answer
+00 is fine. 10 is end of file. 23 is record not found. 35 is file not found.
+
+%%card mf-sqlcode
+%%deck mainframe
+%%kind explain
+%%ask What do SQLCODE 0, 100 and a negative number mean?
+%%answer
+0 is fine. 100 is not found, or no more rows. Negative is an error.
+
+%%card mf-comp3
+%%deck mainframe
+%%kind explain
+%%ask How many bytes does `PIC S9(5)V99 COMP-3` take?
+%%answer
+4. It's 7 digits plus a sign, at two per byte: (7 + 1) / 2 = 4. As plain display digits, it would take 7.
+
+%%card mf-copybook
+%%deck mainframe
+%%kind explain
+%%ask A copybook changes, and one program isn't recompiled. What can go wrong?
+%%answer
+It still reads the old layout, so fields land in the wrong bytes. That's wrong data at best, and an S0C7 at worst.
+
+%%card mf-pseudo
+%%deck mainframe
+%%kind explain
+%%ask What does pseudo-conversational mean in CICS?
+%%answer
+The program sends the screen and ends. CICS starts it again when the user presses a key, so nothing holds memory while people think.
+
+%%card mf-commarea
+%%deck mainframe
+%%kind explain
+%%ask If a CICS program ends after each screen, where does it keep its state?
+%%answer
+In the COMMAREA, or a channel. CICS passes that to the next run.
+
+%%card mf-ksds
+%%deck mainframe
+%%kind explain
+%%ask When would you pick a VSAM KSDS over a sequential file?
+%%answer
+When you need to read a single record by key, without reading everything before it.
+
+%%card mf-batch-window
+%%deck mainframe
+%%kind explain
+%%ask What's the batch window?
+%%answer
+The hours when the overnight jobs must finish, before the online day begins. Missing it can hold up a business.
+
+%%card mf-ebcdic
+%%deck mainframe
+%%kind explain
+%%ask Your sorted file comes out in a different order on the PC. Why?
+%%answer
+Mainframes use EBCDIC, where letters sort before digits. ASCII has digits first.
+
+%%card mf-sort
+%%deck mainframe
+%%kind fill
+%%ask Fill the gap to sort on the first 10 bytes as text, ascending.
+%%run none
+%%code jcl
+//SYSIN    DD *
+  SORT FIELDS=(1,10,CH,____)
+/*
+%%answer
+A
+%%why
+Start, length, format, order. `A` ascending, `D` descending. `CH` is character.

@@ -1,0 +1,223 @@
+%%card cb-pic-pad
+%%deck cobol
+%%kind predict
+%%ask What does this print? (Mind the spaces.)
+%%code cobol
+       01  WS-ITEM  PIC X(5)  VALUE "AB".
+       PROCEDURE DIVISION.
+           DISPLAY "[" WS-ITEM "]".
+%%answer
+[AB   ]
+%%why
+`PIC X(5)` is always 5 characters, so it's padded with spaces on the right.
+
+%%card cb-pic-zero
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-COUNT  PIC 9(4)  VALUE 42.
+       PROCEDURE DIVISION.
+           DISPLAY WS-COUNT.
+%%answer
+0042
+%%why
+`PIC 9(4)` is 4 digits, padded with zeros on the left.
+
+%%card cb-truncate-text
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-CODE  PIC X(3).
+       PROCEDURE DIVISION.
+           MOVE "ABCDEF" TO WS-CODE.
+           DISPLAY WS-CODE.
+%%answer
+ABC
+%%why
+A `MOVE` to a smaller text field cuts off the right side, with no warning.
+
+%%card cb-truncate-number
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-N  PIC 9(2).
+       PROCEDURE DIVISION.
+           MOVE 1234 TO WS-N.
+           DISPLAY WS-N.
+%%answer
+34
+%%why
+A `MOVE` to a smaller number field cuts off the left side, the big digits. Silent data loss, and a classic bug.
+
+%%card cb-implied-decimal
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-PRICE  PIC 9(3)V99  VALUE 12.50.
+       PROCEDURE DIVISION.
+           DISPLAY WS-PRICE.
+%%answer
+01250
+%%why
+`V` is an invisible decimal point. The field stores 5 digits. You need an edited field like `ZZ9.99` to show the dot.
+
+%%card cb-edited
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-PRICE  PIC 9(3)V99  VALUE 12.50.
+       01  WS-OUT    PIC ZZ9.99.
+       PROCEDURE DIVISION.
+           MOVE WS-PRICE TO WS-OUT.
+           DISPLAY "[" WS-OUT "]".
+%%answer
+[ 12.50]
+%%why
+`Z` turns a leading zero into a space, and the `.` is a real printed dot.
+
+%%card cb-table-one
+%%deck cobol
+%%kind predict
+%%ask Where do tables start? What does this print?
+%%code cobol
+       01  WS-T.
+           05  WS-CELL  PIC X  OCCURS 3 TIMES.
+       PROCEDURE DIVISION.
+           MOVE "A" TO WS-CELL(1).
+           MOVE "B" TO WS-CELL(2).
+           MOVE "C" TO WS-CELL(3).
+           DISPLAY WS-CELL(2).
+%%answer
+B
+%%why
+COBOL tables start at 1, so `(2)` is the second item. In most languages it would be `[1]`.
+
+%%card cb-88
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-FLAG  PIC X  VALUE "N".
+           88  DONE        VALUE "Y".
+       PROCEDURE DIVISION.
+           SET DONE TO TRUE.
+           DISPLAY WS-FLAG.
+%%answer
+Y
+%%why
+`SET DONE TO TRUE` moves the 88's value into the field.
+
+%%card cb-rounded
+%%deck cobol
+%%kind predict
+%%ask What does this print?
+%%code cobol
+       01  WS-A  PIC 9(2)V9  VALUE 1.5.
+       01  WS-B  PIC 9(2).
+       01  WS-C  PIC 9(2).
+       PROCEDURE DIVISION.
+           COMPUTE WS-B = WS-A.
+           COMPUTE WS-C ROUNDED = WS-A.
+           DISPLAY WS-B " " WS-C.
+%%answer
+01 02
+%%why
+Without `ROUNDED`, COBOL cuts off the extra digits. With it, 1.5 rounds up to 2.
+
+%%card cb-perform-until
+%%deck cobol
+%%kind predict
+%%ask How many times does the body run?
+%%code cobol
+       01  WS-N  PIC 9(2)  VALUE 5.
+       PROCEDURE DIVISION.
+           PERFORM UNTIL WS-N >= 5
+               DISPLAY "HI"
+           END-PERFORM.
+           DISPLAY "DONE".
+%%answer
+DONE
+%%why
+`PERFORM UNTIL` checks before it starts. The answer is zero times. `WITH TEST AFTER` would run it once.
+
+%%card cb-move-to
+%%deck cobol
+%%kind fill
+%%ask Fill the gap to copy a value into a field.
+%%code cobol
+       01  WS-NAME  PIC X(10).
+       PROCEDURE DIVISION.
+           ____ "ASHA" TO WS-NAME.
+           DISPLAY WS-NAME.
+%%answer
+MOVE
+%%why
+`MOVE` is COBOL's assignment. It reads source first, then target.
+
+%%card cb-end-if
+%%deck cobol
+%%kind fill
+%%ask Fill the gap to close the `IF` properly.
+%%code cobol
+       01  WS-N  PIC 9  VALUE 1.
+       PROCEDURE DIVISION.
+           IF WS-N = 1
+               DISPLAY "ONE"
+           ____.
+%%answer
+END-IF
+%%why
+Close with `END-IF`. Don't rely on a full stop, because it ends every open `IF` at once.
+
+%%card cb-write-loop
+%%deck cobol
+%%kind write
+%%ask Write a loop that shows the numbers 1 to 3 using `PERFORM VARYING`.
+%%code cobol
+       01  WS-I  PIC 9(2).
+%%answer cobol
+       01  WS-I  PIC 9(2).
+       PROCEDURE DIVISION.
+           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > 3
+               DISPLAY WS-I
+           END-PERFORM.
+%%why
+`VARYING` sets the start, the step and the stop condition.
+
+%%card cb-divisions
+%%deck cobol
+%%kind explain
+%%ask Name the four divisions of a COBOL program, in order.
+%%answer
+IDENTIFICATION (its name), ENVIRONMENT (files and machine), DATA (fields), PROCEDURE (the logic).
+
+%%card cb-columns
+%%deck cobol
+%%kind explain
+%%ask In fixed-format COBOL, what are columns 7, 8 and 12, and why does 72 matter?
+%%answer
+Column 7 marks comments with `*`. Area A starts at column 8, for divisions, paragraphs and 01 levels. Area B starts at column 12, for statements. Anything past column 72 is ignored.
+
+%%card cb-fix-loop
+%%deck cobol
+%%kind fix
+%%ask This loop never stops. Fix it.
+%%code cobol
+       01  WS-N  PIC 9.
+       PROCEDURE DIVISION.
+           PERFORM VARYING WS-N FROM 1 BY 1 UNTIL WS-N > 9
+               DISPLAY WS-N
+           END-PERFORM.
+%%answer cobol
+       01  WS-N  PIC 9(2).
+       PROCEDURE DIVISION.
+           PERFORM VARYING WS-N FROM 1 BY 1 UNTIL WS-N > 9
+               DISPLAY WS-N
+           END-PERFORM.
+%%why
+`PIC 9` holds 0 to 9. Adding 1 to 9 wraps to 0, so it never gets past 9. Give the counter room.
