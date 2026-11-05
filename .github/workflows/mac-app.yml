@@ -67,6 +67,8 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
           check 'launch check: finished'
+          # Another window over the whole desktop: the page is told it is hidden, draws nothing, and draws again after.
+          check 'while another window covered the desktop, the page drew: .*"drawsWhileCovered":0,"seenWhileCovered":\["hidden","visible"\],"msCovered":[1-9][0-9][0-9][0-9],"drawsAfter":[1-9]'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'
           # The Mac's own signals: the screen going to sleep, the Mac locking, the screen saver.
           for reason in sleep locked screensaver; do check "hushed for $reason"; check "woken from $reason"; done

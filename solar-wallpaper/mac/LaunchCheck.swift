@@ -164,8 +164,10 @@ enum LaunchCheck {
             say("launch check: took the window away, \(Int(uncoveredAt - coveredAt)) ms after laying it")
         }))
         steps.append((3, {
-            let js = "(function(a,b){var n=0,t=window.__draws||[];for(var i=0;i<t.length;i++)if(t[i]>a+700&&t[i]<b)n++;"
-                + "return JSON.stringify({drawsWhileCovered:n,msCovered:Math.round(b-a),drawsInAll:t.length});})(\(coveredAt),\(uncoveredAt))"
+            // (Also: was the page told it was hidden while covered, and does it draw again afterwards?)
+            let js = "(function(a,b){var n=0,m=0,t=window.__draws||[];for(var i=0;i<t.length;i++){if(t[i]>a+700&&t[i]<b)n++;if(t[i]>b)m++;}"
+                + "var seen=(window.__seen||[]).filter(function(e){return e[0]>a-200&&e[0]<b+1500;}).map(function(e){return e[1];});"
+                + "return JSON.stringify({drawsWhileCovered:n,seenWhileCovered:seen,msCovered:Math.round(b-a),drawsAfter:m});})(\(coveredAt),\(uncoveredAt))"
             ask(hooks, js, "while another window covered the desktop, the page drew:")
         }))
         steps.append((3, { say("launch check: finished") }))
