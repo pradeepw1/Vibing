@@ -341,6 +341,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
           addEventListener("unhandledrejection", function (e) { post("page error: " + (e.reason && e.reason.message || e.reason)); });
           addEventListener("webglcontextlost", function () { post("page: its graphics were lost"); }, true);
           addEventListener("webglcontextrestored", function () { post("page: its graphics came back"); }, true);
+          // Hidden and shown again (another window over the desktop, Mission Control, the screen asleep): every time, up
+          // to a couple of hundred, so the log shows what happens when an app opens.
+          var turns = 0;
+          document.addEventListener("visibilitychange", function () {
+            if (++turns > 200) return;
+            try { window.webkit.messageHandlers.journal.postMessage("page: " + (document.hidden ? "hidden" : "shown")); } catch (e) {}
+          });
         })();
         """
 

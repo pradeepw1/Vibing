@@ -1318,9 +1318,11 @@ function reschedule() {
 
 document.addEventListener("visibilitychange", () => {
   if (!saver || document.hidden) return;
-  // Shown again: don't count the time away as one long frame.
-  lastTick = lastFrame = performance.now();
-  schedule();
+  // Shown again: draw at once (not a second later, when nothing moves), and don't count the time away as one long frame.
+  lastTick = performance.now();
+  lastFrame = -Infinity;
+  if (timer) reschedule();
+  else schedule();
 });
 
 function drawFrame(now) {

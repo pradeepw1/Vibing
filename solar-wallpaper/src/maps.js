@@ -234,19 +234,20 @@ export function createMaps({ renderer, system, enabled, onSettled, onMissing, sk
 
   // The graphics chip can lose everything (a driver reset, switching cards).
   // The compressed maps are kept, so rebuild the textures from them.
+  // All at once (each is decoded off the page's thread), so the picture is back as soon as it can be.
   renderer.domElement.addEventListener("webglcontextrestored", async () => {
-    for (const unit of units.values()) {
-      for (const tier of ["lite", "sharp"]) {
-        for (const t of unit[tier].look?.textures ?? []) {
-          if (!t.userData.blob) continue;
+    const textures = [...units.values()].flatMap((unit) => ["lite", "sharp"].flatMap((tier) => unit[tier].look?.textures ?? []));
+    await Promise.all(
+      textures
+        .filter((t) => t.userData.blob)
+        .map(async (t) => {
           const { image, flipped } = await decode(t.userData.blob);
           t.image = image;
           t.flipY = !flipped;
           t.dispose(); // the old copy on the chip is gone with the context: start the upload afresh, with the right size
           t.needsUpdate = true;
-        }
-      }
-    }
+        }),
+    );
   });
 
   return {
