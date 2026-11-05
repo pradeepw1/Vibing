@@ -180,6 +180,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var fellBack = Set<UInt32>()
     private var gaveUp = Set<UInt32>()
     private var stops: [UInt32: [Date]] = [:]
+    /// The screens as the wallpapers were made for them (which, where, how big), and a check of them waiting to run.
+    private var screenLayout = ""
+    private var screenCheck: DispatchWorkItem?
     private var scopeWindow: NSWindow?
     private var paused = false
     private var power = readPower()
@@ -367,6 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     private func buildWallpapers() {
+        screenLayout = layoutOfScreens()
         guard !paused, wallpapers.isEmpty else { return }
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
         for screen in screens where !gaveUp.contains(screenID(screen)) {
@@ -388,11 +392,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         wallpapers.removeAll()
     }
 
+    private func layoutOfScreens() -> String {
+        NSScreen.screens.map { screen in
+            let f = screen.frame
+            return "\(screenID(screen)):\(Int(f.minX)),\(Int(f.minY)),\(Int(f.width))x\(Int(f.height))@\(screen.backingScaleFactor)"
+        }.joined(separator: " ")
+    }
+
+    /// macOS says the screens changed for small things too, such as the Dock or the menu bar showing and hiding (that
+    /// changes the room left for windows), and it can say it several times in a row. Making the wallpapers again each time
+    /// reloaded the picture every few seconds. So: wait until it has gone quiet for a second, then only act on a real
+    /// change. The same screens at a new size or place just get their windows moved; only a screen added or taken away
+    /// makes the wallpapers again.
     @objc private func screensChanged() {
-        Journal.note("the screens changed")
+        screenCheck?.cancel()
+        let check = DispatchWorkItem { [weak self] in self?.checkScreens() }
+        screenCheck = check
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: check)
+    }
+
+    private func checkScreens() {
+        let layout = layoutOfScreens()
+        guard layout != screenLayout else {
+            Journal.note("the screens said they changed, but nothing about them did: left as they are")
+            return
+        }
+        screenLayout = layout
         noteScreens()
-        removeWallpapers()
-        buildWallpapers()
+        let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
+        let wanted = Set(screens.map { screenID($0) }).subtracting(gaveUp)
+        if !wallpapers.isEmpty && Set(wallpapers.map { $0.screen }) == wanted {
+            for entry in wallpapers {
+                if let screen = screens.first(where: { screenID($0) == entry.screen }) { entry.window.setFrame(screen.frame, display: true) }
+            }
+            Journal.note("the screens moved or changed size: windows moved, nothing reloaded")
+        } else {
+            Journal.note("a screen was added or taken away: the wallpapers are made again")
+            removeWallpapers()
+            buildWallpapers()
+        }
     }
 
     // MARK: Telling the page about a change

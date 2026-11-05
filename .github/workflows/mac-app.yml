@@ -73,6 +73,11 @@ jobs:
           check 'third time: stopped the page'
           check 'Space Scope keeps stopping on a screen: showing the lean picture there'
           check 'page state (after the picture kept stopping): .*"which":"lean","fps":20'
+          # Told five times that the screens changed when nothing did: one quiet note, nothing made again, nothing reloaded.
+          awk '/told the app five times that the screens changed/{f=1} /four seconds after/{f=0} f' run.log > screens.log
+          cat screens.log
+          [ "$(grep -c 'nothing about them did' screens.log)" = 1 ] || { echo "WRONG: expected one quiet note about the screens"; failed=1; }
+          if grep -q 'the page loaded\|made again\|making a window' screens.log; then echo "WRONG: the wallpapers were made again or reloaded"; failed=1; fi
           # Another window over the whole desktop: the page is told it is hidden, draws nothing, and draws again after.
           check 'while another window covered the desktop, the page drew: .*"drawsWhileCovered":0,"seenWhileCovered":\["hidden","visible"\],"msCovered":[1-9][0-9][0-9][0-9],"drawsAfter":[1-9]'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'

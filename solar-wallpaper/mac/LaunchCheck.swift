@@ -194,6 +194,13 @@ enum LaunchCheck {
         steps.append((8, { stopPage("second") }))
         steps.append((8, { stopPage("third") }))
         steps.append((15, { ask(hooks, stateJS, "page state (after the picture kept stopping):") }))
+        // macOS saying the screens changed when nothing about them did (as when the Dock or the menu bar shows and hides):
+        // the wallpapers must not be made again or reloaded, however many times it says so.
+        steps.append((1, {
+            for _ in 0..<5 { NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil) }
+            say("launch check: told the app five times that the screens changed")
+        }))
+        steps.append((4, { say("launch check: four seconds after") }))
         steps.append((3, { say("launch check: finished") }))
         run(steps)
     }
