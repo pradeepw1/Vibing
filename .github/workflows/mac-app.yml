@@ -37,8 +37,8 @@ jobs:
           app="solar-wallpaper/mac/build/Solar System Live.app"
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
-          # The app walks through its check (a minute or so; longer on a slow machine) and says when it is done.
-          for i in $(seq 1 180); do
+          # The app walks through its check (two minutes or so; longer on a slow machine) and says when it is done.
+          for i in $(seq 1 240); do
             grep -q "launch check: finished" run.log && break
             kill -0 "$pid" 2>/dev/null || break
             sleep 1
@@ -67,6 +67,12 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
           check 'launch check: finished'
+          # The Low Power Mode signal comes on a background thread: the app takes it on the main one, and doesn't crash.
+          check 'the Low Power Mode setting changed'
+          # A page that keeps stopping: after three times the screen gets the lean picture, instead of reloading for ever.
+          check 'third time: stopped the page'
+          check 'Space Scope keeps stopping on a screen: showing the lean picture there'
+          check 'page state (after the picture kept stopping): .*"which":"lean"'
           # Another window over the whole desktop: the page is told it is hidden, draws nothing, and draws again after.
           check 'while another window covered the desktop, the page drew: .*"drawsWhileCovered":0,"seenWhileCovered":\["hidden","visible"\],"msCovered":[1-9][0-9][0-9][0-9],"drawsAfter":[1-9]'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'

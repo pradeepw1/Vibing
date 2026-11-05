@@ -171,10 +171,15 @@ final class Settings {
 
 // MARK: - The app
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private let settings = Settings()
     private var statusItem: NSStatusItem!
-    private var wallpapers: [(window: NSWindow, web: WKWebView)] = []
+    private var wallpapers: [(window: NSWindow, web: WKWebView, screen: UInt32)] = []
+    /// Screens where Space Scope's page kept stopping, so they show the lean picture instead; and where even that kept
+    /// stopping, so they show nothing. (Picking a picture in the menu tries again.)
+    private var fellBack = Set<UInt32>()
+    private var gaveUp = Set<UInt32>()
+    private var stops: [UInt32: [Date]] = [:]
     private var scopeWindow: NSWindow?
     private var paused = false
     private var power = readPower()
@@ -196,6 +201,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             NSApp.terminate(nil)
             return
         }
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        Journal.note("started: version \(version), \(ProcessInfo.processInfo.operatingSystemVersionString), "
+            + "\(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) GB of memory, picture: \(settings.style.rawValue)")
+        noteScreens()
         installMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -260,11 +269,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             config.userContentController.addUserScript(
                 WKUserScript(source: "window.solarSearch = \"\(quoted)\";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
+        // Errors the page runs into, and its graphics being lost, go to the log (a few of them: not a flood).
+        config.userContentController.add(self, name: "journal")
+        config.userContentController.addUserScript(WKUserScript(source: Self.reportProblems, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let web = WKWebView(frame: frame, configuration: config)
         LaunchCheck.log("web view: made")
         web.autoresizingMask = [.width, .height]
         if #available(macOS 12.0, *) { web.underPageBackgroundColor = .black }
         return web
+    }
+
+    private static let reportProblems = """
+        (function () {
+          var sent = 0, said = {};
+          function post(text) {
+            text = String(text).slice(0, 300);
+            if (sent >= 20 || said[text]) return;
+            said[text] = true;
+            sent++;
+            try { window.webkit.messageHandlers.journal.postMessage(text); } catch (e) {}
+          }
+          addEventListener("error", function (e) { post("page error: " + e.message + " (" + String(e.filename || "").split("/").pop() + ":" + e.lineno + ")"); });
+          addEventListener("unhandledrejection", function (e) { post("page error: " + (e.reason && e.reason.message || e.reason)); });
+          addEventListener("webglcontextlost", function () { post("page: its graphics were lost"); }, true);
+          addEventListener("webglcontextrestored", function () { post("page: its graphics came back"); }, true);
+        })();
+        """
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let which = wallpapers.first(where: { $0.web === message.webView }).map { "screen \($0.screen)" } ?? "the Space Scope window"
+        Journal.note("\(which): \(message.body)")
+    }
+
+    private func screenID(_ screen: NSScreen) -> UInt32 {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+    }
+
+    private func noteScreens() {
+        for (index, screen) in NSScreen.screens.enumerated() {
+            Journal.note("screen \(screenID(screen))\(index == 0 ? " (the one with the menu bar)" : ""): \(screen.localizedName), "
+                + "\(Int(screen.frame.width)) x \(Int(screen.frame.height)) points, \(screen.backingScaleFactor)x sharp")
+        }
+    }
+
+    /// The picture a screen shows: the one picked, unless Space Scope kept stopping there.
+    private func style(for screen: UInt32) -> Style {
+        fellBack.contains(screen) ? .lean : settings.style
     }
 
     private var currentFrames: Int {
@@ -291,46 +341,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         LaunchCheck.log("load asked for")
     }
 
+    /// A borderless window just above the desktop picture but below the desktop icons, with the page in it.
+    private func makeWallpaper(on screen: NSScreen, style: Style) -> (window: NSWindow, web: WKWebView, screen: UInt32) {
+        LaunchCheck.log("making a window for a screen")
+        let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        LaunchCheck.log("window made")
+        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        window.isOpaque = true
+        window.backgroundColor = .black
+        window.hasShadow = false
+        window.ignoresMouseEvents = true // clicks go through to the desktop
+        window.isReleasedWhenClosed = false
+        window.setFrame(screen.frame, display: false)
+        let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size), search: search(for: style))
+        web.navigationDelegate = self
+        window.contentView?.addSubview(web)
+        LaunchCheck.log("web view added to the window")
+        load(web, page: page(for: style))
+        LaunchCheck.log("page asked for")
+        if quiet.isEmpty { window.orderFrontRegardless() }
+        LaunchCheck.log("window shown")
+        return (window, web, screenID(screen))
+    }
+
     private func buildWallpapers() {
         guard !paused, wallpapers.isEmpty else { return }
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
-        let style = settings.style
-        for screen in screens {
-            // Borderless, and just above the desktop picture but below the desktop icons.
-            LaunchCheck.log("making a window for a screen")
-            let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
-            LaunchCheck.log("window made")
-            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
-            window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-            window.isOpaque = true
-            window.backgroundColor = .black
-            window.hasShadow = false
-            window.ignoresMouseEvents = true // clicks go through to the desktop
-            window.isReleasedWhenClosed = false
-            window.setFrame(screen.frame, display: false)
-            let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size), search: search(for: style))
-            web.navigationDelegate = self
-            window.contentView?.addSubview(web)
-            LaunchCheck.log("web view added to the window")
-            load(web, page: page(for: style))
-            LaunchCheck.log("page asked for")
-            if quiet.isEmpty { window.orderFrontRegardless() }
-            LaunchCheck.log("window shown")
-            wallpapers.append((window, web))
+        for screen in screens where !gaveUp.contains(screenID(screen)) {
+            let id = screenID(screen)
+            wallpapers.append(makeWallpaper(on: screen, style: style(for: id)))
+            Journal.note("screen \(id): showing \(style(for: id).rawValue)")
         }
     }
 
+    private func dropWallpaper(_ entry: (window: NSWindow, web: WKWebView, screen: UInt32)) {
+        entry.web.stopLoading()
+        entry.web.navigationDelegate = nil
+        entry.web.removeFromSuperview()
+        entry.window.orderOut(nil)
+    }
+
     private func removeWallpapers() {
-        for entry in wallpapers {
-            entry.web.stopLoading()
-            entry.web.navigationDelegate = nil
-            entry.web.removeFromSuperview()
-            entry.window.orderOut(nil)
-        }
+        for entry in wallpapers { dropWallpaper(entry) }
         wallpapers.removeAll()
     }
 
     @objc private func screensChanged() {
+        Journal.note("the screens changed")
+        noteScreens()
         removeWallpapers()
         buildWallpapers()
     }
@@ -346,23 +405,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        LaunchCheck.log("a page finished loading")
+        let which = wallpapers.first(where: { $0.web === webView }).map { "screen \($0.screen)" } ?? "the Space Scope window"
+        Journal.note("\(which): the page loaded")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        LaunchCheck.log("a page failed: \(error.localizedDescription)")
+        Journal.note("a page failed: \(error.localizedDescription)")
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        LaunchCheck.log("a page couldn't start loading: \(error.localizedDescription)")
+        Journal.note("a page couldn't start loading: \(error.localizedDescription)")
     }
 
     /// macOS can stop a page's process when it needs the memory. A wallpaper has to come back.
+    /// macOS can stop a page's process (when it needs the memory, or the page crashed). A wallpaper has to come back, but
+    /// not over and over: if it stops three times in ten minutes on a screen, that screen gets the lean picture, which is
+    /// lighter; if that keeps stopping too, the screen is left alone.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        LaunchCheck.log("a page's process stopped")
-        if wallpapers.contains(where: { $0.web === webView }) {
-            load(webView, page: page(for: settings.style))
+        guard let index = wallpapers.firstIndex(where: { $0.web === webView }) else {
+            Journal.note("the Space Scope window's page stopped")
+            return
         }
+        let id = wallpapers[index].screen
+        let now = Date()
+        let recent = (stops[id] ?? []).filter { now.timeIntervalSince($0) < 600 } + [now]
+        stops[id] = recent
+        Journal.note("screen \(id): the page stopped (\(recent.count) time\(recent.count == 1 ? "" : "s") in 10 minutes), showing \(style(for: id).rawValue)")
+        guard recent.count >= 3 else {
+            load(webView, page: page(for: style(for: id)))
+            return
+        }
+        stops[id] = []
+        dropWallpaper(wallpapers[index])
+        if style(for: id) == .scope, let screen = NSScreen.screens.first(where: { screenID($0) == id }) {
+            fellBack.insert(id)
+            Journal.note("screen \(id): Space Scope keeps stopping on a screen: showing the lean picture there")
+            wallpapers[index] = makeWallpaper(on: screen, style: .lean)
+        } else {
+            gaveUp.insert(id)
+            Journal.note("screen \(id): the picture keeps stopping: leaving this screen alone")
+            wallpapers.remove(at: index)
+        }
+        rebuildMenu()
     }
 
     // MARK: Drawing less, or not at all
@@ -371,13 +455,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func hush(_ reason: String) {
         quiet.insert(reason)
         for entry in wallpapers { entry.window.orderOut(nil) }
-        LaunchCheck.log("hushed for \(reason): \(quiet.sorted())")
+        Journal.note("hushed for \(reason): \(quiet.sorted())")
     }
 
     private func unhush(_ reason: String) {
         quiet.remove(reason)
         if quiet.isEmpty { for entry in wallpapers { entry.window.orderFrontRegardless() } }
-        LaunchCheck.log("woken from \(reason): \(quiet.sorted())")
+        Journal.note("woken from \(reason): \(quiet.sorted())")
     }
 
     /// Looks at the power again (on the battery? Low Power Mode?) and sets the frame rate, or stops drawing, to fit.
@@ -386,7 +470,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         if !initial && !force && now == power { return }
         power = now
         let frames = framesPerSecond(style: settings.style, onBattery: power.onBattery, lowPower: power.lowPower, mode: settings.batteryMode)
-        LaunchCheck.log("power: battery \(power.onBattery), low power \(power.lowPower): \(frames.map { "\($0) frames a second" } ?? "paused")")
+        Journal.note("power: battery \(power.onBattery), low power \(power.lowPower): \(frames.map { "\($0) frames a second" } ?? "paused")")
         if initial {
             // (The pages are not made yet: their address says the frame rate. Paused: the windows stay hidden.)
             if frames == nil { quiet.insert("battery") }
@@ -438,7 +522,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     @objc private func unlocked() { unhush("locked") }
     @objc private func screenSaverOn() { hush("screensaver") }
     @objc private func screenSaverOff() { unhush("screensaver") }
-    @objc private func powerChanged() { applyPower() }
+    /// macOS sends this one on a background thread, and windows, menus and web pages may only be touched on the main one.
+    @objc private func powerChanged() {
+        DispatchQueue.main.async { [weak self] in
+            Journal.note("the Low Power Mode setting changed")
+            self?.applyPower()
+        }
+    }
 
     // MARK: The menu
 
@@ -459,6 +549,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func rebuildMenu() {
         let menu = NSMenu()
         menu.addItem(item("Solar System Live", nil))
+        if !fellBack.isEmpty || !gaveUp.isEmpty {
+            menu.addItem(item("Space Scope kept stopping on a screen, so it shows the lean picture there", nil))
+        }
         menu.addItem(.separator())
 
         let styleMenu = NSMenu()
@@ -534,6 +627,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         menu.addItem(.separator())
         menu.addItem(item("Open Space Scope in a window…", #selector(openScope)))
         menu.addItem(item("Credits", #selector(openCredits)))
+        menu.addItem(item("Show the log (for when something goes wrong)", #selector(openLog)))
         menu.addItem(.separator())
         menu.addItem(item("Quit Solar System Live", #selector(quit), key: "q"))
         statusItem.menu = menu
@@ -543,6 +637,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     private func setStyle(_ style: Style) {
         settings.style = style
+        fellBack.removeAll()
+        gaveUp.removeAll()
+        stops.removeAll()
+        Journal.note("picture: \(style.rawValue)")
         removeWallpapers()
         buildWallpapers()
         rebuildMenu()
@@ -658,6 +756,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     @objc private func openCredits() {
         NSWorkspace.shared.open(webRoot.appendingPathComponent("CREDITS.txt"))
+    }
+
+    @objc private func openLog() {
+        Journal.note("log opened from the menu")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSWorkspace.shared.open(Journal.url) } // (once that line is written)
     }
 
     @objc private func quit() { NSApp.terminate(nil) }

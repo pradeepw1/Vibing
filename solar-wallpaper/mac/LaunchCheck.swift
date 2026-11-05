@@ -170,6 +170,30 @@ enum LaunchCheck {
                 + "return JSON.stringify({drawsWhileCovered:n,seenWhileCovered:seen,msCovered:Math.round(b-a),drawsAfter:m});})(\(coveredAt),\(uncoveredAt))"
             ask(hooks, js, "while another window covered the desktop, the page drew:")
         }))
+        // The Low Power Mode signal arrives on a background thread: the app has to take it on the main one (it used to touch
+        // its windows straight from the signal, which can crash a Mac app).
+        steps.append((1, {
+            if #available(macOS 12.0, *) {
+                DispatchQueue.global().async {
+                    NotificationCenter.default.post(name: NSNotification.Name.NSProcessInfoPowerStateDidChange, object: nil)
+                }
+            }
+        }))
+        // Space Scope's page stopping over and over (as if it crashed): after the third time in ten minutes, the screen gets
+        // the lean picture instead of reloading for ever.
+        let stopPage = { (which: String) in
+            guard let web = hooks.web(), let pid = (web.value(forKey: "_webProcessIdentifier") as? NSNumber)?.int32Value, pid > 0 else {
+                say("launch check: \(which) time: no page process to stop")
+                return
+            }
+            kill(pid, SIGKILL)
+            say("launch check: \(which) time: stopped the page's process")
+        }
+        steps.append((2, { hooks.useStyle(.scope) }))
+        steps.append((15, { stopPage("first") }))
+        steps.append((8, { stopPage("second") }))
+        steps.append((8, { stopPage("third") }))
+        steps.append((15, { ask(hooks, stateJS, "page state (after the picture kept stopping):") }))
         steps.append((3, { say("launch check: finished") }))
         run(steps)
     }
