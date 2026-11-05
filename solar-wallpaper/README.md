@@ -130,7 +130,12 @@ Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-ba
 
 **Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved. (Its own settings panel isn't set up: that needs a `project.json` listing the settings, which isn't included. The page does read Wallpaper Engine's settings by the same names as Lively's, if you write one.)
 
-**macOS, with [Plash](https://sindresorhus.com/plash) (free):** add a website and point it at the `index.html` file.
+**macOS, the Solar System Live app:** a real Mac app (in `mac/`), in the menu bar with no Dock icon. It puts the Wallpaper behind your desktop icons on every screen and every Space, and clicks go straight through to the desktop. The menu bar menu has the zoom, the time speed, the switches (camera, names, orbits, asteroids, clock, real maps), *Show on every screen*, *Pause the wallpaper*, *Open at login*, and *Open Space Scope…*, which opens the full app in a normal window. It runs on macOS 11 or newer, on Apple-chip and Intel Macs.
+
+- **Build it on your Mac (the easy way to get no warnings):** install the Command Line Tools once (`xcode-select --install`), then run `solar-wallpaper/mac/build.sh install` in Terminal. It builds the app, puts it in Applications and opens it. An app built on your own Mac isn't blocked by macOS.
+- **Or download the disk image:** the *Mac app* job on GitHub (Actions, then the run, then *Artifacts*) builds `SolarSystemLive.dmg` and a zip. Open the disk image and drag the app to Applications. This copy isn't signed by an Apple developer account (that costs money), so the first time macOS says it can't check it for malware. Right-click the app and pick *Open*; on macOS 15, open *System Settings*, *Privacy & Security* and press *Open Anyway*. Or run `xattr -dr com.apple.quarantine "/Applications/Solar System Live.app"` once.
+
+**macOS, with [Plash](https://sindresorhus.com/plash) (free), if you'd rather not use the app:** add a website and point it at the `index.html` file.
 
 **Linux:** KDE Plasma and some other desktops have "web page" wallpaper plugins. Point one at `index.html`.
 
@@ -224,6 +229,7 @@ The built files are in git, but the originals are not.
 | `src/wallpaper-labels.js`, `src/wallpaper-settings.js` | The Wallpaper's names (not clickable) and its settings |
 | `src/options.js`, `src/skyplaces.js` | What both pages share: the time speeds and how a setting is cleaned up, and the black holes as names on the sky |
 | `dist/scope.html` | Space Scope: the full app, loads `solar.js` |
+| `mac/main.swift`, `mac/build.sh`, `mac/Info.plist` | The Mac app: the menu bar menu and the windows behind the desktop icons, and the script that builds, signs (ad hoc), packs and installs it. `.github/workflows/mac-app.yml` runs the build on a Mac and checks it starts |
 | `src/modes.js` | The two page names, which settings only Space Scope has, and how a wallpaper app's **Mode** setting is read |
 | `tools/make-land.mjs` | Rebuilds `src/land.js` from Natural Earth map data |
 | `tools/build.mjs`, `tools/bundles.mjs` | Build `dist/solar.js` and `dist/wallpaper.js`, and write `dist/LivelyProperties.json` from the same lists the pages use. `test/dist.test.mjs` makes them again and fails if the committed ones are out of date |
