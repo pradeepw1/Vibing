@@ -37,10 +37,16 @@ jobs:
           app="solar-wallpaper/mac/build/Solar System Live.app"
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
-          sleep 66
+          # The app walks through its check (a minute or so; longer on a slow machine) and says when it is done.
+          for i in $(seq 1 180); do
+            grep -q "launch check: finished" run.log && break
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          sleep 3 # (the last answers from the page)
           screencapture -x screen.png || true
           if kill -0 "$pid" 2>/dev/null; then
-            echo "Still running after 66 seconds."
+            echo "Still running at the end of the check."
             kill "$pid"
           else
             echo "It stopped by itself:"
@@ -59,7 +65,8 @@ jobs:
           check 'page state (lean): .*"page":true.*"which":"lean".*"settingsButton":false'
           check 'after picking 4x in the menu the page says: 4.0× · Out to Mars'
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
-          check 'while hushed, the page saw and drew: .*"drawsWhileHushed":0'
+          check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
+          check 'launch check: finished'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'
           # The Mac's own signals: the screen going to sleep, the Mac locking, the screen saver.
           for reason in sleep locked screensaver; do check "hushed for $reason"; check "woken from $reason"; done
