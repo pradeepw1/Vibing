@@ -16,6 +16,10 @@ enum LaunchCheck {
         let quiet: (Bool) -> Void
         let style: () -> String
         let window: () -> NSWindow?
+        let openScope: () -> Void
+        let scopeWeb: () -> WKWebView?
+        let closeScope: () -> Void
+        let reset: () -> Void
     }
 
     private static var cover: NSWindow? // (an ordinary window laid over the whole desktop, for one of the checks)
@@ -201,6 +205,27 @@ enum LaunchCheck {
             say("launch check: told the app five times that the screens changed")
         }))
         steps.append((4, { say("launch check: four seconds after") }))
+        // Set up in the Space Scope window (Saturn, the camera put somewhere, standing still), close it: the wallpaper shows
+        // just that. Then Reset: back to how it started.
+        let wallpaperNow = "(function(){var s=window.solarSystem;if(!s)return 'not Space Scope';return JSON.stringify({view:s.settings.view,"
+            + "drift:s.settings.drift,cam:s.settings.cam||null,camNow:s.camera.position.clone().sub(s.controls.target).toArray()"
+            + ".map(function(n){return Math.round(n*10)/10;})});})()"
+        steps.append((1, { hooks.openScope() }))
+        steps.append((15, {
+            hooks.scopeWeb()?.evaluateJavaScript("window.solarSystem.set('drift',false);window.solarSystem.set('view','saturn');'ok'", completionHandler: nil)
+            say("launch check: in the Space Scope window: camera still, looking at Saturn")
+        }))
+        steps.append((6, {
+            hooks.scopeWeb()?.evaluateJavaScript("var s=window.solarSystem;s.camera.position.copy(s.controls.target).add({x:6,y:3,z:8});'ok'", completionHandler: nil)
+            say("launch check: in the Space Scope window: camera put at 6, 3, 8 from Saturn")
+        }))
+        steps.append((3, {
+            hooks.closeScope()
+            say("launch check: closed the Space Scope window")
+        }))
+        steps.append((15, { ask(hooks, wallpaperNow, "after setting up Saturn in the Space Scope window, the wallpaper shows:") }))
+        steps.append((1, { hooks.reset() }))
+        steps.append((15, { ask(hooks, wallpaperNow, "after Reset, the wallpaper shows:") }))
         steps.append((3, { say("launch check: finished") }))
         run(steps)
     }

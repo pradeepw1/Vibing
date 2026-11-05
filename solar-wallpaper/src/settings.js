@@ -83,7 +83,19 @@ export function save(settings) {
 export function parse(key, value) {
   switch (key) {
     case "view":
-      return VIEWS.some((v) => v.id === value) || viewpoint(value) ? value : undefined;
+      // (A moon too: clicking one in Space Scope looks at it.)
+      return VIEWS.some((v) => v.id === value) || viewpoint(value) || MOONS.some((m) => m.id === value) ? value : undefined;
+    case "cam": {
+      // Where the camera was left, from what it looks at: "x,y,z" (a view set up in Space Scope and kept as the wallpaper).
+      const n = String(value).split(",").map(Number);
+      return n.length === 3 && n.every((x) => Number.isFinite(x) && Math.abs(x) < 5000) && Math.hypot(...n) > 1e-6 ? n : undefined;
+    }
+    case "look": {
+      // Standing on a body: "height,turn,tilt" (height in the body's radii, the other two in degrees).
+      const [height, turn, tilt] = String(value).split(",").map(Number);
+      if (![height, turn, tilt].every(Number.isFinite)) return undefined;
+      return [Math.min(12, Math.max(0.02, height)), turn, Math.min(80, Math.max(-80, tilt))];
+    }
     case "reverse":
     case "paused":
     case "strange":

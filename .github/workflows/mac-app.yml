@@ -38,7 +38,7 @@ jobs:
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
           # The app walks through its check (two minutes or so; longer on a slow machine) and says when it is done.
-          for i in $(seq 1 240); do
+          for i in $(seq 1 300); do
             grep -q "launch check: finished" run.log && break
             kill -0 "$pid" 2>/dev/null || break
             sleep 1
@@ -67,6 +67,9 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
           check 'launch check: finished'
+          # What the Space Scope window is left showing becomes the wallpaper; Reset puts it back.
+          check 'after setting up Saturn in the Space Scope window, the wallpaper shows: {"view":"saturn","drift":false,"cam":\[6,3,8\],"camNow":\[6,3,8\]}'
+          check 'after Reset, the wallpaper shows: {"view":"middle","drift":[a-z]*,"cam":null'
           # The Low Power Mode signal comes on a background thread: the app takes it on the main one, and doesn't crash.
           check 'the Low Power Mode setting changed'
           # A page that keeps stopping: after three times the screen gets the lean picture, instead of reloading for ever.

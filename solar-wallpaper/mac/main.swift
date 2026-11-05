@@ -150,6 +150,25 @@ final class Settings {
         set { store.set(newValue, forKey: "allScreens") }
     }
 
+    /// Where the camera was left in Space Scope ("x,y,z" from what it looks at), and, standing on a body, how
+    /// ("height,turn,tilt"). Nil: the view's own framing.
+    var camera: String? {
+        get { store.string(forKey: "camera") }
+        set { store.set(newValue, forKey: "camera") }
+    }
+
+    var look: String? {
+        get { store.string(forKey: "look") }
+        set { store.set(newValue, forKey: "look") }
+    }
+
+    /// Back to how the wallpaper started: the picture, the view and the camera, the speed, the zoom and the switches.
+    /// (Not the app's own choices: the battery, every screen or not, opening at login.)
+    func reset() {
+        for key in ["style", "view", "camera", "look", "speed", "zoom"] { store.removeObject(forKey: key) }
+        for choice in switchChoices + scopeSwitches { store.removeObject(forKey: "switch.\(choice.key)") }
+    }
+
     /// A switch the person has flipped, or nil if they never did (then the page's own default stands).
     func picked(_ key: String) -> Bool? {
         store.object(forKey: "switch.\(key)") as? Bool
@@ -183,6 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     /// The screens as the wallpapers were made for them (which, where, how big), and a check of them waiting to run.
     private var screenLayout = ""
     private var screenCheck: DispatchWorkItem?
+    /// What the Space Scope window shows, as it last said (the wallpaper takes it when the window closes).
+    private var pendingSetUp: [String: Any]?
     private var scopeWindow: NSWindow?
     private var paused = false
     private var power = readPower()
@@ -235,10 +256,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 if on { self?.hush("test") } else { self?.unhush("test") }
             },
             style: { [weak self] in self?.settings.style.rawValue ?? "?" },
-            window: { [weak self] in self?.wallpapers.first?.window }))
+            window: { [weak self] in self?.wallpapers.first?.window },
+            openScope: { [weak self] in self?.openScope() },
+            scopeWeb: { [weak self] in self?.scopeWindow?.contentView?.subviews.first as? WKWebView },
+            closeScope: { [weak self] in self?.scopeWindow?.close() },
+            reset: { [weak self] in self?.resetWallpaper() }))
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// Quitting with the Space Scope window open still keeps what it shows, for the next start.
+    func applicationWillTerminate(_ notification: Notification) {
+        if let setUp = pendingSetUp { keepSetUp(setUp, show: false) }
+    }
 
     /// A little main menu so that Cmd-Q and Cmd-W work in the Space Scope window.
     private func installMainMenu() {
@@ -260,7 +290,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: The wallpaper windows
 
     /// A web view whose page finds `search` (the settings, written like a page address) when it starts.
-    private func makeWebView(frame: NSRect, search: String?) -> WKWebView {
+    /// `setUp`: the Space Scope window, whose page says what it shows (see `keepSetUp`).
+    private func makeWebView(frame: NSRect, search: String?, setUp: Bool = false) -> WKWebView {
         let config = WKWebViewConfiguration()
         LaunchCheck.log("web view: settings made")
         // The page loads its planet maps from files next to it.
@@ -274,6 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         }
         // Errors the page runs into, and its graphics being lost, go to the log (a few of them: not a flood).
         config.userContentController.add(self, name: "journal")
+        if setUp { config.userContentController.add(self, name: "scene") }
         config.userContentController.addUserScript(WKUserScript(source: Self.reportProblems, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let web = WKWebView(frame: frame, configuration: config)
         LaunchCheck.log("web view: made")
@@ -300,6 +332,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         """
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "scene" {
+            // What the Space Scope window shows now: kept until the window closes, then shown on the desktop.
+            if let text = message.body as? String, let data = text.data(using: .utf8),
+               let setUp = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                pendingSetUp = setUp
+            }
+            return
+        }
         let which = wallpapers.first(where: { $0.web === message.webView }).map { "screen \($0.screen)" } ?? "the Space Scope window"
         Journal.note("\(which): \(message.body)")
     }
@@ -327,12 +367,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// The settings as a page address would say them.
-    private func search(for style: Style) -> String {
-        var items = ["wallpaper=1", "speed=\(settings.speed)", "fps=\(frames(for: style))"]
+    /// `window`: for the Space Scope window, which opens on what the wallpaper shows but is the full app (no wallpaper
+    /// savings, its own frame rate).
+    private func search(for style: Style, window: Bool = false) -> String {
+        var items = window ? ["speed=\(settings.speed)"] : ["wallpaper=1", "speed=\(settings.speed)", "fps=\(frames(for: style))"]
         for choice in switchChoices + (style == .scope ? scopeSwitches : []) {
             if let picked = settings.picked(choice.key) { items.append("\(choice.key)=\(picked ? 1 : 0)") }
         }
-        items.append(style == .scope ? "view=\(settings.view)" : "zoom=\(number(settings.zoom))")
+        if style == .scope {
+            items.append("view=\(settings.view)")
+            if let camera = settings.camera { items.append("cam=\(camera)") }
+            if let look = settings.look { items.append("look=\(look)") }
+        } else {
+            items.append("zoom=\(number(settings.zoom))")
+        }
         return "?" + items.joined(separator: "&")
     }
 
@@ -664,7 +712,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             menu.addItem(item("Open at login", #selector(toggleLogin), on: launchesAtLogin))
         }
         menu.addItem(.separator())
-        menu.addItem(item("Open Space Scope in a window…", #selector(openScope)))
+        menu.addItem(item("Set up the wallpaper in Space Scope…", #selector(openScope)))
+        menu.addItem(item("Reset the wallpaper…", #selector(askToReset)))
         menu.addItem(item("Credits", #selector(openCredits)))
         menu.addItem(item("Show the log (for when something goes wrong)", #selector(openLog)))
         menu.addItem(.separator())
@@ -689,8 +738,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         if let raw = sender.representedObject as? String, let style = Style(rawValue: raw) { setStyle(style) }
     }
 
+    /// Whatever the Space Scope window was left showing becomes the wallpaper: the view, where the camera was, the speed
+    /// and the switches. (Space Scope is the picture from then on.)
+    private func keepSetUp(_ setUp: [String: Any], show: Bool = true) {
+        pendingSetUp = nil
+        if let view = setUp["view"] as? String { settings.view = view }
+        if let speed = setUp["speed"] as? String { settings.speed = speed }
+        for choice in switchChoices + scopeSwitches {
+            if let on = setUp[choice.key] as? Bool { settings.pick(choice.key, on) }
+        }
+        let numbers = { (key: String) in (setUp[key] as? [NSNumber])?.map { "\($0.doubleValue)" }.joined(separator: ",") }
+        settings.camera = numbers("cam")
+        settings.look = numbers("look")
+        settings.style = .scope
+        Journal.note("the wallpaper now shows what Space Scope was left showing: \(settings.view)")
+        if show { startAgain() }
+    }
+
+    /// The wallpapers made again from the settings (every screen tried again, with Space Scope where it was picked).
+    private func startAgain() {
+        fellBack.removeAll()
+        gaveUp.removeAll()
+        stops.removeAll()
+        removeWallpapers()
+        buildWallpapers()
+        rebuildMenu()
+    }
+
+    private func resetWallpaper() {
+        settings.reset()
+        Journal.note("the wallpaper was reset")
+        startAgain()
+    }
+
+    @objc private func askToReset() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Reset the wallpaper?"
+        alert.informativeText = "It goes back to how it started: Space Scope, out to Jupiter, live time, the camera going round. "
+            + "What you set up in Space Scope is forgotten."
+        alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { resetWallpaper() }
+    }
+
     private func setView(_ id: String) {
         settings.view = id
+        settings.camera = nil // (a view picked from the menu has its own framing)
+        settings.look = nil
         send("view", id)
         rebuildMenu()
     }
@@ -769,12 +864,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered, defer: false)
-            window.title = "Space Scope"
+            window.title = "Space Scope: what you leave it showing becomes your wallpaper"
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
             if let content = window.contentView {
-                let web = makeWebView(frame: content.bounds, search: nil) // (no settings: the full app, as in a browser)
+                // It opens on what the wallpaper shows, and whatever it is left showing becomes the wallpaper.
+                let web = makeWebView(frame: content.bounds, search: search(for: .scope, window: true), setUp: true)
                 content.addSubview(web)
                 load(web, page: "scope.html")
             }
@@ -787,6 +883,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     /// Closing Space Scope throws its page away, so it stops using the graphics chip.
     func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === scopeWindow else { return }
+        for case let web as WKWebView in scopeWindow?.contentView?.subviews ?? [] {
+            web.configuration.userContentController.removeScriptMessageHandler(forName: "scene") // (nothing more from it)
+        }
+        if let setUp = pendingSetUp { keepSetUp(setUp) }
         DispatchQueue.main.async { [weak self] in
             self?.scopeWindow?.contentView?.subviews.forEach { $0.removeFromSuperview() }
             self?.scopeWindow = nil

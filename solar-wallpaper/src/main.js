@@ -1464,6 +1464,28 @@ window.wallpaperPropertyListener = {
   },
 };
 
+// In the Mac app, the Space Scope window is where the wallpaper is set up: what it shows (the view, where the camera was
+// left, the speed and the switches) is sent to the app now and then, and the desktop shows it once the window is closed.
+// Anywhere else there is no one to send it to, and nothing runs.
+function setUp() {
+  const s = { view: settings.view, speed: settings.speed };
+  for (const key of ["labels", "orbits", "belts", "clock", "drift", "photos", "strange"]) s[key] = settings[key];
+  if (pov.id) s.look = [povCam.state.altitude, povCam.state.yaw, povCam.state.pitch].map((n) => +n.toFixed(3));
+  else if (!away.stage && focus) s.cam = camera.position.clone().sub(controls.target).toArray().map((n) => +n.toFixed(4));
+  return s;
+}
+const sceneOut = window.webkit?.messageHandlers?.scene;
+if (sceneOut) {
+  let sent = "";
+  setInterval(() => {
+    if (tween || flight || settle || (away.stage && away.stage !== "there")) return; // (on the way somewhere: wait till there)
+    const now = JSON.stringify(setUp());
+    if (now === sent) return;
+    sent = now;
+    sceneOut.postMessage(now);
+  }, 1000);
+}
+
 // Handy for poking at things from the browser console.
 window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail };
 
@@ -1472,6 +1494,9 @@ system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio,
 if (galaxyOf(settings.view)) flyTo(away.home, true); // set up the solar system to come back to
 flyTo(settings.view, true);
 if (settle) settleSky(performance.now(), new Date(clock.time), 0);
+// A view set up in Space Scope and kept as the wallpaper: the camera where it was left (see `setUp` below).
+if (settings.cam && !pov.id && !away.stage && focus) camera.position.copy(controls.target).add(new Vector3().fromArray(settings.cam));
+if (settings.look && pov.id) [povCam.state.altitude, povCam.state.yaw, povCam.state.pitch] = settings.look;
 startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);
 if (saver) schedule();
 else requestAnimationFrame(frame);
