@@ -45,6 +45,8 @@ jobs:
             sample "$pid" 2 -file sample.txt >/dev/null 2>&1 || true
             sed -n '1,45p' sample.txt 2>/dev/null || true
             kill "$pid"
+            # What macOS itself wrote down about the app.
+            sudo log show --style compact --last 2m --predicate 'process == "SolarSystemLive"' 2>&1 | tail -40 || true
           else
             echo "It stopped by itself:"
             cat run.log

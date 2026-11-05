@@ -156,27 +156,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         return web
     }
 
-    /// The settings as the page's address says them.
-    private func query(wallpaper: Bool) -> [URLQueryItem] {
-        var items = [
-            URLQueryItem(name: "zoom", value: String(settings.zoom)),
-            URLQueryItem(name: "speed", value: settings.speed),
-        ]
-        for choice in switchChoices {
-            if let picked = settings.picked(choice.key) {
-                items.append(URLQueryItem(name: choice.key, value: picked ? "1" : "0"))
-            }
-        }
-        // "wallpaper" takes the page's settings button away: nobody can click it here anyway.
-        if wallpaper { items.append(URLQueryItem(name: "wallpaper", value: "1")) }
-        return items
-    }
-
-    private func load(_ web: WKWebView, page: String, wallpaper: Bool) {
-        guard var parts = URLComponents(url: webRoot.appendingPathComponent(page), resolvingAgainstBaseURL: false) else { return }
-        parts.queryItems = query(wallpaper: wallpaper)
-        guard let url = parts.url else { return }
+    /// Opens one of the web pages. The settings are not in the address: once the page has loaded, `didFinish` below
+    /// says them to it (the page takes them without a fuss while it is starting).
+    private func load(_ web: WKWebView, page: String) {
+        let url = webRoot.appendingPathComponent(page)
+        LaunchCheck.log("loading \(url.path)")
         web.loadFileURL(url, allowingReadAccessTo: webRoot)
+        LaunchCheck.log("load asked for")
     }
 
     private func buildWallpapers() {
@@ -199,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             web.navigationDelegate = self
             window.contentView?.addSubview(web)
             LaunchCheck.log("web view added to the window")
-            load(web, page: "index.html", wallpaper: true)
+            load(web, page: "index.html")
             LaunchCheck.log("page asked for")
             window.orderFrontRegardless()
             LaunchCheck.log("window shown")
@@ -259,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         LaunchCheck.log("a page's process stopped")
         if wallpapers.contains(where: { $0.web === webView }) {
-            load(webView, page: "index.html", wallpaper: true)
+            load(webView, page: "index.html")
         }
     }
 
@@ -401,7 +387,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             if let content = window.contentView {
                 let web = makeWebView(frame: content.bounds)
                 content.addSubview(web)
-                load(web, page: "scope.html", wallpaper: false)
+                load(web, page: "scope.html")
             }
             scopeWindow = window
         }
