@@ -91,18 +91,32 @@ enum LaunchCheck {
             ask(hooks, stateJS, "page state (lean):")
             hooks.pickZoom(4)
         }
+        // While hushed the page is hidden, and a hidden page isn't drawn. (A hidden page doesn't answer the app until it is
+        // shown again, so the page writes down its own hide and show events, and its own draws, for the app to read after.)
+        var hushedAt = 0.0
+        var wokeAt = 0.0
+        let now = { Date().timeIntervalSince1970 * 1000 }
+        at(37) {
+            ask(hooks, "(function(){var w=window.solarSystem||window.solarWallpaper;window.__seen=[];window.__draws=[];"
+                + "document.addEventListener('visibilitychange',function(){window.__seen.push([Date.now(),document.visibilityState]);});"
+                + "var r=w.renderer,d=r.render.bind(r);r.render=function(){window.__draws.push(Date.now());return d.apply(null,arguments);};return 'recording';})()",
+                "recording:")
+        }
         at(38) {
             ask(hooks, "document.querySelector('#zoom-note').textContent", "after picking 4x in the menu the page says:")
+            hushedAt = now()
             hooks.quiet(true)
         }
-        at(40) {
-            ask(hooks, "document.visibilityState", "visibility while hushed:")
+        at(41) {
+            wokeAt = now()
             hooks.quiet(false)
         }
-        at(42) {
-            ask(hooks, "document.visibilityState", "visibility after waking:")
+        at(44) {
+            let js = "(function(a,b){var n=0,t=window.__draws||[];for(var i=0;i<t.length;i++)if(t[i]>a+500&&t[i]<b)n++;"
+                + "return JSON.stringify({seen:(window.__seen||[]).map(function(e){return e[1];}),drawsWhileHushed:n,drawsInAll:t.length,visibility:document.visibilityState});})(\(hushedAt),\(wokeAt))"
+            ask(hooks, js, "while hushed, the page saw and drew:")
         }
-        at(44) { say("launch check: finished") }
+        at(46) { say("launch check: finished") }
     }
 
     /// The picture as 96 by 28 characters: the brightest spot in each cell, so a star or a planet still shows.
