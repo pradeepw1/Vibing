@@ -317,14 +317,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         fellBack.contains(screen) ? .lean : settings.style
     }
 
-    private var currentFrames: Int {
-        framesPerSecond(style: settings.style, onBattery: power.onBattery, lowPower: power.lowPower, mode: settings.batteryMode)
-            ?? framesPerSecond(style: settings.style, onBattery: false, lowPower: false, mode: .full) ?? 20
+    /// The frame rate for a picture right now, while it is drawn at all.
+    private func frames(for style: Style) -> Int {
+        framesPerSecond(style: style, onBattery: power.onBattery, lowPower: power.lowPower, mode: settings.batteryMode)
+            ?? framesPerSecond(style: style, onBattery: false, lowPower: false, mode: .full) ?? 20
     }
 
     /// The settings as a page address would say them.
     private func search(for style: Style) -> String {
-        var items = ["wallpaper=1", "speed=\(settings.speed)", "fps=\(currentFrames)"]
+        var items = ["wallpaper=1", "speed=\(settings.speed)", "fps=\(frames(for: style))"]
         for choice in switchChoices + (style == .scope ? scopeSwitches : []) {
             if let picked = settings.picked(choice.key) { items.append("\(choice.key)=\(picked ? 1 : 0)") }
         }
@@ -397,11 +398,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: Telling the page about a change
 
     /// Sets one of the page's settings now (without the page saving it: this app remembers it).
-    private func send(_ key: String, _ value: Any) {
+    private func send(_ key: String, _ value: Any, to pages: [WKWebView]? = nil) {
         guard let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
               let json = String(data: data, encoding: .utf8) else { return }
         let js = "(function(a){var w=window.solarSystem||window.solarWallpaper;if(w)w.set(\"\(key)\",a[0],{remember:false});})(\(json))"
-        for entry in wallpapers { entry.web.evaluateJavaScript(js, completionHandler: nil) }
+        for web in pages ?? wallpapers.map({ $0.web }) { web.evaluateJavaScript(js, completionHandler: nil) }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -476,9 +477,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             if frames == nil { quiet.insert("battery") }
             return
         }
-        if let frames = frames {
+        if frames != nil {
             unhush("battery")
-            send("fps", frames)
+            for entry in wallpapers { send("fps", self.frames(for: style(for: entry.screen)), to: [entry.web]) } // (a screen may show the other picture)
         } else {
             hush("battery")
         }

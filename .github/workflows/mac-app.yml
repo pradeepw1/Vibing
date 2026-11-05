@@ -72,7 +72,7 @@ jobs:
           # A page that keeps stopping: after three times the screen gets the lean picture, instead of reloading for ever.
           check 'third time: stopped the page'
           check 'Space Scope keeps stopping on a screen: showing the lean picture there'
-          check 'page state (after the picture kept stopping): .*"which":"lean"'
+          check 'page state (after the picture kept stopping): .*"which":"lean","fps":20'
           # Another window over the whole desktop: the page is told it is hidden, draws nothing, and draws again after.
           check 'while another window covered the desktop, the page drew: .*"drawsWhileCovered":0,"seenWhileCovered":\["hidden","visible"\],"msCovered":[1-9][0-9][0-9][0-9],"drawsAfter":[1-9]'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'
