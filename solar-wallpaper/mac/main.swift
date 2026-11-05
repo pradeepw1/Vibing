@@ -119,7 +119,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         LaunchCheck.log("wallpaper windows made: \(wallpapers.count)")
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        LaunchCheck.runIfAsked { [weak self] in self?.wallpapers.first?.web }
+        LaunchCheck.runIfAsked(
+            wallpaper: { [weak self] in self?.wallpapers.first?.web },
+            menu: { [weak self] in self?.statusItem.menu },
+            pickFour: { [weak self] in self?.setZoom(4) })
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

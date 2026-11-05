@@ -12,7 +12,8 @@ enum LaunchCheck {
         if on { say("launch check: \(text)") }
     }
 
-    static func runIfAsked(wallpaper: @escaping () -> WKWebView?) {
+    /// `menu`: the menu bar menu. `pickFour`: does what choosing "4x" in it does.
+    static func runIfAsked(wallpaper: @escaping () -> WKWebView?, menu: @escaping () -> NSMenu?, pickFour: @escaping () -> Void) {
         guard let path = ProcessInfo.processInfo.environment["SSL_SNAPSHOT"], !path.isEmpty else { return }
         // If the page never answers (its process didn't start, say), at least say so.
         DispatchQueue.main.asyncAfter(deadline: .now() + 22) { say("launch check: 22 seconds in") }
@@ -27,6 +28,13 @@ enum LaunchCheck {
                 + "visibility:document.visibilityState,canvas:c?[c.width,c.height]:null,zoomNote:n&&n.textContent});})()"
             web.evaluateJavaScript(js) { result, error in
                 say("launch check: page state: \(result.map { "\($0)" } ?? "none") \(error?.localizedDescription ?? "")")
+            }
+            say("launch check: menu: " + (menu()?.items.map { $0.isSeparatorItem ? "-" : $0.title }.joined(separator: " | ") ?? "none"))
+            pickFour()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                web.evaluateJavaScript("document.querySelector('#zoom-note').textContent") { result, _ in
+                    say("launch check: after picking 4x in the menu the page says: \(result.map { "\($0)" } ?? "none")")
+                }
             }
             web.takeSnapshot(with: nil) { image, error in
                 guard let image = image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else {
