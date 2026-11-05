@@ -226,6 +226,31 @@ enum LaunchCheck {
         steps.append((15, { ask(hooks, wallpaperNow, "after setting up Saturn in the Space Scope window, the wallpaper shows:") }))
         steps.append((1, { hooks.reset() }))
         steps.append((15, { ask(hooks, wallpaperNow, "after Reset, the wallpaper shows:") }))
+        // Other apps opening, and Mission Control, with the wallpaper showing round them: the picture has to carry on as
+        // it was (no reload, its graphics kept). The page writes down what happens to it while this goes on.
+        let watchJS = "(function(){var g=window.solarSystem||window.solarWallpaper;window.__mark=Date.now();window.__seen=[];"
+            + "window.__lost=0;window.__back=0;window.__draws=0;"
+            + "document.addEventListener('visibilitychange',function(){window.__seen.push(document.visibilityState);});"
+            + "addEventListener('webglcontextlost',function(){window.__lost++;},true);"
+            + "addEventListener('webglcontextrestored',function(){window.__back++;},true);"
+            + "var r=g.renderer,d=r.render.bind(r);r.render=function(){window.__draws++;return d.apply(null,arguments);};"
+            + "window.__tex=r.info.memory.textures;return 'watching';})()"
+        let openApp = { (path: String) in
+            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration()) { _, error in
+                say("launch check: opened \(URL(fileURLWithPath: path).lastPathComponent): \(error?.localizedDescription ?? "ok")")
+            }
+        }
+        steps.append((2, { ask(hooks, watchJS, "watching the wallpaper:") }))
+        steps.append((1, { openApp("/System/Applications/Calculator.app") }))
+        steps.append((4, { openApp("/System/Applications/TextEdit.app") }))
+        steps.append((4, { openApp("/System/Applications/Mission Control.app") }))
+        steps.append((3, { openApp("/System/Applications/Mission Control.app") }))
+        steps.append((4, { openApp("/System/Applications/Calculator.app") }))
+        steps.append((4, {
+            ask(hooks, "(function(){var g=window.solarSystem||window.solarWallpaper;return JSON.stringify({samePage:typeof window.__mark==='number',"
+                + "seen:window.__seen||null,lost:window.__lost,back:window.__back,draws:window.__draws,texBefore:window.__tex,"
+                + "texNow:g?g.renderer.info.memory.textures:null});})()", "after other apps and Mission Control, the wallpaper page:")
+        }))
         steps.append((3, { say("launch check: finished") }))
         run(steps)
     }
