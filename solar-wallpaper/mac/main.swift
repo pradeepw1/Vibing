@@ -145,9 +145,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     private func makeWebView(frame: NSRect) -> WKWebView {
         let config = WKWebViewConfiguration()
+        LaunchCheck.log("web view: settings made")
         // The page loads its planet maps from files next to it.
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        LaunchCheck.log("web view: file access allowed")
         let web = WKWebView(frame: frame, configuration: config)
+        LaunchCheck.log("web view: made")
         web.autoresizingMask = [.width, .height]
         if #available(macOS 12.0, *) { web.underPageBackgroundColor = .black }
         return web
@@ -181,7 +184,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
         for screen in screens {
             // Borderless, and just above the desktop picture but below the desktop icons.
+            LaunchCheck.log("making a window for a screen")
             let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            LaunchCheck.log("window made")
             window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
             window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
             window.isOpaque = true
@@ -193,8 +198,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size))
             web.navigationDelegate = self
             window.contentView?.addSubview(web)
+            LaunchCheck.log("web view added to the window")
             load(web, page: "index.html", wallpaper: true)
+            LaunchCheck.log("page asked for")
             window.orderFrontRegardless()
+            LaunchCheck.log("window shown")
             wallpapers.append((window, web))
         }
     }
