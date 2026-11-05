@@ -200,6 +200,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var gaveUp = Set<UInt32>()
     private var stops: [UInt32: [Date]] = [:]
     /// The screens as the wallpapers were made for them (which, where, how big), and a check of them waiting to run.
+    /// Which build this is (build.sh writes it in: the commit, and when), so the menu and the log can say.
+    private let buildName: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "SSLBuild") as? String ?? "unknown build"
+        return "\(version) (\(build))"
+    }()
     private var screenLayout = ""
     private var screenCheck: DispatchWorkItem?
     /// What the Space Scope window shows, as it last said (the wallpaper takes it when the window closes).
@@ -225,10 +231,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             NSApp.terminate(nil)
             return
         }
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let version = buildName
         Journal.note("started: version \(version), \(ProcessInfo.processInfo.operatingSystemVersionString), "
             + "\(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) GB of memory, picture: \(settings.style.rawValue)")
         noteScreens()
+        // Two copies would each put a wallpaper on the desktop and fight over it. This one is the newer: the others go.
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+            .filter { $0 != NSRunningApplication.current }
+        for other in others {
+            Journal.note("another copy was running (process \(other.processIdentifier)): asked it to quit")
+            other.terminate()
+        }
         installMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -340,8 +353,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             }
             return
         }
+        let text = "\(message.body)"
+        if text.contains("graphics were lost"), let web = message.webView {
+            trouble(web, "its graphics were lost", reload: false)
+            return
+        }
         let which = wallpapers.first(where: { $0.web === message.webView }).map { "screen \($0.screen)" } ?? "the Space Scope window"
-        Journal.note("\(which): \(message.body)")
+        Journal.note("\(which): \(text)")
     }
 
     private func screenID(_ screen: NSScreen) -> UInt32 {
@@ -509,17 +527,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     /// not over and over: if it stops three times in ten minutes on a screen, that screen gets the lean picture, which is
     /// lighter; if that keeps stopping too, the screen is left alone.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        trouble(webView, "the page stopped", reload: true)
+    }
+
+    /// Something went wrong with a screen's picture: its page stopped (`reload`: so load it again), or its graphics were
+    /// lost (the picture goes black, and the page gets them back by itself). Three times in ten minutes on a screen and
+    /// that screen gets the lean picture; if that has trouble three times too, the screen is left alone.
+    private func trouble(_ webView: WKWebView, _ what: String, reload: Bool) {
         guard let index = wallpapers.firstIndex(where: { $0.web === webView }) else {
-            Journal.note("the Space Scope window's page stopped")
+            Journal.note("the Space Scope window: \(what)")
             return
         }
         let id = wallpapers[index].screen
         let now = Date()
         let recent = (stops[id] ?? []).filter { now.timeIntervalSince($0) < 600 } + [now]
         stops[id] = recent
-        Journal.note("screen \(id): the page stopped (\(recent.count) time\(recent.count == 1 ? "" : "s") in 10 minutes), showing \(style(for: id).rawValue)")
+        Journal.note("screen \(id): \(what) (\(recent.count) time\(recent.count == 1 ? "" : "s") in 10 minutes), showing \(style(for: id).rawValue)")
         guard recent.count >= 3 else {
-            load(webView, page: page(for: style(for: id)))
+            if reload { load(webView, page: page(for: style(for: id))) }
             return
         }
         stops[id] = []
@@ -635,7 +660,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     private func rebuildMenu() {
         let menu = NSMenu()
-        menu.addItem(item("Solar System Live", nil))
+        menu.addItem(item("Solar System Live \(buildName)", nil))
         if !fellBack.isEmpty || !gaveUp.isEmpty {
             menu.addItem(item("Space Scope kept stopping on a screen, so it shows the lean picture there", nil))
         }
@@ -716,6 +741,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         menu.addItem(item("Reset the wallpaper…", #selector(askToReset)))
         menu.addItem(item("Credits", #selector(openCredits)))
         menu.addItem(item("Show the log (for when something goes wrong)", #selector(openLog)))
+        menu.addItem(item("Copy the log (to paste when asking for help)", #selector(copyLog)))
         menu.addItem(.separator())
         menu.addItem(item("Quit Solar System Live", #selector(quit), key: "q"))
         statusItem.menu = menu
@@ -900,6 +926,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     @objc private func openLog() {
         Journal.note("log opened from the menu")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSWorkspace.shared.open(Journal.url) } // (once that line is written)
+    }
+
+    /// The last hundred lines of the log, on the clipboard.
+    @objc private func copyLog() {
+        Journal.note("log copied from the menu")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            let text = (try? String(contentsOf: Journal.url, encoding: .utf8)) ?? "(the log is empty)"
+            let lines = text.split(separator: "\n", omittingEmptySubsequences: false).suffix(100).joined(separator: "\n")
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("Solar System Live \(self?.buildName ?? "")\n" + lines, forType: .string)
+            self?.tell("The log is copied", "Paste it (Cmd-V) wherever you're asking for help.")
+        }
     }
 
     @objc private func quit() { NSApp.terminate(nil) }

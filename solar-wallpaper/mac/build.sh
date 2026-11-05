@@ -57,6 +57,9 @@ fi
 rm -f "${bins[@]}"
 
 cp "$here/Info.plist" "$app/Contents/Info.plist"
+# Which build this is, for the menu and the log: the commit it was built from, and when.
+commit="$(git -C "$here" rev-parse --short HEAD 2>/dev/null || echo "not from git")"
+/usr/libexec/PlistBuddy -c "Add :SSLBuild string $commit, $(date '+%Y-%m-%d %H:%M')" "$app/Contents/Info.plist"
 cp -R "$dist" "$app/Contents/Resources/web"
 rm -f "$app/Contents/Resources/web/LivelyProperties.json" # (only Lively reads it)
 
