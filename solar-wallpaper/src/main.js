@@ -128,7 +128,8 @@ let lastLookView = viewpoint(settings.view) ? "middle" : settings.view;
 // --- Out among the galaxies ---
 // away.stage: null in the solar system; "leaving" while the camera turns to
 // face the galaxy and the screen dips to black; "there" in among the galaxies
-// (flying, or looking round); "returning" while flying home.
+// (flying, or looking round); "returning" while flying home, where the last
+// picture of the flight dissolves into the solar system.
 const away = {
   stage: null,
   galaxy: null,
@@ -337,6 +338,7 @@ function flyTo(id, instant = false) {
 // --- Going out to the galaxies and back ---
 const TURN_MS = 1100;
 const DIP_MS = 400;
+const DISSOLVE_MS = 1200;
 
 function goToGalaxy(id, instant) {
   if (away.stage === "there" || away.stage === "returning") {
@@ -495,13 +497,15 @@ function unturnFrame(now) {
 }
 const turnTo = new Quaternion();
 
-function finishHome() {
+/** `dip`: come out of the dark. (Not after a flight home: its last picture is on the screen already, dissolving.) */
+function finishHome(dip = true) {
   const id = away.then ?? away.home;
   const wasThere = away.stage !== "leaving";
   away.stage = null;
   away.then = null;
   away.captioned = null;
-  if (wasThere) away.arrived = performance.now();
+  if (wasThere && dip) away.arrived = performance.now();
+  labelsEl.style.opacity = "";
   lg.controls.enabled = false;
   lg.release();
   leaveInner();
@@ -568,20 +572,50 @@ function galaxyFrame(now) {
       return true; // stay dark: the new scene draws its first picture next frame, and the fade-in starts after that
     }
   }
-  if (away.stage === "returning") {
-    // Dark at the end of the flight home, and also just after coming back up out of the Gate or a system.
-    setFade(Math.max((t - 0.8) / 0.2, 1 - (now - away.arrived) / DIP_MS));
-    if (t >= 1) {
-      finishHome();
-      return false;
-    }
-  } else if (away.dive === null) setFade(1 - (now - away.arrived) / DIP_MS); // (not while sinking in: that fade is the dive's)
+  if (away.dive === null) setFade(1 - (now - away.arrived) / DIP_MS); // (not while sinking in: that fade is the dive's)
+  // The names go just before the picture does: a held picture can't take them with it.
+  labelsEl.style.opacity = away.stage === "returning" ? String(Math.min(1, (1 - t) / 0.15)) : "";
   renderer.autoClear = true;
   lg.render(renderer, 1000 / settings.fps);
   // Getting ready (making the stars, the first picture) is done in the dark.
   if (away.arrived === Infinity) away.arrived = performance.now();
+  if (away.stage === "returning" && t >= 1) {
+    holdPicture(); // (now: only straight after drawing is the picture there to copy)
+    finishHome(false);
+    return false;
+  }
   ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, away.stage === "there" ? away.galaxy : null);
   return true;
+}
+
+/**
+ * The galaxies and the solar system are drawn on their own, so the two can't be on the screen together. To go from one
+ * to the other without going dark: a copy of the last picture of the flight stays up, the solar system is drawn
+ * underneath it, and the copy dissolves away.
+ */
+let held = null; // { el: the copy, from: when it starts to dissolve (Infinity: once the picture underneath is drawn) }
+function holdPicture() {
+  const picture = renderer.domElement;
+  const el = document.createElement("canvas");
+  el.id = "held";
+  el.width = picture.width;
+  el.height = picture.height;
+  el.getContext("2d", { alpha: false }).drawImage(picture, 0, 0);
+  el.style.cssText = "position:fixed;inset:0;pointer-events:none";
+  held?.el.remove();
+  fadeEl.before(el); // (over the names, so the solar system's dissolve in with it)
+  held = { el, from: Infinity };
+}
+
+function dissolveFrame(now) {
+  if (!held) return;
+  const t = (now - held.from) / DISSOLVE_MS;
+  if (t >= 1) {
+    held.el.remove();
+    held = null;
+    return;
+  }
+  held.el.style.opacity = String(1 - ease(Math.max(0, t)));
 }
 
 /** One frame on the other side of the Gate. */
@@ -619,6 +653,7 @@ function setFade(v) {
   fadeEl.style.opacity = String(v);
 }
 const fadeEl = document.getElementById("fade");
+const labelsEl = document.getElementById("labels");
 
 // --- The view from a body ---
 // pov.id is the body we stand on (or are leaving). A change of view blends
@@ -1278,7 +1313,7 @@ function mustLayOut(now) {
 function still() {
   return (
     !(settings.drift && !reducedMotion) && (settings.paused || (settings.speed === "live" && !settings.reverse)) &&
-    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading
+    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held
   );
 }
 
@@ -1352,6 +1387,7 @@ function drawFrame(now) {
 
   tickClock(dt);
   noteFrame(now);
+  dissolveFrame(now);
   ui.updateClock(clock.time, clock.synced && !settings.paused);
   if ((away.stage === "there" || away.stage === "returning") && galaxyFrame(now)) {
     updateHover(now);
@@ -1390,6 +1426,7 @@ function drawFrame(now) {
   strangeFrame(dt, now);
 
   render();
+  if (held?.from === Infinity) held.from = performance.now();
   const ground = pov.id && bodies.get(pov.id);
   // Label as seen from the ground only once we're down there (or on the way back up).
   const down = ground && (!tween || camera.position.distanceTo(ground.group.position) < 3 * ground.radius * ground.group.scale.x);

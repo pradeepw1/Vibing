@@ -37,8 +37,8 @@ jobs:
           app="solar-wallpaper/mac/build/Solar System Live.app"
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
-          # The app walks through its check (four minutes or so; longer on a slow machine) and says when it is done.
-          for i in $(seq 1 420); do
+          # The app walks through its check (five minutes or so; longer on a slow machine) and says when it is done.
+          for i in $(seq 1 480); do
             grep -q "launch check: finished" run.log && break
             kill -0 "$pid" 2>/dev/null || break
             sleep 1
@@ -69,6 +69,8 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
           check 'launch check: finished'
+          # Home from a galaxy, the picture dissolves into the solar system: nothing dark, and nothing left over the screen after.
+          check 'home from a galaxy, the Space Scope window: {"stage":null,"darkest":0,"held":true,"lit":true,"stillHeld":false}'
           # What the Space Scope window is left showing becomes the wallpaper; Reset puts it back.
           check 'after setting up Saturn in the Space Scope window, the wallpaper shows: {"view":"saturn","drift":false,"cam":\[6,3,8\],"camNow":\[6,3,8\]}'
           check 'after Reset, the wallpaper shows: {"view":"middle","drift":[a-z]*,"cam":null'
