@@ -5,9 +5,19 @@ import Cocoa
 import WebKit
 
 enum LaunchCheck {
+    static let on: Bool = !(ProcessInfo.processInfo.environment["SSL_SNAPSHOT"] ?? "").isEmpty
+
+    /// One line of progress, only while the check is on.
+    static func log(_ text: String) {
+        if on { say("launch check: \(text)") }
+    }
+
     static func runIfAsked(wallpaper: @escaping () -> WKWebView?) {
         guard let path = ProcessInfo.processInfo.environment["SSL_SNAPSHOT"], !path.isEmpty else { return }
+        // If the page never answers (its process didn't start, say), at least say so.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 22) { say("launch check: 22 seconds in") }
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+            say("launch check: 15 seconds in")
             guard let web = wallpaper() else {
                 say("launch check: there is no wallpaper window")
                 return
@@ -29,7 +39,7 @@ enum LaunchCheck {
         }
     }
 
-    private static func say(_ text: String) {
+    static func say(_ text: String) {
         FileHandle.standardError.write((text + "\n").data(using: .utf8) ?? Data())
     }
 

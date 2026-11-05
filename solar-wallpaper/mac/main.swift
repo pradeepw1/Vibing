@@ -96,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: Start up
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LaunchCheck.log("started; screens: \(NSScreen.screens.count)")
         guard FileManager.default.fileExists(atPath: webRoot.appendingPathComponent("index.html").path) else {
             tell("Solar System Live can't find its pictures", "The app is missing its \"web\" folder. Please download it again.")
             NSApp.terminate(nil)
@@ -111,8 +112,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 button.title = "SSL"
             }
         }
+        LaunchCheck.log("menu bar item made")
         rebuildMenu()
+        LaunchCheck.log("menu built")
         buildWallpapers()
+        LaunchCheck.log("wallpaper windows made: \(wallpapers.count)")
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         LaunchCheck.runIfAsked { [weak self] in self?.wallpapers.first?.web }
@@ -222,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     /// Once a wallpaper page has loaded, say all the settings again, in case the address lost them.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        LaunchCheck.log("a page finished loading")
         guard wallpapers.contains(where: { $0.web === webView }) else { return }
         var all: [String: Any] = ["zoom": settings.zoom, "speed": settings.speed, "ui": false]
         for choice in switchChoices {
@@ -235,7 +240,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// macOS can stop a page's process when it needs the memory. A wallpaper has to come back.
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        LaunchCheck.log("a page failed: \(error.localizedDescription)")
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        LaunchCheck.log("a page couldn't start loading: \(error.localizedDescription)")
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        LaunchCheck.log("a page's process stopped")
         if wallpapers.contains(where: { $0.web === webView }) {
             load(webView, page: "index.html", wallpaper: true)
         }
