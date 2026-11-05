@@ -14,7 +14,7 @@ import * as A from "astronomy-engine";
 import { createBelts } from "./belts.js";
 import { createMaps } from "./maps.js";
 import { createModeGate, pageAddress, SCOPE_PAGE, scopeAddress, wantsScope } from "./modes.js";
-import { SPEEDS, speedRate } from "./options.js";
+import { hostSearch, SPEEDS, speedRate } from "./options.js";
 import { startPainting } from "./painter.js";
 import { createSky } from "./sky.js";
 import { BLACK_HOLE_PLACES } from "./skyplaces.js";
@@ -41,7 +41,7 @@ function start() {
   const CLOSE_PX = 70; // a planet this big on screen gets a finer sphere
 
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const settings = loadSettings(location.search, reducedMotion);
+  const settings = loadSettings(hostSearch(), reducedMotion);
 
   // How much to scale the drawing: the screen's own sharpness, but never so many pixels that a big screen costs a lot more.
   const fitRatio = () => Math.max(0.35, Math.min(devicePixelRatio || 1, 2, Math.sqrt(MAX_PIXELS / Math.max(1, innerWidth * innerHeight))));

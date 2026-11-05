@@ -288,10 +288,10 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
       if (body.kind === "moon" && standingOn) {
         // From a body, name the moons of its own family; other planets' moons are too close to them to label.
         const family = bodies.get(standingOn).kind === "moon" ? bodies.get(standingOn).parent.id : standingOn;
-        show &&= body.parent.id === family && body.fade > 0.5;
+        show &&= body.parent.id === family && body.fade > 0.5 && body.group.visible;
       } else if (body.kind === "moon") {
         const near = camera.position.distanceTo(body.parent.group.position) / body.parent.radius;
-        show &&= near < 30 && body.fade > 0.5;
+        show &&= near < 30 && body.fade > 0.5 && body.group.visible; // (a wallpaper leaves out moons too small to see: see saver.js)
       }
       if (show) {
         v.project(camera);

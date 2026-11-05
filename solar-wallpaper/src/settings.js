@@ -8,7 +8,7 @@ import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { MOONS, PLANETS } from "./bodies.js";
 import { GALAXIES } from "./galaxies.js";
 import { GATE } from "./gate.js";
-import { bool, parseShared, SPEEDS, speedRate } from "./options.js";
+import { bool, hostSearch, parseShared, SPEEDS, speedRate } from "./options.js";
 
 export { SPEEDS, speedRate };
 
@@ -93,7 +93,7 @@ export function parse(key, value) {
   }
 }
 
-export function loadSettings(search = location.search) {
+export function loadSettings(search = hostSearch()) {
   const settings = { ...DEFAULTS };
   for (const [k, v] of Object.entries(readSaved())) {
     const parsed = parse(k, v);
@@ -104,10 +104,14 @@ export function loadSettings(search = location.search) {
     const parsed = parse(k, v);
     if (parsed !== undefined) settings[k] = parsed;
   }
-  // "wallpaper" is shorthand for: no settings button, 30 fps (easy on battery).
-  if (params.has("wallpaper") && bool(params.get("wallpaper") || "1")) {
+  // "wallpaper" is shorthand for: no settings button, 30 fps, and the savings in saver.js (easy on battery). Nothing
+  // made up drifts by unless asked for, and a wallpaper doesn't remember settings: whatever runs it says them each time.
+  const saver = params.has("wallpaper") && bool(params.get("wallpaper") || "1");
+  if (saver) {
     settings.ui = false;
     if (!params.has("fps")) settings.fps = 30;
+    if (!params.has("strange")) settings.strange = false;
   }
+  settings.saver = saver;
   return settings;
 }

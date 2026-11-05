@@ -15,6 +15,7 @@ import { BLACK_HOLE_PLACES } from "./skyplaces.js";
 import { createSystem, setAnisotropy, texture } from "./system.js";
 import { createMaps, nearestFor } from "./maps.js";
 import { createModeGate, pageAddress, WALLPAPER_PAGE, wantsWallpaper } from "./modes.js";
+import { createDetail, fitRatio, LIMITS, pixelsPerUnit, smoothsEdges } from "./saver.js";
 import { startPainting } from "./painter.js";
 import { createUI } from "./ui.js";
 import { createElsewhere } from "./elsewhere.js";
@@ -29,15 +30,26 @@ const MAX_YEAR = 2400;
 
 const settings = loadSettings();
 
+// As a wallpaper (scope.html?wallpaper, see saver.js) the drawing is capped in pixels, edges are smoothed only where
+// they would show, and textures are read plainly. Space Scope proper draws as sharp as the screen allows.
+const saver = settings.saver;
+let pixelRatio = saver ? fitRatio(devicePixelRatio, innerWidth, innerHeight) : Math.min(devicePixelRatio || 1, 2);
+
 let renderer;
 try {
-  renderer = new WebGLRenderer({ antialias: true, powerPreference: "low-power" });
+  if (saver) {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2", { alpha: false, antialias: smoothsEdges(pixelRatio), depth: true, stencil: false, powerPreference: "low-power" });
+    if (!context) throw new Error("WebGL is not available");
+    renderer = new WebGLRenderer({ canvas, context });
+  } else {
+    renderer = new WebGLRenderer({ antialias: true, powerPreference: "low-power" });
+  }
 } catch {
   document.getElementById("error").hidden = false;
   throw new Error("WebGL is not available");
 }
-const pixelRatio = Math.min(devicePixelRatio || 1, 2);
-setAnisotropy(renderer.capabilities.getMaxAnisotropy());
+setAnisotropy(saver ? 1 : renderer.capabilities.getMaxAnisotropy());
 renderer.setPixelRatio(pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
@@ -73,6 +85,10 @@ const system = createSystem(scene, pixelRatio);
 const belts = createBelts(pixelRatio);
 scene.add(...belts.parts);
 const { bodies } = system;
+// A wallpaper: lighter spheres, and a moon is drawn only once it is big enough to see (see saver.js).
+const detail = saver ? createDetail(bodies) : null;
+const sunMaterial = bodies.get("sun").mesh.material;
+if (saver) sky.cullGalaxies();
 const lg = createLocalGroup(renderer.domElement, pixelRatio); // out among the galaxies
 const ex = createExoSystem(renderer.domElement, pixelRatio); // round another star
 const beyond = createElsewhere(renderer.domElement); // through the Gate
@@ -128,6 +144,7 @@ const away = {
 };
 
 function store() {
+  if (settings.saver) return; // a wallpaper doesn't remember: whatever runs it says its settings each time
   save({ ...settings, view: savedView });
 }
 
@@ -146,6 +163,7 @@ function set(key, value, how = {}) {
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "photos") usePhotos(value);
+  if (key === "fps") reschedule();
   if (key === "speed" || key === "reverse") settings.paused = false;
   if (key === "speed" && value !== "live") clock.synced = false;
   store();
@@ -275,7 +293,18 @@ function blocked(view, offset) {
   return false;
 }
 
+/**
+ * A wallpaper leaves out moons that are too small to see, and doesn't move them. A view that frames a planet and its
+ * moons (and the view from a moon) needs them where they really are, so they are put there when a view is chosen.
+ */
+function placeMoons() {
+  if (!detail) return;
+  detail.update(camera, pixelsPerUnit(innerHeight * pixelRatio, camera.fov), { showAll: true });
+  system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0, pov.id ? pov : null);
+}
+
 function flyTo(id, instant = false) {
+  placeMoons();
   const galaxy = galaxyOf(id);
   if (galaxy) return goToGalaxy(galaxy, instant);
   if (away.stage) return comeHome(id, instant);
@@ -1127,27 +1156,34 @@ function checkLoaded() {
   }
 }
 
+const moonIds = new Set(detail ? detail.moons.map((m) => m.id) : []); // (a wallpaper: its moons get their maps once big enough to show one)
 const photos = createMaps({
   renderer,
   system,
   enabled: settings.photos,
+  skip: moonIds,
   onSettled: () => {
     mapsDone = true;
     checkLoaded();
   },
-  onMissing: (id) => SURFACES.includes(id) && paintJobs([id]), // no real map: the painted surface it is
+  onMissing: (id) => (SURFACES.includes(id) || moonIds.has(id)) && paintJobs([id]), // no real map: the painted surface it is
 });
+
+/** A moon has become big enough to show a map. */
+function wantMoon(id) {
+  if (!photos.enabled || photos.add([id]).length === 0) paintJobs([id]); // no real map to load: paint it
+}
 
 /** Real maps on or off, from the menu. Off, whatever isn't painted yet gets painted. */
 function usePhotos(on) {
   photos.setEnabled(on);
   if (!photos.enabled) {
     // Nothing more to wait for from the maps (if loading was still going, it won't finish by itself).
-    paintJobs(SURFACES, () => {
+    paintJobs([...SURFACES, ...(detail ? detail.wanted : [])], () => {
       mapsDone = true;
       checkLoaded();
     });
-  }
+  } else if (detail) photos.add([...detail.wanted]); // moons drawn while the real maps were off now get theirs
 }
 
 function startPaint(...first) {
@@ -1198,6 +1234,8 @@ let lastTick = startTime;
 
 /** Moves everything to `date` (and the asteroids). */
 function layOut(date, dt, seconds) {
+  // (Before the move, so a moon that has just come into view is put in its place at once.)
+  if (detail) for (const id of detail.update(camera, pixelsPerUnit(innerHeight * pixelRatio, camera.fov), { showAll: Boolean(pov.id) })) wantMoon(id);
   system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, seconds, pov.id ? pov : null);
   belts.update(A.MakeTime(date).tt, beltView());
 }
@@ -1216,15 +1254,73 @@ function settleSky(now, date, seconds) {
   }
 }
 
+// A wallpaper doesn't want waking on every refresh of the screen (60 or 120 times a second) to draw 30 times: it waits
+// out the rest of a frame's time and then draws on the next refresh, and while the page is hidden nothing runs at all.
+let waiting = false; // a frame is on its way
+let timer = 0; // the wait before it (0 once the screen's next refresh is what is being waited for)
+let sinceLayout = 0; // seconds since the planets were last moved (a wallpaper only)
+let lastLayoutAt = -Infinity;
+
+/** Does the picture need the planets moved now? At real speed with the camera drifting, once a second is plenty. */
+function mustLayOut(now) {
+  return (
+    settings.speed !== "live" || settings.reverse || tween || flight || settle || pov.id || away.stage || stage.running ||
+    !loadedShown || system.fading || now - lastLayoutAt >= LIMITS.layoutEvery
+  );
+}
+
 function frame(now) {
-  requestAnimationFrame(frame);
+  if (!saver) {
+    requestAnimationFrame(frame);
+    drawFrame(now);
+    return;
+  }
+  if (!waiting) return; // (a second chain of frames would draw twice as often: only the one `schedule` set going counts)
+  waiting = false;
+  timer = 0;
+  try {
+    drawFrame(now);
+  } finally {
+    schedule();
+  }
+}
+
+function schedule() {
+  if (waiting || document.hidden) return;
+  waiting = true;
+  const wait = Math.max(0, 1000 / settings.fps - (performance.now() - lastFrame) - 8); // (8: about half a refresh at 60 Hz, which the screen adds)
+  timer = setTimeout(() => {
+    timer = 0;
+    requestAnimationFrame(frame);
+  }, wait);
+}
+
+/** The pace changed (a setting): start the wait again with the new one. */
+function reschedule() {
+  if (!saver || !waiting || !timer) return; // not running, or the screen's refresh is already what is awaited
+  clearTimeout(timer);
+  timer = 0;
+  waiting = false;
+  schedule();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!saver || document.hidden) return;
+  // Shown again: don't count the time away as one long frame.
+  lastTick = lastFrame = performance.now();
+  schedule();
+});
+
+function drawFrame(now) {
   for (const step of painters) step(10 / painters.length);
   const gap = 1000 / settings.fps;
   const elapsed = now - lastFrame;
-  if (elapsed < gap - 1) return;
-  lastFrame = now - (elapsed % gap) * (elapsed < gap * 2 ? 1 : 0);
+  if (elapsed < gap - (saver ? LIMITS.early : 1)) return;
+  // (A wallpaper doesn't make up for a late frame by drawing the next one sooner: it only has to come at about the right pace.)
+  lastFrame = saver ? now : now - (elapsed % gap) * (elapsed < gap * 2 ? 1 : 0);
   const dt = Math.min((now - lastTick) / 1000, 0.25);
   lastTick = now;
+  if (saver) sunMaterial.uniforms.time.value = (now - startTime) / 1000; // the Sun's surface keeps moving between layouts
 
   tickClock(dt);
   noteFrame(now);
@@ -1237,7 +1333,15 @@ function frame(now) {
   if (!away.stage) setFade(1 - (now - away.arrived) / DIP_MS); // just home: the dip clears
   const date = new Date(clock.time);
   updateBlend(now);
-  layOut(date, dt, (now - startTime) / 1000);
+  if (!saver) layOut(date, dt, (now - startTime) / 1000);
+  else {
+    sinceLayout += dt;
+    if (mustLayOut(now)) {
+      layOut(date, Math.min(sinceLayout, 1), (now - startTime) / 1000);
+      sinceLayout = 0;
+      lastLayoutAt = now;
+    }
+  }
   for (const p of belts.parts) p.visible = settings.belts;
 
   if (pov.id) movePovCamera(now, dt);
@@ -1280,6 +1384,16 @@ function loadMaps(now, elapsed, gap) {
 }
 
 addEventListener("resize", () => {
+  if (saver) {
+    if (!innerWidth || !innerHeight) return;
+    // The window (or the screen it is on) changed, so work out the drawing size again, or the cap on pixels would only
+    // hold for the size the page started at.
+    pixelRatio = fitRatio(devicePixelRatio, innerWidth, innerHeight);
+    renderer.setPixelRatio(pixelRatio);
+    sky.starMat.uniforms.pixelRatio.value = pixelRatio;
+    for (const p of belts.parts) p.material.uniforms.pixelRatio.value = pixelRatio;
+    system.markers.material.uniforms.pixelRatio.value = pixelRatio;
+  }
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   lg.resize();
@@ -1339,7 +1453,7 @@ window.wallpaperPropertyListener = {
 };
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
@@ -1347,4 +1461,5 @@ if (galaxyOf(settings.view)) flyTo(away.home, true); // set up the solar system 
 flyTo(settings.view, true);
 if (settle) settleSky(performance.now(), new Date(clock.time), 0);
 startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);
-requestAnimationFrame(frame);
+if (saver) schedule();
+else requestAnimationFrame(frame);

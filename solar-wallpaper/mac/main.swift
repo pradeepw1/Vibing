@@ -1,18 +1,62 @@
 // Solar System Live for the Mac.
 //
-// A small app that puts the Wallpaper page (web/index.html, inside the app) behind your desktop
-// icons, on every screen and every Space, and ignores the mouse so clicking the desktop still
-// clicks the desktop. Its settings are in a menu in the menu bar (there is no Dock icon).
-// "Open Space Scope" opens the full app in a normal window.
+// A small app that puts the solar system behind your desktop icons, on every screen and every Space,
+// and ignores the mouse so clicking the desktop still clicks the desktop. Its settings are in a menu in
+// the menu bar (there is no Dock icon). The picture is Space Scope (web/scope.html, inside the app) run as
+// a wallpaper, which goes easy on the battery, or the lean Wallpaper page (web/index.html) if you prefer.
+// "Open Space Scope" opens the full app, to fly about in, in a normal window.
 //
-// Everything that draws is the same web page as in the browser: this file only gives it a window
-// and a menu.
+// It also spares the battery: fewer frames a second when the Mac runs on its battery or is in Low Power
+// Mode, and nothing drawn at all while the screen sleeps, the Mac is locked or the screen saver is on.
+//
+// Everything that draws is the same web page as in the browser: this file only gives it a window and a menu.
 import Cocoa
 import WebKit
 import ServiceManagement
+import IOKit.ps
 
 // MARK: - What can be picked
 
+enum Style: String {
+    case scope // Space Scope as a wallpaper
+    case lean // the lean Wallpaper page: just the planets
+}
+
+enum BatteryMode: String {
+    case save // fewer frames a second
+    case full // the same as when plugged in
+    case pause // nothing drawn
+}
+
+let styleChoices: [(style: Style, label: String)] = [
+    (.scope, "Space Scope (the full picture, easy on the battery)"),
+    (.lean, "Lean Wallpaper (just the planets, lightest)"),
+]
+
+let batteryChoices: [(mode: BatteryMode, label: String)] = [
+    (.save, "Save power (fewer frames a second)"),
+    (.full, "Full speed"),
+    (.pause, "Pause"),
+]
+
+// Space Scope's views (what the camera looks at).
+let viewChoices: [(id: String, label: String)] = [
+    ("middle", "Out to Jupiter"),
+    ("system", "Whole solar system"),
+    ("inner", "Inner planets"),
+    ("sun", "The Sun"),
+    ("mercury", "Mercury"),
+    ("venus", "Venus"),
+    ("earth", "Earth"),
+    ("mars", "Mars"),
+    ("jupiter", "Jupiter"),
+    ("saturn", "Saturn"),
+    ("uranus", "Uranus"),
+    ("neptune", "Neptune"),
+    ("pluto", "Pluto"),
+]
+
+// The lean Wallpaper's zoom.
 let zoomChoices: [(zoom: Double, label: String)] = [
     (1, "The whole system"),
     (1.9, "Out to Saturn"),
@@ -40,15 +84,60 @@ let switchChoices: [(key: String, label: String)] = [
     ("clock", "Date and time"),
     ("photos", "Real planet maps"),
 ]
+let scopeSwitches: [(key: String, label: String)] = [
+    ("strange", "Strange sightings (all made up)"),
+]
+
+// MARK: - Saving the battery
+
+/// Frames a second the page should draw, or nil for none at all. The camera moves slowly, so fewer frames still look
+/// smooth; every frame not drawn is power not spent.
+func framesPerSecond(style: Style, onBattery: Bool, lowPower: Bool, mode: BatteryMode) -> Int? {
+    if onBattery && mode == .pause { return nil }
+    if lowPower { return style == .scope ? 12 : 10 } // the person asked the Mac to save power: whatever the mode says
+    if onBattery && mode == .save { return style == .scope ? 20 : 15 }
+    return style == .scope ? 30 : 20
+}
+
+struct PowerState: Equatable {
+    var onBattery: Bool
+    var lowPower: Bool
+}
+
+func readPower() -> PowerState {
+    var onBattery = false
+    if let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+       let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() {
+        onBattery = (type as String) == "Battery Power"
+    }
+    var lowPower = false
+    if #available(macOS 12.0, *) { lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled }
+    return PowerState(onBattery: onBattery, lowPower: lowPower)
+}
 
 // MARK: - What the person picked (kept between runs)
 
 final class Settings {
     private let store = UserDefaults.standard
 
+    var style: Style {
+        get { Style(rawValue: store.string(forKey: "style") ?? "") ?? .scope }
+        set { store.set(newValue.rawValue, forKey: "style") }
+    }
+
+    var batteryMode: BatteryMode {
+        get { BatteryMode(rawValue: store.string(forKey: "batteryMode") ?? "") ?? .save }
+        set { store.set(newValue.rawValue, forKey: "batteryMode") }
+    }
+
     var zoom: Double {
         get { store.object(forKey: "zoom") as? Double ?? 1 }
         set { store.set(newValue, forKey: "zoom") }
+    }
+
+    var view: String {
+        get { store.string(forKey: "view") ?? "middle" }
+        set { store.set(newValue, forKey: "view") }
     }
 
     var speed: String {
@@ -73,6 +162,7 @@ final class Settings {
     /// What a switch is set to right now, as the menu shows it.
     func isOn(_ key: String) -> Bool {
         if let picked = picked(key) { return picked }
+        if key == "strange" { return false } // a wallpaper doesn't have things drifting by unless asked
         // Someone who asked their Mac for less motion gets a camera that holds still, as in the browser.
         if key == "drift" { return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
         return true
@@ -87,6 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var wallpapers: [(window: NSWindow, web: WKWebView)] = []
     private var scopeWindow: NSWindow?
     private var paused = false
+    private var power = readPower()
+    private var powerTimer: Timer?
+    /// Why nothing is being drawn right now: "sleep", "locked", "screensaver", "session", "battery". Empty: drawing.
+    private var quiet = Set<String>()
 
     /// Where the web page is: a folder called "web" inside the app.
     private lazy var webRoot: URL = {
@@ -113,16 +207,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             }
         }
         LaunchCheck.log("menu bar item made")
+        applyPower(initial: true)
         rebuildMenu()
         LaunchCheck.log("menu built")
         buildWallpapers()
         LaunchCheck.log("wallpaper windows made: \(wallpapers.count)")
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(screensChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        LaunchCheck.runIfAsked(
-            wallpaper: { [weak self] in self?.wallpapers.first?.web },
+        watchTheMac()
+        LaunchCheck.runIfAsked(LaunchCheck.Hooks(
+            web: { [weak self] in self?.wallpapers.first?.web },
             menu: { [weak self] in self?.statusItem.menu },
-            pickFour: { [weak self] in self?.setZoom(4) })
+            pickView: { [weak self] id in self?.setView(id) },
+            useStyle: { [weak self] style in self?.setStyle(style) },
+            pickZoom: { [weak self] zoom in self?.setZoom(zoom) },
+            quiet: { [weak self] on in
+                if on { self?.hush("test") } else { self?.unhush("test") }
+            },
+            style: { [weak self] in self?.settings.style.rawValue ?? "?" }))
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -146,12 +246,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     // MARK: The wallpaper windows
 
-    private func makeWebView(frame: NSRect) -> WKWebView {
+    /// A web view whose page finds `search` (the settings, written like a page address) when it starts.
+    private func makeWebView(frame: NSRect, search: String?) -> WKWebView {
         let config = WKWebViewConfiguration()
         LaunchCheck.log("web view: settings made")
         // The page loads its planet maps from files next to it.
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         LaunchCheck.log("web view: file access allowed")
+        if let search = search {
+            // (A page opened from a file can't be given settings in its address, so they are set before it starts.)
+            let quoted = search.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            config.userContentController.addUserScript(
+                WKUserScript(source: "window.solarSearch = \"\(quoted)\";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
         let web = WKWebView(frame: frame, configuration: config)
         LaunchCheck.log("web view: made")
         web.autoresizingMask = [.width, .height]
@@ -159,8 +266,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         return web
     }
 
-    /// Opens one of the web pages. The settings are not in the address: once the page has loaded, `didFinish` below
-    /// says them to it (the page takes them without a fuss while it is starting).
+    private var currentFrames: Int {
+        framesPerSecond(style: settings.style, onBattery: power.onBattery, lowPower: power.lowPower, mode: settings.batteryMode)
+            ?? framesPerSecond(style: settings.style, onBattery: false, lowPower: false, mode: .full) ?? 20
+    }
+
+    /// The settings as a page address would say them.
+    private func search(for style: Style) -> String {
+        var items = ["wallpaper=1", "speed=\(settings.speed)", "fps=\(currentFrames)"]
+        for choice in switchChoices + (style == .scope ? scopeSwitches : []) {
+            if let picked = settings.picked(choice.key) { items.append("\(choice.key)=\(picked ? 1 : 0)") }
+        }
+        items.append(style == .scope ? "view=\(settings.view)" : "zoom=\(number(settings.zoom))")
+        return "?" + items.joined(separator: "&")
+    }
+
+    private func page(for style: Style) -> String { style == .scope ? "scope.html" : "index.html" }
+
     private func load(_ web: WKWebView, page: String) {
         let url = webRoot.appendingPathComponent(page)
         LaunchCheck.log("loading \(url.path)")
@@ -171,6 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func buildWallpapers() {
         guard !paused, wallpapers.isEmpty else { return }
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
+        let style = settings.style
         for screen in screens {
             // Borderless, and just above the desktop picture but below the desktop icons.
             LaunchCheck.log("making a window for a screen")
@@ -184,13 +307,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             window.ignoresMouseEvents = true // clicks go through to the desktop
             window.isReleasedWhenClosed = false
             window.setFrame(screen.frame, display: false)
-            let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size), search: search(for: style))
             web.navigationDelegate = self
             window.contentView?.addSubview(web)
             LaunchCheck.log("web view added to the window")
-            load(web, page: "index.html")
+            load(web, page: page(for: style))
             LaunchCheck.log("page asked for")
-            window.orderFrontRegardless()
+            if quiet.isEmpty { window.orderFrontRegardless() }
             LaunchCheck.log("window shown")
             wallpapers.append((window, web))
         }
@@ -217,26 +340,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private func send(_ key: String, _ value: Any) {
         guard let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
               let json = String(data: data, encoding: .utf8) else { return }
-        let js = "(function(a){var w=window.solarWallpaper;if(w)w.set(\"\(key)\",a[0],{remember:false});})(\(json))"
+        let js = "(function(a){var w=window.solarSystem||window.solarWallpaper;if(w)w.set(\"\(key)\",a[0],{remember:false});})(\(json))"
         for entry in wallpapers { entry.web.evaluateJavaScript(js, completionHandler: nil) }
     }
 
-    /// Once a wallpaper page has loaded, say all the settings again, in case the address lost them.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         LaunchCheck.log("a page finished loading")
-        guard wallpapers.contains(where: { $0.web === webView }) else { return }
-        var all: [String: Any] = ["zoom": settings.zoom, "speed": settings.speed, "ui": false]
-        for choice in switchChoices {
-            if let picked = settings.picked(choice.key) { all[choice.key] = picked }
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: all, options: []),
-              let json = String(data: data, encoding: .utf8) else { return }
-        let js = "(function go(n,s){var w=window.solarWallpaper;if(!w){if(n<100)setTimeout(function(){go(n+1,s)},200);return;}"
-            + "for(var k in s)w.set(k,s[k],{remember:false});})(0,\(json))"
-        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
-    /// macOS can stop a page's process when it needs the memory. A wallpaper has to come back.
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         LaunchCheck.log("a page failed: \(error.localizedDescription)")
     }
@@ -245,12 +356,88 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         LaunchCheck.log("a page couldn't start loading: \(error.localizedDescription)")
     }
 
+    /// macOS can stop a page's process when it needs the memory. A wallpaper has to come back.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         LaunchCheck.log("a page's process stopped")
         if wallpapers.contains(where: { $0.web === webView }) {
-            load(webView, page: "index.html")
+            load(webView, page: page(for: settings.style))
         }
     }
+
+    // MARK: Drawing less, or not at all
+
+    /// Nothing is drawn while a window isn't on screen: its page is hidden, and a hidden page stops its own work.
+    private func hush(_ reason: String) {
+        quiet.insert(reason)
+        for entry in wallpapers { entry.window.orderOut(nil) }
+        LaunchCheck.log("hushed for \(reason): \(quiet.sorted())")
+    }
+
+    private func unhush(_ reason: String) {
+        quiet.remove(reason)
+        if quiet.isEmpty { for entry in wallpapers { entry.window.orderFrontRegardless() } }
+        LaunchCheck.log("woken from \(reason): \(quiet.sorted())")
+    }
+
+    /// Looks at the power again (on the battery? Low Power Mode?) and sets the frame rate, or stops drawing, to fit.
+    private func applyPower(initial: Bool = false, force: Bool = false) {
+        let now = readPower()
+        if !initial && !force && now == power { return }
+        power = now
+        let frames = framesPerSecond(style: settings.style, onBattery: power.onBattery, lowPower: power.lowPower, mode: settings.batteryMode)
+        LaunchCheck.log("power: battery \(power.onBattery), low power \(power.lowPower): \(frames.map { "\($0) frames a second" } ?? "paused")")
+        if initial {
+            // (The pages are not made yet: their address says the frame rate. Paused: the windows stay hidden.)
+            if frames == nil { quiet.insert("battery") }
+            return
+        }
+        if let frames = frames {
+            unhush("battery")
+            send("fps", frames)
+        } else {
+            hush("battery")
+        }
+        rebuildMenu()
+    }
+
+    private func powerNote() -> String {
+        if power.lowPower { return "Low Power Mode is on" }
+        return power.onBattery ? "Running on the battery" : "Plugged in"
+    }
+
+    /// What to listen for so that nothing is drawn when nobody can see it, and the power state is noticed.
+    private func watchTheMac() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(self, selector: #selector(screensSlept), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(screensWoke), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(sessionLeft), name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(sessionBack), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
+        let distributed = DistributedNotificationCenter.default()
+        distributed.addObserver(self, selector: #selector(locked), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(unlocked), name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+        distributed.addObserver(self, selector: #selector(screenSaverOn), name: NSNotification.Name("com.apple.screensaver.didstart"), object: nil)
+        distributed.addObserver(self, selector: #selector(screenSaverOff), name: NSNotification.Name("com.apple.screensaver.didstop"), object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(screensChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        if #available(macOS 12.0, *) {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(powerChanged), name: NSNotification.Name.NSProcessInfoPowerStateDidChange, object: nil)
+        }
+        // Plugging in or unplugging doesn't tell us, so look now and then (a slow, loose timer costs next to nothing).
+        let timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.applyPower() }
+        timer.tolerance = 15
+        powerTimer = timer
+    }
+
+    @objc private func screensSlept() { hush("sleep") }
+    @objc private func screensWoke() { unhush("sleep") }
+    @objc private func sessionLeft() { hush("session") }
+    @objc private func sessionBack() { unhush("session") }
+    @objc private func locked() { hush("locked") }
+    @objc private func unlocked() { unhush("locked") }
+    @objc private func screenSaverOn() { hush("screensaver") }
+    @objc private func screenSaverOff() { unhush("screensaver") }
+    @objc private func powerChanged() { applyPower() }
 
     // MARK: The menu
 
@@ -273,18 +460,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         menu.addItem(item("Solar System Live", nil))
         menu.addItem(.separator())
 
-        let zoomMenu = NSMenu()
-        for choice in zoomChoices {
-            let it = item("\(number(choice.zoom))×   \(choice.label)", #selector(pickZoom(_:)), on: abs(settings.zoom - choice.zoom) < 0.05)
-            it.representedObject = choice.zoom
-            zoomMenu.addItem(it)
+        let styleMenu = NSMenu()
+        for choice in styleChoices {
+            let it = item(choice.label, #selector(pickStyle(_:)), on: settings.style == choice.style)
+            it.representedObject = choice.style.rawValue
+            styleMenu.addItem(it)
         }
-        zoomMenu.addItem(.separator())
-        zoomMenu.addItem(item("Zoom in", #selector(zoomIn), key: "+"))
-        zoomMenu.addItem(item("Zoom out", #selector(zoomOut), key: "-"))
-        let zoomItem = NSMenuItem(title: "Zoom (now \(number(settings.zoom))×)", action: nil, keyEquivalent: "")
-        zoomItem.submenu = zoomMenu
-        menu.addItem(zoomItem)
+        let styleItem = NSMenuItem(title: "Picture", action: nil, keyEquivalent: "")
+        styleItem.submenu = styleMenu
+        menu.addItem(styleItem)
+
+        if settings.style == .scope {
+            let viewMenu = NSMenu()
+            for choice in viewChoices {
+                let it = item(choice.label, #selector(pickView(_:)), on: settings.view == choice.id)
+                it.representedObject = choice.id
+                viewMenu.addItem(it)
+            }
+            let current = viewChoices.first(where: { $0.id == settings.view })?.label ?? settings.view
+            let viewItem = NSMenuItem(title: "Look at (now \(current))", action: nil, keyEquivalent: "")
+            viewItem.submenu = viewMenu
+            menu.addItem(viewItem)
+        } else {
+            let zoomMenu = NSMenu()
+            for choice in zoomChoices {
+                let it = item("\(number(choice.zoom))×   \(choice.label)", #selector(pickZoom(_:)), on: abs(settings.zoom - choice.zoom) < 0.05)
+                it.representedObject = choice.zoom
+                zoomMenu.addItem(it)
+            }
+            zoomMenu.addItem(.separator())
+            zoomMenu.addItem(item("Zoom in", #selector(zoomIn), key: "+"))
+            zoomMenu.addItem(item("Zoom out", #selector(zoomOut), key: "-"))
+            let zoomItem = NSMenuItem(title: "Zoom (now \(number(settings.zoom))×)", action: nil, keyEquivalent: "")
+            zoomItem.submenu = zoomMenu
+            menu.addItem(zoomItem)
+        }
 
         let speedMenu = NSMenu()
         for choice in speedChoices {
@@ -297,20 +507,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         menu.addItem(speedItem)
 
         menu.addItem(.separator())
-        for choice in switchChoices {
+        for choice in switchChoices + (settings.style == .scope ? scopeSwitches : []) {
             let it = item(choice.label, #selector(flip(_:)), on: settings.isOn(choice.key))
             it.representedObject = choice.key
             menu.addItem(it)
         }
 
         menu.addItem(.separator())
+        let batteryMenu = NSMenu()
+        batteryMenu.addItem(item(powerNote(), nil))
+        batteryMenu.addItem(.separator())
+        for choice in batteryChoices {
+            let it = item(choice.label, #selector(pickBattery(_:)), on: settings.batteryMode == choice.mode)
+            it.representedObject = choice.mode.rawValue
+            batteryMenu.addItem(it)
+        }
+        let batteryItem = NSMenuItem(title: "When on the battery", action: nil, keyEquivalent: "")
+        batteryItem.submenu = batteryMenu
+        menu.addItem(batteryItem)
         menu.addItem(item("Show on every screen", #selector(toggleAllScreens), on: settings.allScreens))
         menu.addItem(item("Pause the wallpaper", #selector(togglePause), on: paused))
         if #available(macOS 13.0, *) {
             menu.addItem(item("Open at login", #selector(toggleLogin), on: launchesAtLogin))
         }
         menu.addItem(.separator())
-        menu.addItem(item("Open Space Scope…", #selector(openScope)))
+        menu.addItem(item("Open Space Scope in a window…", #selector(openScope)))
         menu.addItem(item("Credits", #selector(openCredits)))
         menu.addItem(.separator())
         menu.addItem(item("Quit Solar System Live", #selector(quit), key: "q"))
@@ -318,6 +539,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     // MARK: What the menu does
+
+    private func setStyle(_ style: Style) {
+        settings.style = style
+        removeWallpapers()
+        buildWallpapers()
+        rebuildMenu()
+    }
+
+    @objc private func pickStyle(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let style = Style(rawValue: raw) { setStyle(style) }
+    }
+
+    private func setView(_ id: String) {
+        settings.view = id
+        send("view", id)
+        rebuildMenu()
+    }
+
+    @objc private func pickView(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? String { setView(id) }
+    }
 
     private func setZoom(_ zoom: Double) {
         let clean = min(zoomRange.upperBound, max(zoomRange.lowerBound, (zoom * 100).rounded() / 100))
@@ -347,6 +589,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         settings.pick(key, on)
         send(key, on)
         rebuildMenu()
+    }
+
+    @objc private func pickBattery(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = BatteryMode(rawValue: raw) else { return }
+        settings.batteryMode = mode
+        applyPower(force: true)
     }
 
     @objc private func toggleAllScreens() {
@@ -388,7 +636,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             window.delegate = self
             window.center()
             if let content = window.contentView {
-                let web = makeWebView(frame: content.bounds)
+                let web = makeWebView(frame: content.bounds, search: nil) // (no settings: the full app, as in a browser)
                 content.addSubview(web)
                 load(web, page: "scope.html")
             }

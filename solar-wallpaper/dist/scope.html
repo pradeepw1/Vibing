@@ -59,6 +59,7 @@
   #menu-btn { position: fixed; top: calc(18px + var(--safe-top)); right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--panel-line);
     background: var(--panel); color: var(--text); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px);
     transition: opacity .4s; }
+  #menu-btn[hidden] { display: none; } /* (the wallpaper: no button) */
   #menu-btn:hover { border-color: rgba(255,255,255,.25); }
   /* Faint, not gone, so it can always be found. A touch or a mouse move brings it back. */
   .idle #menu-btn:not([aria-expanded="true"]) { opacity: 0.3; }

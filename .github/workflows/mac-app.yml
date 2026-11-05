@@ -32,15 +32,15 @@ jobs:
           test -f "$app/Contents/Resources/AppIcon.icns"
           du -sh "$app" solar-wallpaper/mac/build/SolarSystemLive.dmg solar-wallpaper/mac/build/SolarSystemLive.zip
 
-      - name: Start it and check it keeps running and draws
+      - name: Start it and check it draws, takes the menu's choices, saves power
         run: |
           app="solar-wallpaper/mac/build/Solar System Live.app"
           SSL_SNAPSHOT="$PWD/snapshot.png" "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
           pid=$!
-          sleep 25
+          sleep 50
           screencapture -x screen.png || true
           if kill -0 "$pid" 2>/dev/null; then
-            echo "Still running after 25 seconds."
+            echo "Still running after 50 seconds."
             kill "$pid"
           else
             echo "It stopped by itself:"
@@ -48,8 +48,27 @@ jobs:
             exit 1
           fi
           cat run.log
-          grep -q "launch check: page state: .*\"page\":true" run.log
-          grep -q "after picking 4x in the menu the page says: 4.0× · Out to Mars" run.log
+          check() { grep -q "$1" run.log || { echo "MISSING in the log: $1"; failed=1; }; }
+          failed=0
+          # Space Scope is what the wallpaper shows when the app starts, as a wallpaper: the savings are on, no settings button.
+          check 'page state (scope): .*"page":true.*"which":"scope".*"saver":true.*"settingsButton":false'
+          check 'launch check: menu: .*Look at (now Out to Jupiter)'
+          check 'after picking the Inner planets view the page says: inner'
+          # Switching to the lean picture and zooming it from the menu.
+          check 'style now: lean'
+          check 'page state (lean): .*"page":true.*"which":"lean".*"settingsButton":false'
+          check 'after picking 4x in the menu the page says: 4.0× · Out to Mars'
+          # While hushed (screen asleep, locked, screen saver) the page is hidden, which stops its work.
+          check 'visibility while hushed: hidden'
+          check 'visibility after waking: visible'
+          # The frame rate for each situation.
+          check 'frame rate scope, plugged in: 30'
+          check 'frame rate scope, battery, save power: 20'
+          check 'frame rate scope, battery, pause: paused'
+          check 'frame rate scope, low power mode: 12'
+          check 'frame rate lean, plugged in: 20'
+          check 'frame rate lean, battery, save power: 15'
+          exit $failed
 
       - uses: actions/upload-artifact@v4
         with:

@@ -130,7 +130,9 @@ Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-ba
 
 **Windows, with Wallpaper Engine:** open the wallpaper editor, create a wallpaper from `dist/index.html`. Click the small button in the top right of the wallpaper to change settings. They're saved. (Its own settings panel isn't set up: that needs a `project.json` listing the settings, which isn't included. The page does read Wallpaper Engine's settings by the same names as Lively's, if you write one.)
 
-**macOS, the Solar System Live app:** a real Mac app (in `mac/`), in the menu bar with no Dock icon. It puts the Wallpaper behind your desktop icons on every screen and every Space, and clicks go straight through to the desktop. The menu bar menu has the zoom, the time speed, the switches (camera, names, orbits, asteroids, clock, real maps), *Show on every screen*, *Pause the wallpaper*, *Open at login*, and *Open Space Scope…*, which opens the full app in a normal window. It runs on macOS 11 or newer, on Apple-chip and Intel Macs.
+**macOS, the Solar System Live app:** a real Mac app (in `mac/`), in the menu bar with no Dock icon. It puts the solar system behind your desktop icons on every screen and every Space, and clicks go straight through to the desktop. What it shows is Space Scope run as a wallpaper (the full picture, set up to go easy on the battery, see below); *Picture* in the menu switches to the lean Wallpaper page, which is the lightest. The menu has *Look at* (or the zoom, for the lean picture), the time speed, the switches (camera, names, orbits, asteroids, clock, real maps, and the made-up sightings for Space Scope), *When on the battery*, *Show on every screen*, *Pause the wallpaper*, *Open at login*, and *Open Space Scope in a window…*, which opens the full app to fly about in. It runs on macOS 11 or newer, on Apple-chip and Intel Macs.
+
+It also spares the battery by itself. On the battery it draws 20 frames a second (Space Scope) or 15 (lean) instead of 30 or 20; in Low Power Mode, 12 or 10; and *When on the battery* can be set to *Full speed* or *Pause*. While the screen sleeps, the Mac is locked or the screen saver is on, nothing is drawn at all (the window is taken off the screen, so its page is hidden and stops). When another window covers the whole desktop, macOS should hide the page in the same way; I haven't been able to check that on a real Mac.
 
 - **Build it on your Mac (the easy way to get no warnings):** install the Command Line Tools once (`xcode-select --install`), then run `solar-wallpaper/mac/build.sh install` in Terminal. It builds the app, puts it in Applications and opens it. An app built on your own Mac isn't blocked by macOS.
 - **Or download the disk image:** the *Mac app* job on GitHub (Actions, then the run, then *Artifacts*) builds `SolarSystemLive.dmg` and a zip. Open the disk image and drag the app to Applications. This copy isn't signed by an Apple developer account (that costs money), so the first time macOS says it can't check it for malware. Right-click the app and pick *Open*; on macOS 15, open *System Settings*, *Privacy & Security* and press *Open Anyway*. Or run `xattr -dr com.apple.quarantine "/Applications/Solar System Live.app"` once.
@@ -141,7 +143,19 @@ Point your wallpaper app at `dist/index.html`. That's Wallpaper mode, the low-ba
 
 **Phones:** not yet. That needs a native app (see Next).
 
-For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It hides the settings button. In Space Scope it also runs at 30 frames a second to save power (`scope.html?wallpaper`). The flag goes with you if you switch modes.
+For wallpaper use, add `?wallpaper` to the address (`index.html?wallpaper`). It hides the settings button. The flag goes with you if you switch modes.
+
+**Space Scope as a wallpaper (`scope.html?wallpaper`).** Space Scope is made for flying about and close-ups, so on its own it draws a lot more than the Wallpaper page. With `?wallpaper` it gets the same savings, and nothing else about it changes (a picture of the five views taken before and after differs by less than 0.1 in 255 on average):
+
+- 30 frames a second, not 60. It waits out the rest of a frame's time and then draws on the screen's next refresh, rather than being woken on every refresh (60 or 120 times a second) to do nothing. Hidden, it stops completely.
+- Lighter spheres (48 by 24 instead of 96 by 48 or 64 by 32) until a planet is big on screen, and a moon is only drawn, and only gets its map, once it is big enough to see. In the default view that took the triangles drawn from about 169 thousand to about 50 thousand; in the view of Jupiter, 33 thousand to 16 thousand.
+- At real speed the planets are moved once a second instead of every frame (the camera still moves every frame).
+- At most 2.5 million pixels are drawn, and edges are smoothed only on screens that aren't sharp enough to hide them (a Retina screen skips it).
+- The made-up sightings stay off unless asked for (`strange=1`), and nothing is remembered between runs: whatever starts the wallpaper says its settings each time.
+
+I measured these in a test browser that draws in software, so they are comparisons, not a battery figure: the drawing for each frame came out about the same as the lean Wallpaper page's (170 ms in that slow browser, against 654 ms before), and the page's own work per frame fell from 5.4 ms to 3.0 ms, and it now happens 30 times a second instead of 60. I haven't measured it on a real laptop.
+
+An app that opens the page from a file can't put a `?` on its address, so it can set `window.solarSearch = "?wallpaper=1&view=jupiter"` before the page starts, and the page reads its settings from that.
 
 ## Settings
 

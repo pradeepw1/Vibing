@@ -15,6 +15,15 @@ export const SPEEDS = [
 
 export const speedRate = (id) => SPEEDS.find((s) => s.id === id)?.rate ?? 1;
 
+/**
+ * The settings written in the page's address, or, for an app that opens the page without one (it can't always put a "?"
+ * on a file's address), the text it set in `window.solarSearch` before the page started.
+ */
+export function hostSearch() {
+  if (typeof location !== "undefined" && location.search) return location.search;
+  return typeof window !== "undefined" && typeof window.solarSearch === "string" ? window.solarSearch : "";
+}
+
 export const bool = (v) => !["0", "false", "no", "off"].includes(String(v).toLowerCase());
 
 /** Cleans up a setting both pages understand, or returns undefined if it isn't one or isn't valid. */

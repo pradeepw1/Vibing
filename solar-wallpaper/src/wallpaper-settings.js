@@ -2,7 +2,7 @@
 // running time backwards): what's left is what a wallpaper needs. Same three places as
 // settings.js: the defaults, what you last picked in the menu (saved in this browser,
 // under its own name so it never mixes with Space Scope's), then the page address.
-import { bool, parseShared } from "./options.js";
+import { bool, hostSearch, parseShared } from "./options.js";
 import { clampZoom, ZOOM } from "./wallpaper-camera.js";
 
 export const DEFAULTS = {
@@ -56,7 +56,7 @@ export function save(changes) {
   }
 }
 
-export function loadSettings(search = location.search, reducedMotion = false) {
+export function loadSettings(search = hostSearch(), reducedMotion = false) {
   const settings = { ...DEFAULTS, drift: !reducedMotion };
   for (const [k, v] of Object.entries(readSaved())) {
     const parsed = parse(k, v);
