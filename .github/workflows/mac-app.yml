@@ -1,0 +1,67 @@
+name: Mac app
+
+# Builds "Solar System Live.app" (one app for Apple-chip and Intel Macs) and checks that it starts.
+# The disk image and the zip are kept with the run, under "Artifacts".
+on:
+  push:
+    paths:
+      - "solar-wallpaper/mac/**"
+      - "solar-wallpaper/dist/**"
+      - ".github/workflows/mac-app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the app
+        run: ARCHS="arm64 x86_64" solar-wallpaper/mac/build.sh dmg zip
+
+      - name: Look at what was built
+        run: |
+          app="solar-wallpaper/mac/build/Solar System Live.app"
+          lipo -info "$app/Contents/MacOS/SolarSystemLive"
+          codesign -dv "$app" 2>&1 | head -5
+          test -f "$app/Contents/Resources/web/index.html"
+          test -f "$app/Contents/Resources/web/scope.html"
+          test -f "$app/Contents/Resources/AppIcon.icns"
+          du -sh "$app" solar-wallpaper/mac/build/SolarSystemLive.dmg solar-wallpaper/mac/build/SolarSystemLive.zip
+
+      - name: Start it and check it keeps running
+        run: |
+          app="solar-wallpaper/mac/build/Solar System Live.app"
+          "$app/Contents/MacOS/SolarSystemLive" > run.log 2>&1 &
+          pid=$!
+          sleep 15
+          screencapture -x screen.png || true
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "Still running after 15 seconds."
+            kill "$pid"
+          else
+            echo "It stopped by itself:"
+            cat run.log
+            exit 1
+          fi
+          cat run.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SolarSystemLive-mac
+          path: |
+            solar-wallpaper/mac/build/SolarSystemLive.dmg
+            solar-wallpaper/mac/build/SolarSystemLive.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-check
+          path: |
+            screen.png
+            run.log
+          if-no-files-found: ignore
