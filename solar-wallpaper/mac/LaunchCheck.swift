@@ -91,8 +91,9 @@ enum LaunchCheck {
             ask(hooks, stateJS, "page state (lean):")
             hooks.pickZoom(4)
         }
-        // While hushed the page is hidden, and a hidden page isn't drawn. (A hidden page doesn't answer the app until it is
-        // shown again, so the page writes down its own hide and show events, and its own draws, for the app to read after.)
+        // While hushed the window is off the screen and the page should draw nothing. (A page that is off the screen doesn't
+        // answer the app until it is shown again, so the page writes down its own draws, and any hide and show events, for
+        // the app to read after. On macOS 14 it draws nothing but is not told it is hidden: `seen` stays empty.)
         var hushedAt = 0.0
         var wokeAt = 0.0
         let now = { Date().timeIntervalSince1970 * 1000 }

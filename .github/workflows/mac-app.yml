@@ -58,8 +58,8 @@ jobs:
           check 'style now: lean'
           check 'page state (lean): .*"page":true.*"which":"lean".*"settingsButton":false'
           check 'after picking 4x in the menu the page says: 4.0× · Out to Mars'
-          # While hushed (screen asleep, locked, screen saver) the page is hidden and draws nothing, and comes back when woken.
-          check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"visibility":"visible"'
+          # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
+          check 'while hushed, the page saw and drew: .*"drawsWhileHushed":0'
           check 'while hushed, the page saw and drew: .*"drawsInAll":[1-9]'
           # The frame rate for each situation.
           check 'frame rate scope, plugged in: 30'
