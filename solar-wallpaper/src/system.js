@@ -287,7 +287,7 @@ export function createSystem(scene, pixelRatio) {
   markerGeo.setAttribute("alpha", new Float32BufferAttribute(planetsOnly.map(() => 0.9), 1));
   const markerMat = new ShaderMaterial({
     ...shaders.markers,
-    uniforms: { pixelRatio: { value: pixelRatio }, viewHeight: { value: 1000 } },
+    uniforms: { pixelRatio: { value: pixelRatio }, viewHeight: { value: 1000 }, fade: { value: 1 } },
     transparent: true,
     depthWrite: false,
   });

@@ -62,6 +62,21 @@ const HOLE_FULL = 1500; // ...and is all there from here
 const HOLE_GLOW = 0.55; // how much the blurred picture glows round a black hole's bright disc
 const SYSTEM_VIEW = 0.00045; // how far from a star with planets you arrive: just under half a light-year
 const SYSTEM_STAR_PX = 7; // how big its glow looks there, in pixels
+// A landing (the flight home that ends in the solar system): how long it takes, in ms. So much, plus so much for every
+// 2.7 times nearer it has to get, and never more than the last figure.
+const LANDING_BASE = 2600;
+const LANDING_STEP = 340;
+const LANDING_MOST = 10000;
+// A landing that starts inside the Milky Way (from the black hole at its middle, say) goes up and out of it first, to
+// this far from the Sun (thousands of light-years), where the whole galaxy is in view, and comes down from there.
+// Straight across, the camera would be looking out through the disc from inside it, where the stars close by are
+// too near to draw: a second or more of nothing at all. It backs away from what it was looking at, climbing as it
+// goes, and looks at the middle of the galaxy all the way up (the Sun's part of it is too faint to steer by from in
+// there, and a star it was looking at is soon a dot); over the top, what it looks at moves across the galaxy to the Sun.
+const RISE_TO = 60;
+const RISE_FROM = 2; // (not from nearer the Sun than this: from there its own stretch of the sky is in view all the way)
+const RISE_STEPS = 1.5; // the time the rise is given, counted as this many steps on top of what it covers
+const DOWN_EASE = 1.5; // coming down from the top: slowly at first (that is the view worth having), then steadily
 const GATE_VIEW = 0.0007; // how far from the Gate you arrive, in thousands of light-years (about 0.7 of one)
 const GATE_RING = 0.17; // the ring's radius, as a share of that: it fills about half the screen height on arrival
 const HOLE_WIDE = 1.4; // near one, the stars are drawn this much wider than the screen, so bent light has something to pick up from past the edge
@@ -390,6 +405,7 @@ export function createLocalGroup(canvas, pixelRatio) {
   // --- Flights ---
   let flight = null;
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const steady = (t) => t * t * (3 - 2 * t); // gentler at both ends, and never as fast in the middle
   const look = new Matrix4();
   const q = new Quaternion();
 
@@ -442,8 +458,12 @@ export function createLocalGroup(canvas, pixelRatio) {
   /**
    * Flies to a place: a galaxy, or "home" (to the Sun's spot in the Milky
    * Way). `from`: where the camera starts if not where it is now.
+   *
+   * `landing` (home only): come right down to the Sun instead, for the solar system to be drawn over the end of the
+   * flight (see main.js). { dir: which side of the Sun to come in on, up: which way is up there, distance: how far from
+   * it to stop, settleBy: the distance by which the camera is on that side, so the rest is a straight run in }.
    */
-  function flyTo(id, { instant = false, from = null } = {}) {
+  function flyTo(id, { instant = false, from = null, landing = null } = {}) {
     build();
     const place = places.get(id === "home" ? "sun" : id);
     // Where we're going has to be there, in full (the far ones are only a dot until now).
@@ -451,7 +471,10 @@ export function createLocalGroup(canvas, pixelRatio) {
       const g = GALAXIES.find((x) => x.id === gid);
       if (g) buildGalaxy(g);
     }
-    const end = viewpointFor(place);
+    const down = id === "home" ? landing : null;
+    const end = down
+      ? { target: place.position, position: place.position.clone().addScaledVector(down.dir, down.distance), up: down.up }
+      : viewpointFor(place);
     controls.enabled = false;
     if (from) {
       camera.position.copy(from.position);
@@ -466,16 +489,30 @@ export function createLocalGroup(canvas, pixelRatio) {
       return;
     }
     const startOffset = camera.position.clone().sub(end.target);
-    const d0 = Math.max(startOffset.length(), 1e-3);
+    const reach = startOffset.length();
+    const d0 = Math.max(reach, 1e-3);
     const d1 = end.position.clone().sub(end.target).length();
+    const toDir = end.position.clone().sub(end.target).normalize();
+    // (A landing goes through far more sizes than a flight between galaxies, at a steadier pace, so it takes longer.)
+    const rises = Boolean(down) && d0 > RISE_FROM && d0 < RISE_TO * 0.8 && camera.position.distanceTo(centre) < MILKY_WAY.radius * 1.2;
+    const top = Math.log(RISE_TO);
+    const steps = down ? (rises ? top : Math.log(d0)) - Math.log(d1) : 0; // on the way down
+    const stepsUp = rises ? top - Math.log(d0) + RISE_STEPS : 0;
+    const until = stepsUp / (stepsUp + steps); // how far along the top is
+    // How far along the solar system comes into sight (`settleBy` from the Sun).
+    const sight = !down ? 0 : rises ? until + (1 - until) * ((top - Math.log(down.settleBy)) / steps) ** (1 / DOWN_EASE) : Math.log(d0 / down.settleBy) / steps;
     flight = {
       start: null, // set on the first frame, so time spent getting ready isn't skipped
-      duration: 3200 + 600 * Math.min(4, Math.abs(Math.log(d0 / Math.max(d1, 0.01)))),
+      duration: down ? Math.min(LANDING_MOST, LANDING_BASE + LANDING_STEP * (steps + stepsUp)) : 3200 + 600 * Math.min(4, Math.abs(Math.log(d0 / Math.max(d1, 0.01)))),
       end,
-      fromDir: startOffset.divideScalar(d0),
-      toDir: end.position.clone().sub(end.target).normalize(),
+      fromDir: reach >= 1e-3 || !down ? startOffset.divideScalar(d0) : toDir.clone(), // (starting at the Sun's own spot: straight out and back)
+      toDir,
       d0,
-      d1: Math.max(d1, 1e-3),
+      d1: down ? d1 : Math.max(d1, 1e-3),
+      pace: down ? steady : ease,
+      rise: rises ? wayUp(end.target, toDir, until, top) : null,
+      // How far along the camera has come round to the side it lands on: by the time the solar system is in sight.
+      settled: down ? Math.min(1, Math.max(0.05, sight)) : 0,
       fromQuat: camera.quaternion.clone(),
       up: new Vector3(0, 1, 0).applyQuaternion(camera.quaternion), // carried along frame to frame
       last: null,
@@ -491,10 +528,55 @@ export function createLocalGroup(canvas, pixelRatio) {
   const turnTo = new Quaternion();
   /** Where a flight would put the camera `e` of the way along (going straight, before any lift). */
   function along(f, e, out) {
-    turnTo.setFromUnitVectors(f.fromDir, f.toDir);
-    spin.identity().slerp(turnTo, e);
-    const d = Math.exp(Math.log(f.d0) + (Math.log(f.d1) - Math.log(f.d0)) * e);
-    return out.copy(f.fromDir).applyQuaternion(spin).multiplyScalar(d).add(f.end.target);
+    const rise = f.rise;
+    if (rise && e < rise.until) {
+      // The way up: one curve, from standing still at the start to standing still at the top.
+      const s = steady(e / rise.until);
+      const r = 1 - s;
+      const [a, b, c, d] = rise.path;
+      return out.copy(a).multiplyScalar(r * r * r).addScaledVector(b, 3 * r * r * s).addScaledVector(c, 3 * r * s * s).addScaledVector(d, s * s * s);
+    }
+    // Round to the side it lands on, by the time the solar system is in sight; nearer all the while.
+    const w = rise ? MathUtils.smoothstep(e, rise.until, f.settled) : f.settled ? MathUtils.smoothstep(e, 0, f.settled) : e;
+    turnTo.setFromUnitVectors(rise ? rise.over : f.fromDir, f.toDir);
+    spin.identity().slerp(turnTo, w);
+    return out.copy(rise ? rise.over : f.fromDir).applyQuaternion(spin).multiplyScalar(reachAt(f, e)).add(f.end.target);
+  }
+
+  /**
+   * The way up out of the Milky Way, for a landing that starts inside it (see RISE_TO): to a place over the disc on the
+   * side the landing is, back from the Sun a little so that the whole galaxy lies ahead and below. It sets off
+   * backwards, and is soon climbing: there is little to see from inside the disc.
+   */
+  function wayUp(sun, toDir, until, top) {
+    const over = basis.north.clone().multiplyScalar(toDir.dot(basis.north) < 0 ? -0.8 : 0.8).addScaledVector(basis.center, -0.6).normalize();
+    const start = camera.position.clone();
+    const peak = sun.clone().addScaledVector(over, RISE_TO);
+    const span = start.distanceTo(peak);
+    const back = new Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+    const out = basis.north.clone().multiplyScalar(over.dot(basis.north) < 0 ? -1 : 1); // away from the disc, on that side
+    // (It comes to the top still climbing, and turns over there.)
+    // (Mostly backwards at first, or what it was looking at would swing out of the picture: it starts right up against it.)
+    const path = [start, start.clone().addScaledVector(back, span * 0.2).addScaledVector(out, span * 0.06), peak.clone().addScaledVector(out, -span * 0.35), peak];
+    return { until, top, over, path };
+  }
+
+  /** What a flight looks at, `e` of the way along: where it is going, except on the way up out of the Milky Way. */
+  const aim = new Vector3();
+  function aimAt(f, e) {
+    if (!f.rise) return f.end.target;
+    const { until } = f.rise;
+    return aim.lerpVectors(centre, f.end.target, MathUtils.smoothstep(e, until * 0.6, until + (f.settled - until) * 0.5));
+  }
+
+  /** How far from what it flies to a flight is, `e` of the way along. Each step of the way it is so many times nearer. */
+  function reachAt(f, e) {
+    const from = Math.log(f.d0);
+    const to = Math.log(f.d1);
+    if (!f.rise) return Math.exp(from + (to - from) * e);
+    // Down from the top of the way up (see RISE_TO).
+    const { until, top } = f.rise;
+    return Math.exp(top + (to - top) * (Math.max(0, e - until) / (1 - until)) ** DOWN_EASE);
   }
 
   /**
@@ -516,7 +598,7 @@ export function createLocalGroup(canvas, pixelRatio) {
       let when = -1;
       // Looked at evenly in time, since a flight is slow at the start and the end.
       for (let i = 1; i < SAMPLES; i++) {
-        const e = ease(i / SAMPLES);
+        const e = f.pace(i / SAMPLES);
         const near = along(f, e, at).distanceTo(p.position) / p.radius;
         // Closer than it should be, and closer than we start (moving off from right by it is fine).
         if (near < closest && near < start * 0.9) [closest, when] = [near, e];
@@ -531,13 +613,15 @@ export function createLocalGroup(canvas, pixelRatio) {
       if (over.lengthSq() < 1e-9) over.copy(camera.position).sub(p.position).addScaledVector(heading, -at.copy(camera.position).sub(p.position).dot(heading));
       if (over.lengthSq() < 1e-9) continue;
       over.normalize();
-      const avoid = { over, when, end: Math.min(0.97, when + Math.max(0.35, when * 1.5)), amount: 0 };
+      // (A landing is back on its line by the time the solar system comes into sight: from there it is a straight run in.)
+      const last = f.settled > when ? Math.min(0.97, f.settled) : 0.97;
+      const avoid = { over, when, end: Math.min(last, when + Math.max(0.35, when * 1.5)), amount: 0 };
       // The least that clears it, all along the way.
       for (let amount = 0; amount < p.radius * 8; amount += p.radius * 0.02) {
         avoid.amount = amount;
         let clear = true;
         for (let i = 1; i < SAMPLES && clear; i++) {
-          const e = ease(i / SAMPLES);
+          const e = f.pace(i / SAMPLES);
           along(f, e, at).addScaledVector(over, amount * detour(avoid, e));
           clear = at.distanceTo(p.position) / p.radius >= CLEAR || e > avoid.end;
         }
@@ -603,7 +687,7 @@ export function createLocalGroup(canvas, pixelRatio) {
     f.start ??= now;
     f.last ??= now;
     const t = Math.min(1, (now - f.start) / f.duration);
-    const e = ease(t);
+    const e = f.pace(t);
     along(f, e, camera.position);
     // Round any galaxy in the way, not through it.
     for (const a of f.avoid) camera.position.addScaledVector(a.over, a.amount * detour(a, e));
@@ -614,7 +698,9 @@ export function createLocalGroup(canvas, pixelRatio) {
     // as we pass), so there up is carried on from the last frame instead,
     // and turned back gently after: no faster than ROLL_SPEED, unless that
     // wouldn't finish by the end.
-    forward.subVectors(f.end.target, camera.position).normalize();
+    f.at = e;
+    const looksAt = aimAt(f, e);
+    forward.subVectors(looksAt, camera.position).normalize();
     up.copy(f.up).addScaledVector(forward, -forward.dot(f.up));
     if (up.lengthSq() < 1e-12) up.copy(f.end.up).addScaledVector(forward, -forward.dot(f.end.up));
     up.normalize();
@@ -630,14 +716,15 @@ export function createLocalGroup(canvas, pixelRatio) {
     }
     f.up.copy(up);
     f.last = now;
-    look.lookAt(camera.position, f.end.target, up);
+    look.lookAt(camera.position, looksAt, up);
     // Turn from where we were facing to face it, over the first part of the
     // flight. It keeps moving, so carry on turning the same way round rather
     // than always the short way (which would flip once it passes halfway).
     q.setFromRotationMatrix(look);
     if (q.dot(f.turn ?? f.fromQuat) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
     f.turn = (f.turn ?? new Quaternion()).copy(q);
-    turnBetween(f.fromQuat, q, 1 - (1 - Math.min(1, e * 3)) ** 2, camera.quaternion);
+    // (On the way up out of the Milky Way it turns to the galaxy sooner: that is what there is to see.)
+    turnBetween(f.fromQuat, q, f.rise ? MathUtils.smoothstep(e, 0, f.rise.until * 0.3) : 1 - (1 - Math.min(1, e * 3)) ** 2, camera.quaternion);
     if (t >= 1) {
       if (f.home) flight = null;
       else finish(f.end);
@@ -706,16 +793,19 @@ export function createLocalGroup(canvas, pixelRatio) {
   let slow = 0;
   let fast = 0;
   let lastRender = 0;
+  let light = 1; // how bright the whole picture is (see setLight)
   function render(renderer, budgetMs = 1000 / 60) {
     // Some older graphics chips can't draw into a buffer like that: then
     // straight to the screen, each star's light rolled off on its own.
     if (!renderer.extensions.has("EXT_color_buffer_float") && !renderer.extensions.has("EXT_color_buffer_half_float")) {
       const was = renderer.toneMapping;
       renderer.toneMapping = ACESFilmicToneMapping;
+      for (const m of [materials[0], far?.children[0].material]) if (m) m.uniforms.opacity.value = light;
       renderer.render(scene, camera);
       renderer.toneMapping = was;
       return;
     }
+    show.material.uniforms.exposure.value = EXPOSURE * light;
     renderer.getDrawingBufferSize(bufferSize);
     camera.updateMatrixWorld();
     const near = aimHole();
@@ -820,9 +910,17 @@ export function createLocalGroup(canvas, pixelRatio) {
     get flying() {
       return Boolean(flight);
     },
+    /** On a landing: how near the solar system is to coming into sight (1 = it is in sight, and it is a straight run in). */
+    get nearing() {
+      return flight?.settled ? Math.min(1, (flight.at ?? 0) / flight.settled) : 1;
+    },
     /** Fades every star (0..1), for the dip between scenes. */
     setOpacity(v) {
       materials[0].uniforms.opacity.value = v;
+    },
+    /** Dims the whole picture (1 = as it is, 0 = black), while the solar system is drawn over it on the way home. */
+    setLight(v) {
+      light = v;
     },
     resize() {
       camera.aspect = innerWidth / innerHeight;

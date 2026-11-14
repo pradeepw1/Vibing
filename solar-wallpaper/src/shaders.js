@@ -804,6 +804,7 @@ export const markers = {
   vertexShader: /* glsl */ `
     uniform float pixelRatio;
     uniform float viewHeight;
+    uniform float fade; // all of them at once (1 = as they are)
     attribute float radius;
     attribute vec3 tint;
     attribute float alpha;
@@ -814,7 +815,7 @@ export const markers = {
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mv;
       float px = radius * projectionMatrix[1][1] * viewHeight * 0.5 / -mv.z;
-      vAlpha = alpha * (1.0 - smoothstep(1.5, 3.5, px));
+      vAlpha = fade * alpha * (1.0 - smoothstep(1.5, 3.5, px));
       gl_PointSize = 5.0 * pixelRatio;
     }
   `,

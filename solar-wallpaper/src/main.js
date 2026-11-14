@@ -128,8 +128,8 @@ let lastLookView = viewpoint(settings.view) ? "middle" : settings.view;
 // --- Out among the galaxies ---
 // away.stage: null in the solar system; "leaving" while the camera turns to
 // face the galaxy and the screen dips to black; "there" in among the galaxies
-// (flying, or looking round); "returning" while flying home, where the last
-// picture of the flight dissolves into the solar system.
+// (flying, or looking round); "returning" while flying home, all the way down
+// into the solar system (see `landing`).
 const away = {
   stage: null,
   galaxy: null,
@@ -339,10 +339,14 @@ function flyTo(id, instant = false) {
 const TURN_MS = 1100;
 const DIP_MS = 400;
 const DISSOLVE_MS = 1200;
+const LAND_FROM = 2.5; // the solar system comes into sight this far from the Sun, in thousands of light-years (or nearer, starting nearer):
+// while the stars round about are still moving past, so the flight never seems to stop...
+const LAND_FAR = 1500; // ...when the camera is this many times further from it than it will end up: the whole of it is a dot
 
 function goToGalaxy(id, instant) {
   if (away.stage === "there" || away.stage === "returning") {
     // Already out here: fly across.
+    cancelLanding();
     leaveInner();
     carryFade(); // (if we were sinking in, don't snap back to clear)
     away.dive = null;
@@ -477,7 +481,128 @@ function comeHome(id, instant) {
   away.dive = null;
   showCaption(null); // (the arrival note, if there is one)
   away.stage = "returning";
-  lg.flyTo("home");
+  landing = planLanding(id);
+  lg.flyTo("home", landing ? { landing: { dir: landing.dir, up: camera.up, distance: landing.end, settleBy: landing.from } } : {});
+}
+
+/**
+ * The flight home is one move, from the galaxy to the view of the solar system it ends in. The galaxies and the solar
+ * system are two scenes, each with its own camera and its own idea of how big a unit is, but they point the same way and
+ * the Sun is the centre of both. So the solar system's camera is tied to the galaxies' one: `scale` times as far from
+ * what it looks at as that one is from the Sun, on the same side, turned the same way. The flight is made to end where
+ * that puts the solar system's camera just where the view wants it. For the last stretch both scenes are drawn, the
+ * solar system over the galaxies: it comes up out of a dot in the middle of the picture, while the galaxies' stars give
+ * way to the solar system's own sky behind it.
+ */
+let landing = null; // { id, view, offset, dir, from, end, scale, shown, sky }
+
+function planLanding(id) {
+  if (viewpoint(id) || pov.id) return null; // the view from a body is too different a picture to fly into: that one dissolves
+  layOut(new Date(clock.time), 0, (performance.now() - startTime) / 1000); // (nothing here has moved while we were away)
+  const view = viewFor(id);
+  const offset = offsetFor(view, focus?.body.id === "sun" && view.body.id === "sun");
+  // Starting close by (from a star with planets), everything is that much smaller, so there is still a way to come down.
+  const reach = Math.max(lg.camera.position.distanceTo(lg.places.get("sun").position), 1e-3);
+  const from = Math.min(LAND_FROM, reach / 4);
+  const end = from / LAND_FAR;
+  return { id, view, offset, dir: offset.clone().normalize(), from, end, scale: offset.length() / end, shown: false, sky: 0 };
+}
+
+/** Puts the solar system's camera where the galaxies' one says (see `landing`). */
+const landAt = new Vector3();
+function placeLanding() {
+  landAt.subVectors(lg.camera.position, lg.places.get("sun").position).multiplyScalar(landing.scale);
+  camera.position.copy(controls.target).add(landAt);
+  camera.quaternion.copy(lg.camera.quaternion);
+  // (From this far off, the usual limits of what the camera draws would cut the planets out.)
+  const far = landAt.length();
+  camera.near = Math.min(5, Math.max(0.01, far * 0.0005));
+  camera.far = Math.max(3000, far * 2 + 2000);
+  camera.updateProjectionMatrix();
+}
+
+function usualCamera() {
+  camera.near = 0.01;
+  camera.far = 3000;
+  camera.updateProjectionMatrix();
+  system.markers.material.uniforms.fade.value = 1;
+  lg.setLight(1);
+  labelsEl.style.opacity = "";
+}
+
+/** The solar system comes into sight: set its view up as a jump there would, with the camera still far out. */
+function beginLanding() {
+  const L = landing;
+  L.shown = true;
+  ui.setAway(null);
+  labelsEl.style.opacity = "0";
+  away.home = L.id;
+  lastLookView = L.id;
+  controls.minDistance = L.view.body.radius * nearestFor(L.view.body.id);
+  focus = L.view;
+  flight = null;
+  placeMoons();
+  lastFocus.copy(L.view.body.group.position);
+  controls.target.copy(L.view.body.group.position);
+  placeLanding();
+}
+
+/** Down: the solar system's camera is where the view wants it, and its own controls take over from there. */
+function endLanding() {
+  const { id } = landing;
+  placeLanding();
+  landing = null;
+  usualCamera();
+  const then = away.then;
+  away.stage = null;
+  away.then = null;
+  away.captioned = null;
+  lg.controls.enabled = false;
+  lg.release();
+  povCam.state.enabled = false;
+  controls.enabled = true;
+  if (then && then !== id) flyTo(then, false); // (another view asked for on the way)
+  ui.sync();
+}
+
+/** Off somewhere else instead, part of the way down: back to the galaxies alone. */
+function cancelLanding() {
+  const L = landing;
+  if (!L) return;
+  landing = null;
+  labelsEl.style.opacity = "";
+  if (!L.shown) return;
+  camera.position.copy(controls.target).add(L.offset); // (the view is set up: leave it as if we had arrived)
+  usualCamera();
+  ui.setAway(lg.places);
+}
+
+/**
+ * One frame of a landing. Returns true while the galaxies are all there is to draw, false once the solar system goes
+ * over them (the rest of the frame draws that).
+ */
+function landingFrame(now, t) {
+  const L = landing;
+  const d = lg.camera.position.distanceTo(lg.places.get("sun").position);
+  if (!L.shown && lg.nearing >= 1) beginLanding(); // (not by how far it is: on the way up out of the Milky Way it may pass close by)
+  if (L.shown) {
+    const down = Math.min(1, Math.max(0, 1 - Math.log(d / L.end) / Math.log(LAND_FAR))); // 0 as it comes into sight, 1 home
+    L.sky = MathUtils.smoothstep(down, 0.3, 0.75);
+    lg.setLight(1 - L.sky);
+    system.markers.material.uniforms.fade.value = MathUtils.smoothstep(down, 0, 0.2); // (or the planets' dots would pop up all at once)
+    labelsEl.style.opacity = String(MathUtils.smoothstep(down, 0.72, 1)); // their names come last: before, they would be in a heap
+  } else labelsEl.style.opacity = String(1 - MathUtils.smoothstep(lg.nearing, 0.8, 1)); // the galaxies' names go first
+  if (L.sky < 1) {
+    renderer.autoClear = true;
+    lg.render(renderer, 1000 / settings.fps);
+  }
+  if (away.arrived === Infinity) away.arrived = performance.now();
+  if (!L.shown) {
+    ui.updateAwayLabels(lg.camera, innerWidth, innerHeight, null);
+    return true;
+  }
+  if (t >= 1) endLanding();
+  return false;
 }
 
 /** Turning back after changing our mind: from where the turn got to, back to the usual view. */
@@ -499,6 +624,7 @@ const turnTo = new Quaternion();
 
 /** `dip`: come out of the dark. (Not after a flight home: its last picture is on the screen already, dissolving.) */
 function finishHome(dip = true) {
+  cancelLanding();
   const id = away.then ?? away.home;
   const wasThere = away.stage !== "leaving";
   away.stage = null;
@@ -573,7 +699,8 @@ function galaxyFrame(now) {
     }
   }
   if (away.dive === null) setFade(1 - (now - away.arrived) / DIP_MS); // (not while sinking in: that fade is the dive's)
-  // The names go just before the picture does: a held picture can't take them with it.
+  if (landing) return landingFrame(now, t);
+  // (Home to the view from a body.) The names go just before the picture does: a held picture can't take them with it.
   labelsEl.style.opacity = away.stage === "returning" ? String(Math.min(1, (1 - t) / 0.15)) : "";
   renderer.autoClear = true;
   lg.render(renderer, 1000 / settings.fps);
@@ -954,7 +1081,7 @@ function updateSkyCentre() {
 function render() {
   if (!pov.id || tween) {
     camera.layers.enableAll();
-    renderer.autoClear = true;
+    renderer.autoClear = !(landing?.shown && landing.sky < 1); // (on the way down, the galaxies are on the screen already: over them)
     renderer.render(scene, camera);
     return;
   }
@@ -1411,7 +1538,7 @@ function drawFrame(now) {
   if (pov.id) movePovCamera(now, dt);
   else {
     moveCamera(now);
-    controls.autoRotate = settings.drift && !reducedMotion && !flight && !stage.running; // a sighting would drift out of view
+    controls.autoRotate = settings.drift && !reducedMotion && !flight && !stage.running && !landing; // a sighting would drift out of view
     controls.update(dt);
   }
   updateSkyCentre();
@@ -1419,7 +1546,9 @@ function drawFrame(now) {
   // After the camera's usual move, so the turn wins.
   if (away.stage === "leaving") leavingFrame(now);
   else if (away.stage === "unturning") unturnFrame(now);
+  else if (landing?.shown) placeLanding();
   fadeStarsWhenSpinning(dt);
+  if (landing?.shown) sky.setStarFade(landing.sky);
   sky.group.position.copy(camera.position);
   sky.setEcliptic(settings.orbits ? 1 - system.overviewShare : 0);
   system.fitGlow(camera);

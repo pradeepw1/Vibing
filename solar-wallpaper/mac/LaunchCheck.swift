@@ -212,23 +212,24 @@ enum LaunchCheck {
             + "drift:s.settings.drift,cam:s.settings.cam||null,camNow:s.camera.position.clone().sub(s.controls.target).toArray()"
             + ".map(function(n){return Math.round(n*10)/10;})});})()"
         steps.append((1, { hooks.openScope() }))
-        // Out to a galaxy and home again: the flight home dissolves into the solar system, and the screen never goes dark.
+        // Out to a galaxy and home again: one flight all the way down into the solar system. The screen never goes dark,
+        // the solar system's camera is seen coming in from far out and only ever nearer, and it ends as a jump there would.
         steps.append((15, {
             hooks.scopeWeb()?.evaluateJavaScript("window.solarSystem.set('view','galaxy-m31',{remember:false});'ok'", completionHandler: nil)
             say("launch check: in the Space Scope window: flying to Andromeda")
         }))
         steps.append((18, {
-            // (The copy has to be the picture, too: a blank one would be the very black it is there to avoid.)
-            let js = "window.__dark=0;window.__held=false;window.__lit=false;setInterval(function(){var f=+getComputedStyle(document.getElementById('fade')).opacity,"
-                + "h=document.getElementById('held');if(f>window.__dark)window.__dark=f;if(h){window.__held=true;if(!window.__lit){"
-                + "var d=h.getContext('2d').getImageData((h.width/2|0)-32,(h.height/2|0)-32,64,64).data;"
-                + "for(var i=0;i<d.length;i+=4)if(d[i]>40){window.__lit=true;break;}}}},30);"
+            let js = "window.__dark=0;window.__far=0;window.__back=0;window.__last=1/0;setInterval(function(){var s=window.solarSystem,"
+                + "f=+getComputedStyle(document.getElementById('fade')).opacity,d=s.camera.position.distanceTo(s.controls.target);"
+                + "if(f>window.__dark)window.__dark=f;if(d>500){if(d>window.__far)window.__far=d;if(d>window.__last*1.0001)window.__back++;window.__last=d;}},30);"
                 + "window.solarSystem.set('view','middle',{remember:false});'ok'"
             hooks.scopeWeb()?.evaluateJavaScript(js, completionHandler: nil)
             say("launch check: in the Space Scope window: flying home")
         }))
-        steps.append((14, {
-            let js = "JSON.stringify({stage:window.solarSystem.away.stage,darkest:window.__dark,held:window.__held,lit:window.__lit,stillHeld:!!document.getElementById('held')})"
+        steps.append((16, {
+            let js = "(function(){var s=window.solarSystem,c=s.camera;return JSON.stringify({stage:s.away.stage,darkest:window.__dark,flewIn:window.__far>10000,"
+                + "turnedBack:window.__back,home:c.position.distanceTo(s.controls.target)<500&&c.near===0.01&&c.far===3000,"
+                + "names:document.getElementById('labels').style.opacity,leftOver:!!document.getElementById('held')});})()"
             hooks.scopeWeb()?.evaluateJavaScript(js) { result, error in
                 say("launch check: home from a galaxy, the Space Scope window: \(result.map { "\($0)" } ?? "none") \(error?.localizedDescription ?? "")")
             }

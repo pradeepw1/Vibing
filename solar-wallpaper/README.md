@@ -100,7 +100,7 @@ Pick one from the menu ("Fly to a star with planets"), click its name on the sky
 - **Made up:** what each world looks like (the kind is picked from its size and heat: a rocky world with seas, a banded gas giant, a smooth ice giant, a lava world, a frozen rock), and where it is on its orbit.
 - Where a planet's size isn't measured, it's worked out from its weight and shown as an estimate in the data; a few planets that not everyone agrees on are marked "disputed" in their label.
 
-Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
+Drag to look round, scroll to zoom. Out there, names show how far each galaxy is from where you are; click one to fly over to it, or click the Milky Way (or press Back or <kbd>Esc</kbd>) to fly home. The flight home is one move with no cut: across to the Milky Way, down into its disc, and on into the solar system, which comes up out of a dot until the camera is back where you left it. The stars in these galaxies are made up; their sizes, tilts, bars, arms and positions come from published measurements.
 
 ### The Gate
 
