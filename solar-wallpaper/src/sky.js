@@ -1,11 +1,13 @@
 // The background: stars, the Milky Way and the nearest galaxies, turned to
-// where the real ones sit in the sky. The stars themselves are made up, but
-// they crowd towards the galaxy's plane like real ones do.
+// where the real ones sit in the sky. The stars are the real ones, as faint as
+// eyes can see (from the Hipparcos catalogue: see stars.js), and the
+// constellations can be drawn over them.
 import {
   AdditiveBlending,
   BackSide,
   LineBasicMaterial,
   LineLoop,
+  LineSegments,
   BufferGeometry,
   Float32BufferAttribute,
   Group,
@@ -18,8 +20,8 @@ import {
   Vector3,
 } from "three";
 import { eqjToScene } from "./ephemeris.js";
-import { createGalaxies } from "./galaxies.js";
-import { clamp, random } from "./noise.js";
+import { createGalaxies, skyDirection } from "./galaxies.js";
+import { constellationLines, realStars, skyNames, starColour, starLook } from "./stars.js";
 import * as shaders from "./shaders.js";
 
 const DEG = Math.PI / 180;
@@ -38,42 +40,39 @@ export function galacticBasis() {
   return { center, north, east, matrix: new Matrix4().makeBasis(center, north, east.clone().negate()) };
 }
 
-function makeStars(count, basis) {
-  const rand = random(4242);
+/** The real stars, to magnitude 6 (see stars.js): each where it is in the sky, as bright and as coloured as it is. */
+function makeStars() {
   const pos = [];
   const size = [];
   const tint = [];
-  const palette = [
-    [0.66, 0.75, 1.0], [0.8, 0.86, 1.0], [1.0, 1.0, 1.0], [1.0, 0.95, 0.85], [1.0, 0.85, 0.65], [1.0, 0.72, 0.52],
-  ];
   const v = new Vector3();
-  for (let i = 0; i < count; i++) {
-    let l, b;
-    if (rand() < 0.45) {
-      // Crowded towards the galaxy's plane.
-      l = rand() * 2 * Math.PI;
-      const g = Math.sqrt(-2 * Math.log(rand() + 1e-9)) * Math.cos(2 * Math.PI * rand());
-      b = clamp(g * 0.2, -1.5, 1.5);
-    } else {
-      l = rand() * 2 * Math.PI;
-      b = Math.asin(2 * rand() - 1);
-    }
-    v.copy(basis.center).multiplyScalar(Math.cos(b) * Math.cos(l))
-      .addScaledVector(basis.east, Math.cos(b) * Math.sin(l))
-      .addScaledVector(basis.north, Math.sin(b))
-      .normalize()
-      .multiplyScalar(900);
+  for (const s of realStars()) {
+    skyDirection(s.ra, s.dec, v).multiplyScalar(900);
     pos.push(v.x, v.y, v.z);
-    const bright = Math.pow(rand(), 7); // a few bright ones, lots of faint ones
-    size.push(1.1 + 2.6 * bright);
-    const c = palette[Math.floor(rand() * palette.length)];
-    const k = 0.35 + 0.65 * Math.min(1, bright * 2 + rand() * 0.3);
-    tint.push(c[0] * k, c[1] * k, c[2] * k);
+    const { size: px, bright } = starLook(s.mag);
+    size.push(px);
+    const c = starColour(s.bv);
+    tint.push(c[0] * bright, c[1] * bright, c[2] * bright);
   }
   const g = new BufferGeometry();
   g.setAttribute("position", new Float32BufferAttribute(pos, 3));
   g.setAttribute("size", new Float32BufferAttribute(size, 1));
   g.setAttribute("tint", new Float32BufferAttribute(tint, 3));
+  return g;
+}
+
+/** The constellations' lines, just inside the stars. */
+function makeLines() {
+  const pos = [];
+  const v = new Vector3();
+  for (const [r1, d1, r2, d2] of constellationLines()) {
+    skyDirection(r1, d1, v).multiplyScalar(890);
+    pos.push(v.x, v.y, v.z);
+    skyDirection(r2, d2, v).multiplyScalar(890);
+    pos.push(v.x, v.y, v.z);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(pos, 3));
   return g;
 }
 
@@ -98,13 +97,26 @@ export function createSky(pixelRatio, { places = [] } = {}) {
     depthWrite: false,
     transparent: true,
   });
-  const starPoints = new Points(makeStars(7000, basis), starMat);
+  const starPoints = new Points(makeStars(), starMat);
   starPoints.renderOrder = -1;
   starPoints.frustumCulled = false;
   group.add(starPoints);
 
   const galaxies = createGalaxies();
   group.add(galaxies.group);
+
+  // The constellations: off unless asked for.
+  const linesMat = new LineBasicMaterial({ color: 0x7088c0, transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+  const lines = new LineSegments(makeLines(), linesMat);
+  lines.renderOrder = -1;
+  lines.frustumCulled = false;
+  lines.visible = false;
+  group.add(lines);
+  let linesOn = false;
+  const showLines = () => {
+    linesMat.opacity = linesOn ? 0.3 * fade : 0;
+    lines.visible = linesOn && fade > 0.01;
+  };
 
   // The ecliptic: the line across the sky that the Sun and planets follow.
   // Only shown in the view from a body.
@@ -139,6 +151,13 @@ export function createSky(pixelRatio, { places = [] } = {}) {
     },
     /** The named galaxies and anything else with a name on the sky, for labels. */
     galaxies: [...galaxies.named, ...places],
+    /** The constellations' names and the brightest stars', for labels when the constellations are shown. */
+    names: skyNames().map((n) => ({ ...n, distance: 890 })),
+    /** Draws the constellations' lines (or not). */
+    setConstellations(on) {
+      linesOn = on;
+      showLines();
+    },
     /**
      * Dims the stars, the Milky Way and the galaxies (1 = full). Used when the view turns so fast
      * against the stars that they'd only streak.
@@ -148,6 +167,7 @@ export function createSky(pixelRatio, { places = [] } = {}) {
       starMat.uniforms.opacity.value = amount;
       milkyMat.opacity = amount;
       starPoints.visible = milky.visible = amount > 0.01; // not the ecliptic line: it doesn't streak
+      showLines();
       galaxies.setFade(amount);
     },
     /** Fades the ecliptic line in (1) or out (0). */

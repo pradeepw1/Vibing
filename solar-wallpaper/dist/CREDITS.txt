@@ -33,6 +33,12 @@ Open Exoplanet Catalogue, https://github.com/OpenExoplanetCatalogue/open_exoplan
 Copyright (C) 2012 Hanno Rein. MIT licence (text below). It gathers results from
 NASA's Exoplanet Archive, exoplanet.eu and the published papers.
 
+THE STARS AND CONSTELLATIONS (src/stars-data.js)
+The stars to magnitude 6 (from the Hipparcos catalogue), the constellations' lines
+and names, and the bright stars' names: from d3-celestial's data,
+https://github.com/ofrohn/d3-celestial. Copyright (c) 2015, Olaf Frohn. BSD 3-Clause
+licence (text below). Packed smaller here; nothing else changed.
+
 CODE
   three.js                      MIT licence, Copyright (c) 2010-2025 three.js authors
                                 (notice kept at the end of solar.js and wallpaper.js)
@@ -63,3 +69,32 @@ THE MIT LICENCE (applies to the MIT items above, each with its own copyright lin
   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
   CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
   OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+THE BSD 3-CLAUSE LICENCE (applies to the star and constellation data above)
+
+  Copyright (c) 2015, Olaf Frohn All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without modification, are
+  permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice, this list
+  of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or other
+  materials provided with the distribution.
+
+  3. Neither the name of the copyright holder nor the names of its contributors may be
+  used to endorse or promote products derived from this software without specific
+  prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+  SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+  DAMAGE.

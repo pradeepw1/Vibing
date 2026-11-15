@@ -82,6 +82,7 @@ const skyPlaces = [
 ];
 const sky = createSky(pixelRatio, { places: skyPlaces });
 scene.add(sky.group);
+sky.setConstellations(settings.constellations);
 const system = createSystem(scene, pixelRatio);
 const belts = createBelts(pixelRatio);
 scene.add(...belts.parts);
@@ -164,6 +165,7 @@ function set(key, value, how = {}) {
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
+  if (key === "constellations") sky.setConstellations(value);
   if (key === "tour" && value) tourIdle = performance.now() - TOUR_STAY + TOUR_FIRST; // (the first trip soon, so you can see it working)
   if (key === "photos") usePhotos(value);
   reschedule(); // (the pace may have changed: a new frame rate, the camera set going, a flight begun)
@@ -217,6 +219,7 @@ const ui = createUI({
   settings,
   bodies,
   galaxies: sky.galaxies,
+  skyNames: sky.names,
   set,
   goLive,
   jumpToNow,

@@ -87,6 +87,7 @@ let switchChoices: [(key: String, label: String)] = [
 let scopeSwitches: [(key: String, label: String)] = [
     ("strange", "Strange sightings (all made up)"),
     ("tour", "Take a tour (flies off somewhere every minute or so)"),
+    ("constellations", "Constellations"),
 ]
 
 // MARK: - Saving the battery
@@ -182,7 +183,7 @@ final class Settings {
     /// What a switch is set to right now, as the menu shows it.
     func isOn(_ key: String) -> Bool {
         if let picked = picked(key) { return picked }
-        if key == "strange" || key == "tour" { return false } // a wallpaper doesn't have things drifting by, or fly off, unless asked
+        if key == "strange" || key == "tour" || key == "constellations" { return false } // a wallpaper doesn't have things drifting by, or fly off, unless asked
         // Someone who asked their Mac for less motion gets a camera that holds still, as in the browser.
         if key == "drift" { return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
         return true

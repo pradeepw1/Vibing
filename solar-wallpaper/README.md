@@ -52,7 +52,8 @@ To stop the camera going round, untick **Camera goes round**: the picture then h
 | Other moons (Phobos, Titan, Triton, Uranus's moons...) | Real size of orbit, real period, real direction (Triton goes backwards). Where they are along their orbit is made up |
 | Eclipses | Moons go dark in their planet's shadow: Io every 42 hours, our Moon (turning red) during real lunar eclipses |
 | Asteroid belt, Trojans, Kuiper belt | Made-up rocks on real-looking orbits. They move the way real asteroids do, they leave the gaps that Jupiter's pull clears out (the Kirkwood gaps), and the Trojans stay 60° ahead of and behind Jupiter |
-| Milky Way | Placed where the real one is in the sky. The stars themselves are made up |
+| Stars | Real: every star you could see on a dark night (about 5,000, to magnitude 6), where it is, as bright as it is and its colour. **Constellations** in the menu (or <kbd>C</kbd>) draws their lines and names, with the brightest stars' names |
+| Milky Way | Placed where the real one is in the sky. Its glow is painted |
 | Nearest galaxies | The Large and Small Magellanic Clouds, the Sagittarius Dwarf, Andromeda (with its two small companions) and Triangulum, at their real places in the sky, real sizes and real tilt, each with its name and distance. Their look is painted in code |
 | Famous galaxies far away | Bode's Galaxy, the Cigar, Centaurus A, the Sculptor, Pinwheel, Whirlpool, Sombrero, M87, NGC 1300, the Antennae and the Cartwheel: 11 to 500 million light-years out, at their real places and real sizes. Their shapes (a ring, a collision, a dust lane, a jet, gas blown out of a starburst) and colours follow the real ones; the individual stars are made up |
 | Black holes | Sagittarius A* (the middle of the Milky Way), Cygnus X-1 and M87*, at their real places and distances. **Drawn far bigger than they are** (from about 170,000 times for M87\* to billions of times for Cygnus X-1), or you'd never see them. The bending of light around them follows the real rule for light past a black hole. The disc, its colours and the star crowds round them are made up |
@@ -179,7 +180,7 @@ These are Space Scope's settings; the Wallpaper has `zoom` (1 to 10, 1 unless yo
 | `ui` | `0` hides the settings button (works on both pages) | `1` |
 | `wallpaper` | shorthand for `ui=0&fps=30` in Space Scope, and for `ui=0` in Wallpaper (it is already easy on battery) | |
 
-Keys: <kbd>Space</kbd> pause, <kbd>←</kbd> <kbd>→</kbd> slower/faster, <kbd>R</kbd> backwards, <kbd>N</kbd> back to now, <kbd>L</kbd> names, <kbd>O</kbd> orbits, <kbd>H</kbd> hide everything, <kbd>F</kbd> full screen, <kbd>1</kbd>-<kbd>9</kbd> look at a planet, <kbd>Shift</kbd>+<kbd>1</kbd>-<kbd>9</kbd> look from it, <kbd>Enter</kbd> look from the planet you're looking at, <kbd>Esc</kbd> / <kbd>B</kbd> / <kbd>Backspace</kbd> back, <kbd>0</kbd> overview.
+Keys: <kbd>Space</kbd> pause, <kbd>←</kbd> <kbd>→</kbd> slower/faster, <kbd>R</kbd> backwards, <kbd>N</kbd> back to now, <kbd>L</kbd> names, <kbd>O</kbd> orbits, <kbd>C</kbd> constellations, <kbd>H</kbd> hide everything, <kbd>F</kbd> full screen, <kbd>1</kbd>-<kbd>9</kbd> look at a planet, <kbd>Shift</kbd>+<kbd>1</kbd>-<kbd>9</kbd> look from it, <kbd>Enter</kbd> look from the planet you're looking at, <kbd>Esc</kbd> / <kbd>B</kbd> / <kbd>Backspace</kbd> back, <kbd>0</kbd> overview.
 
 Drag to turn the view, scroll to zoom, click a planet or moon to see the sky from there.
 
@@ -256,6 +257,8 @@ The built files are in git, but the originals are not.
 
 ## Credits
 
+The stars (to magnitude 6, from the Hipparcos catalogue), the constellations' lines and names, and the bright stars' names come from [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data (Copyright (c) 2015 Olaf Frohn, BSD 3-Clause licence: the full text is in `dist/CREDITS.txt`), packed smaller by `tools/make-stars.mjs` (`npm run stars`).
+
 The planets round other stars come from the [Open Exoplanet Catalogue](https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue) (Hanno Rein and contributors, MIT licence; [Rein 2012](http://arxiv.org/abs/1211.7121)), which gathers results from NASA's Exoplanet Archive and the published papers. [three.js](https://threejs.org) (MIT) draws it. The simplex noise in the shaders is by Ian McEwan (Ashima Arts, Copyright (C) 2011) and Stefan Gustavson (MIT), the hash functions in the sky scenes are "Hash without Sine" by David Hoskins (MIT), and the blackbody colour curve is a fit published by Tanner Helland. The licence texts are in `dist/CREDITS.txt`. [astronomy-engine](https://github.com/cosinekitty/astronomy) by Don Cross (MIT) works out the positions. The painted stand-in for Earth's coastlines comes from [Natural Earth](https://www.naturalearthdata.com) (public domain) via [world-atlas](https://github.com/topojson/world-atlas).
 
 **The real maps.** Every picture comes from a space mission, and the maps were joined, cleaned, resized and in some cases tinted or filled in for this project (see "How the maps are made"). NASA and USGS maps are public domain, and NASA should be thanked as their source; no NASA endorsement is meant or implied.
@@ -281,7 +284,6 @@ The Solar System Scope maps: *Textures by [Solar System Scope](https://www.solar
 
 ## Next
 
-- Real bright stars and constellations, from a star catalogue
 - The Moon's shadow on Earth during a solar eclipse, and Jupiter's moons' shadows on Jupiter
 - Real starting positions for the smaller moons (from JPL's mean orbital elements)
 - Comets, and real positions for spacecraft like Voyager and JWST

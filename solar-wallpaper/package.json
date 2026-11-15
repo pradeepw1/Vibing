@@ -9,7 +9,8 @@
     "land": "node tools/make-land.mjs",
     "maps": "python3 tools/make-maps.py build",
     "test": "node --test test/*.test.mjs",
-    "textures": "esbuild tools/texture-preview.js --bundle --format=iife --outfile=tools/textures.js"
+    "textures": "esbuild tools/texture-preview.js --bundle --format=iife --outfile=tools/textures.js",
+    "stars": "node tools/make-stars.mjs"
   },
   "dependencies": {
     "astronomy-engine": "2.1.19",

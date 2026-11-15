@@ -9,7 +9,7 @@ import { build } from "esbuild";
 
 const root = new URL("../", import.meta.url);
 const THREE = "three.js (MIT, three.js authors), astronomy-engine (MIT, Don Cross), simplex noise (MIT, Copyright (C) 2011 Ashima Arts, Ian McEwan and Stefan Gustavson), hash functions (MIT, Copyright (c) 2014 David Hoskins)";
-const MAPS = "Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural Earth, Celestia; see CREDITS.txt.";
+const MAPS = "Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural Earth, Celestia. Stars and constellations: d3-celestial's data (BSD-3-Clause, Copyright (c) 2015 Olaf Frohn), from the Hipparcos catalogue. See CREDITS.txt.";
 const BANNERS = {
   "dist/solar.js": `/*! Solar System Live (Space Scope). Bundles ${THREE} and data from the Open Exoplanet Catalogue (MIT, Copyright (C) 2012 Hanno Rein). ${MAPS} */`,
   "dist/wallpaper.js": `/*! Solar System Live (Wallpaper). Bundles ${THREE}. ${MAPS} */`,

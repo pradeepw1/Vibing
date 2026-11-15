@@ -6,7 +6,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
+export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -82,7 +82,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     panel.hidden = true; // out of the way, so it can be seen
     menuBtn.setAttribute("aria-expanded", "false");
   });
-  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour" };
+  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour", "constellations-on": "constellations" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
   // The corner note about where you are would print over the open panel: let it fade while the panel is open.
@@ -176,6 +176,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
       case "n": goLive(); break;
       case "l": set("labels", !settings.labels); break;
       case "o": set("orbits", !settings.orbits); break;
+      case "c": set("constellations", !settings.constellations); break;
       case "h": hiddenAll = !hiddenAll; sync(); break;
       case "Escape": if (!panel.hidden) { panel.hidden = true; menuBtn.setAttribute("aria-expanded", "false"); } else goBack(); break;
       case "Backspace":
@@ -256,7 +257,18 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
     x: 0,
     y: 0,
     width: g.name.length * 7 + 6,
+    height: 26,
   }));
+  // The constellations' names and the brightest stars', when the constellations are shown. Nothing to click.
+  const nameLabels = skyNames.map((n) => {
+    const el = document.createElement("div");
+    el.className = `label sky-name${n.star ? " star" : ""}`;
+    el.textContent = n.name;
+    el.style.opacity = "0";
+    solarEl.append(el);
+    return { galaxy: n, el, shown: null, x: 0, y: 0, width: n.name.length * (n.star ? 6 : 7) + 6, height: 14, only: () => settings.constellations };
+  });
+  const skyLabels = [...galaxyLabels, ...nameLabels];
 
   const v = new Vector3();
   const camDir = new Vector3();
@@ -328,10 +340,10 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
 
     // Galaxies are as good as infinitely far away: in the same direction from
     // wherever the camera is.
-    for (const l of galaxyLabels) {
+    for (const l of skyLabels) {
       const { direction, distance } = l.galaxy;
       // Not while the sky is faded out because the view is spinning.
-      let show = skyFade > 0.5 && direction.dot(camDir) > 0.05;
+      let show = (!l.only || l.only()) && skyFade > 0.5 && direction.dot(camDir) > 0.05;
       if (show) {
         v.copy(camera.position).addScaledVector(direction, distance).project(camera);
         const px = ((v.x + 1) / 2) * width;
@@ -345,8 +357,8 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
           toBody.direction.copy(direction);
           show = !toBody.intersectSphere(ground, hitGround);
         }
-        show &&= !overlaps(x, y, l.width, 26);
-        if (show) placed.push({ x, y, w: l.width, h: 26 });
+        show &&= !overlaps(x, y, l.width, l.height);
+        if (show) placed.push({ x, y, w: l.width, h: l.height });
         if (show && (x !== l.x || y !== l.y)) {
           l.el.style.transform = `translate(${x}px, ${y}px)`;
           l.x = x;
@@ -355,7 +367,7 @@ export function createUI({ settings, bodies, galaxies = [], set, goLive, jumpToN
       }
       if (show !== l.shown) {
         l.el.style.opacity = show ? "1" : "0";
-        l.el.style.pointerEvents = show ? "auto" : "none";
+        l.el.style.pointerEvents = show && !l.only ? "auto" : "none";
         l.shown = show;
       }
     }
