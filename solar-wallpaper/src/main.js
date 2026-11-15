@@ -6,6 +6,7 @@ import { createBelts } from "./belts.js";
 import { createPovCamera, povFov } from "./povcam.js";
 import { createExoSystem } from "./exosystem.js";
 import { createLocalGroup } from "./localgroup.js";
+import { placeNote, TOUR_FIRST, TOUR_STAY, tourStop } from "./tour.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -163,6 +164,7 @@ function set(key, value, how = {}) {
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
+  if (key === "tour" && value) tourIdle = performance.now() - TOUR_STAY + TOUR_FIRST; // (the first trip soon, so you can see it working)
   if (key === "photos") usePhotos(value);
   reschedule(); // (the pace may have changed: a new frame rate, the camera set going, a flight begun)
   if (key === "speed" || key === "reverse") settings.paused = false;
@@ -1123,6 +1125,36 @@ stage.onEnd = (s) => {
 };
 
 /** Takes down the note about the sighting that just ended, after a while (whichever scene we're in). */
+/**
+ * The tour (see src/tour.js): once the camera has been still for a stay, off to the next place. On getting to the Sun or
+ * a planet, a note on how far it really is; the galaxies say their own. Anything you do starts the stay again.
+ */
+let tourIdle = performance.now(); // since when nothing has moved (or you last did something)
+let tourNext = Math.floor(Date.now() / TOUR_STAY) % 2 === 0 ? 0 : 2; // (not always the same place first)
+let tourNoted = null; // the place whose note has been shown
+for (const type of ["pointerdown", "keydown", "wheel"]) addEventListener(type, () => (tourIdle = performance.now()), { capture: true, passive: true });
+function tourFrame(now) {
+  if (!settings.tour) return;
+  const moving = flight || tween || landing || held || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
+  if (moving) {
+    tourIdle = now;
+    return;
+  }
+  if (tourNoted !== settings.view) {
+    tourNoted = settings.view;
+    const note = !away.stage && placeNote(settings.view, new Date(clock.time));
+    if (note) {
+      ui.setCaption(note.title, note.lines);
+      noteUntil = now + 12000;
+    }
+  }
+  if (now - tourIdle < TOUR_STAY) return;
+  tourIdle = now;
+  let id = tourStop(tourNext++);
+  if (id === settings.view) id = tourStop(tourNext++); // (already there: on to the one after)
+  set("view", id, { remember: false });
+}
+
 function noteFrame(now) {
   if (noteUntil && now > noteUntil) {
     noteUntil = 0;
@@ -1440,7 +1472,7 @@ function mustLayOut(now) {
 function still() {
   return (
     !(settings.drift && !reducedMotion) && (settings.paused || (settings.speed === "live" && !settings.reverse)) &&
-    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held
+    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held && !landing
   );
 }
 
@@ -1515,6 +1547,7 @@ function drawFrame(now) {
   tickClock(dt);
   noteFrame(now);
   dissolveFrame(now);
+  tourFrame(now);
   ui.updateClock(clock.time, clock.synced && !settings.paused);
   if ((away.stage === "there" || away.stage === "returning") && galaxyFrame(now)) {
     updateHover(now);

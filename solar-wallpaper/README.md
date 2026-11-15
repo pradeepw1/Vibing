@@ -174,6 +174,7 @@ These are Space Scope's settings; the Wallpaper has `zoom` (1 to 10, 1 unless yo
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
 | `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
 | `photos` | `0` for painted planets only (the menu's **Real maps** box). Good for a slow computer or a small download | `1` |
+| `tour` | `1` to take a tour: about every 45 seconds the camera flies off somewhere by itself, to a planet and out to a galaxy, black hole or star with planets in turn, with a note on each (a planet's note says how far it really is from Earth right now). Anything you do makes it wait a full stay again. Also in the menu, and in the Mac app's menu | `0` |
 | `fps` | frames per second, 5 to 240 | 60 in Space Scope, 20 in Wallpaper |
 | `ui` | `0` hides the settings button (works on both pages) | `1` |
 | `wallpaper` | shorthand for `ui=0&fps=30` in Space Scope, and for `ui=0` in Wallpaper (it is already easy on battery) | |
