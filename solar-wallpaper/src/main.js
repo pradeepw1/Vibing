@@ -8,6 +8,7 @@ import { createExoSystem } from "./exosystem.js";
 import { createLocalGroup } from "./localgroup.js";
 import { placeNote, TOUR_FIRST, TOUR_STAY, tourStop } from "./tour.js";
 import { tonight, upcomingEvents, whenText } from "./events.js";
+import { homeFacing, homeNote, homePlace, homeUp } from "./home.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -170,6 +171,11 @@ function set(key, value, how = {}) {
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "constellations") sky.setConstellations(value);
+  if (key === "place" && pov.home) {
+    const note = homeNote(new Date(clock.time), homePlace(value));
+    showCaption(note.title, note.lines);
+    noteUntil = performance.now() + 15000;
+  }
   if (key === "tour" && value) tourIdle = performance.now() - TOUR_STAY + TOUR_FIRST; // (the first trip soon, so you can see it working)
   if (key === "photos") usePhotos(value);
   reschedule(); // (the pace may have changed: a new frame rate, the camera set going, a flight begun)
@@ -342,7 +348,19 @@ function flyTo(id, instant = false) {
   if (away.stage) return comeHome(id, instant);
   away.home = id; // where Back goes from a galaxy
   const from = viewpoint(id);
-  if (from) return enterPov(from, instant);
+  if (from) {
+    const wasHome = pov.home;
+    pov.home = id === "from-home";
+    enterPov(from, instant);
+    if (pov.home) {
+      if (!wasHome) povCam.state.altitude = 0.02; // (as low as it goes: over the rooftops, more or less)
+      const note = homeNote(new Date(clock.time), homePlace(settings.place));
+      showCaption(note.title, note.lines);
+      noteUntil = performance.now() + 15000;
+    }
+    return;
+  }
+  pov.home = false;
   lastLookView = id;
   if (pov.id) return leavePov(id, instant);
   const view = viewFor(id);
@@ -937,7 +955,7 @@ const labelsEl = document.getElementById("labels");
 // pov.id is the body we stand on (or are leaving). A change of view blends
 // from pov.from (a description of what was on screen when it started) to the
 // new layout, with pov.blend running 0 -> 1 alongside the camera move.
-const pov = { id: null, leaving: false, from: null, blend: 1, camOffset: new Vector3() }; // camOffset: camera relative to the ground body, for centring the sky
+const pov = { id: null, leaving: false, from: null, blend: 1, camOffset: new Vector3(), home: false }; // camOffset: camera relative to the ground body, for centring the sky; home: "your sky"
 const povCam = createPovCamera(renderer.domElement);
 const povPose = povCam.newPose();
 let tween = null; // camera move into, out of, or between views from a body
@@ -1071,8 +1089,15 @@ function povTarget() {
     height = Math.min(parentAngle * 0.85 + 5, 30);
   } else aim.copy(b.material.uniforms.sunDir.value);
   const ringPole = b.ring ? b.material.uniforms.ringNormal.value : null;
+  if (pov.home && b.id === "earth") {
+    // Your sky: over where you live, the real way up there at the clock's time, facing the equator.
+    const home = homePlace(settings.place);
+    homeUp(new Date(clock.time), home, homeStand);
+    return povCam.pose(b.group.position, b.radius * b.group.scale.x, homeFacing(homeStand, home, aim), povFov(camera.aspect), povPose, height, null, homeStand);
+  }
   return povCam.pose(b.group.position, b.radius * b.group.scale.x, aim, povFov(camera.aspect), povPose, height, ringPole);
 }
+const homeStand = new Vector3();
 
 const toTurn = new Quaternion();
 

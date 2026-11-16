@@ -4,7 +4,7 @@ import { pageAddress, WALLPAPER_PAGE } from "./modes.js";
 import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 
 const $ = (sel) => document.querySelector(sel);
-const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
+const fromName = (id, view) => (view === "from-home" ? "Your sky" : id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
 export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
@@ -69,6 +69,9 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
+  // Where "your sky" is seen from: "latitude, longitude" (empty: from the time zone).
+  const placeEl = $("#place");
+  placeEl.addEventListener("change", () => set("place", placeEl.value.trim() === "" ? "" : placeEl.value));
   // The time machine: any date and time (local), and the clock carries on from there.
   const gotoEl = $("#goto-date");
   gotoEl.addEventListener("change", () => {
@@ -140,17 +143,18 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
     extra.hidden = listed || !from; // only for views from moons that aren't in the list
     if (!extra.hidden) {
       extra.value = settings.view;
-      extra.textContent = fromName(from);
+      extra.textContent = fromName(from, settings.view);
     }
     if (listed || from) viewSel.value = settings.view;
     // The way back shows even in wallpaper mode: a click may have brought you here.
     const galaxy = galaxyOf(settings.view);
     pill.hidden = !(from || galaxy) || hiddenAll || travelling(); // no second Back while already on the way
     if (from || galaxy) {
-      pillName.textContent = galaxy ? VIEWS.find((v) => v.id === settings.view).label : fromName(from);
+      pillName.textContent = galaxy ? VIEWS.find((v) => v.id === settings.view).label : fromName(from, settings.view);
       $("#pov-back").title = `Back: ${backLabel()}`;
     }
     for (const [id, key] of Object.entries(toggles)) $(`#${id}`).checked = settings[key];
+    if (document.activeElement !== placeEl) placeEl.value = settings.place ? settings.place.join(", ") : "";
     menuBtn.hidden = !settings.ui || hiddenAll;
     hintEl.style.visibility = hiddenAll ? "hidden" : ""; // (H hides everything, the hint too)
     if (!settings.ui || hiddenAll) panel.hidden = true;

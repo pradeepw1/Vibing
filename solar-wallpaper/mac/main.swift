@@ -54,6 +54,7 @@ let viewChoices: [(id: String, label: String)] = [
     ("uranus", "Uranus"),
     ("neptune", "Neptune"),
     ("pluto", "Pluto"),
+    ("from-home", "Your sky (over where you live)"),
 ]
 
 // The lean Wallpaper's zoom.

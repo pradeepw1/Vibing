@@ -3,6 +3,7 @@
 //   2. whatever you last picked in the settings panel (saved in this browser)
 //   3. the page address, e.g. scope.html?speed=day&view=earth&ui=0
 // Wallpaper apps (Lively, Wallpaper Engine) can also push changes in; see main.js.
+import { parsePlace } from "./home.js";
 import { BLACK_HOLES } from "./blackholes.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
 import { MOONS, PLANETS } from "./bodies.js";
@@ -22,6 +23,8 @@ export const VIEWS = [
   // store the list position keep pointing at the same view.
   ...PLANETS.map((p) => ({ id: `from-${p.id}`, label: `From ${p.name}`, from: p.id })),
   { id: "from-moon", label: "From the Moon", from: "moon" },
+  // Over where you live, at the real time of day (see home.js).
+  { id: "from-home", label: "Your sky (over where you live)", from: "earth" },
   // Out among the nearest galaxies, and to the black holes.
   ...GALAXIES.filter((g) => g.name).map((g) => ({ id: `galaxy-${g.id}`, label: g.name, galaxy: g.id })),
   ...BLACK_HOLES.map((h) => ({ id: `galaxy-${h.id}`, label: h.name, galaxy: h.id, hole: true })),
@@ -38,6 +41,7 @@ export function galaxyOf(viewId) {
 
 /** The body a "from-..." view stands on (any planet or moon), or null. */
 export function viewpoint(viewId) {
+  if (viewId === "from-home") return "earth";
   const id = typeof viewId === "string" && viewId.startsWith("from-") ? viewId.slice(5) : null;
   return id && (PLANETS.some((p) => p.id === id) || MOONS.some((m) => m.id === id)) ? id : null;
 }
@@ -56,13 +60,14 @@ export const DEFAULTS = {
   photos: true, // real maps (NASA and others) instead of painted surfaces
   tour: false, // the camera goes off somewhere by itself now and then (see src/tour.js)
   constellations: false, // their lines and names, and the brightest stars' names
+  place: null, // [latitude, longitude, name?] for "your sky" (null: from the computer's time zone)
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
   date: null, // start at this date instead of now
 };
 
 const KEY = "solar-wallpaper:v1";
-const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "fps"];
+const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "place", "fps"];
 
 function readSaved() {
   try {
@@ -98,6 +103,8 @@ export function parse(key, value) {
       if (![height, turn, tilt].every(Number.isFinite)) return undefined;
       return [Math.min(12, Math.max(0.02, height)), turn, Math.min(80, Math.max(-80, tilt))];
     }
+    case "place":
+      return value === null || value === "" ? null : Array.isArray(value) ? parsePlace(value.join(",")) : parsePlace(value);
     case "reverse":
     case "paused":
     case "strange":

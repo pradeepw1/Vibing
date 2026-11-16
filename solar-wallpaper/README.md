@@ -175,6 +175,7 @@ These are Space Scope's settings; the Wallpaper has `zoom` (1 to 10, 1 unless yo
 | `date` | any date, like `2033-05-01` or `1969-07-20T20:17Z`. Start there instead of now | now |
 | `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
 | `photos` | `0` for painted planets only (the menu's **Real maps** box). Good for a slow computer or a small download | `1` |
+| `place` | where *Your sky* is seen from: `latitude,longitude` (like `41.85,-87.65`), and a name after if you like. Empty: your time zone's city | your time zone's city |
 | `tour` | `1` to take a tour: about every 45 seconds the camera flies off somewhere by itself, to a planet and out to a galaxy, black hole or star with planets in turn, with a note on each (a planet's note says how far it really is from Earth right now). Anything you do makes it wait a full stay again. Also in the menu, and in the Mac app's menu | `0` |
 | `fps` | frames per second, 5 to 240 | 60 in Space Scope, 20 in Wallpaper |
 | `ui` | `0` hides the settings button (works on both pages) | `1` |
@@ -185,6 +186,8 @@ Keys: <kbd>Space</kbd> pause, <kbd>←</kbd> <kbd>→</kbd> slower/faster, <kbd>
 Drag to turn the view, scroll to zoom, click a planet or moon to see the sky from there.
 
 A view you reach by clicking isn't saved, so a stray click on your desktop won't change the wallpaper after a restart. Pick it in the settings panel (or the address) to keep it. In Lively, the settings have a **Look at** list and a **Look from** list; set Look from to *Nothing* to go back to the Look at view.
+
+**Your sky** (in the view list, `view=from-home`, and the Mac app's *Look at* menu) is the view from over where you live, at the real time of day: the Sun as high as it really is there (so night is night), the real stars and planets in their places, facing the equator, where the Sun, Moon and planets cross. A note gives that day's sunrise and sunset there and how much of the Moon is lit. Where you live comes from **Where you live** in the menu (or `place=41.85,-87.65`), and if that is empty, from your computer's time zone: its main city, from the tz database, so nothing asks where you are. It is seen from just above the air, so the daytime sky is black rather than blue.
 
 **Coming up** in the menu lists what's on in the sky over the next three months, from whatever date the clock says: eclipses of the Sun and Moon, full moons, planets opposite the Sun (up all night, at their closest), Mercury and Venus at their furthest from the Sun, and planets close together. All worked out by astronomy-engine, the same as the planets' places. Click one to go to it: the clock jumps there and the view turns to it. **Go to a date** takes the clock to any date and time (your birthday, say), and it carries on from there. On the night something is happening, a note says so.
 
@@ -258,6 +261,8 @@ The built files are in git, but the originals are not.
 | `tools/build.mjs`, `tools/bundles.mjs` | Build `dist/solar.js` and `dist/wallpaper.js`, and write `dist/LivelyProperties.json` from the same lists the pages use. `test/dist.test.mjs` makes them again and fails if the committed ones are out of date |
 
 ## Credits
+
+The time zones' cities (for *Your sky*) come from the tz database's `zone.tab` (public domain), by `tools/make-zones.mjs` (`npm run zones`).
 
 The stars (to magnitude 6, from the Hipparcos catalogue), the constellations' lines and names, and the bright stars' names come from [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data (Copyright (c) 2015 Olaf Frohn, BSD 3-Clause licence: the full text is in `dist/CREDITS.txt`), packed smaller by `tools/make-stars.mjs` (`npm run stars`).
 

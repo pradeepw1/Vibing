@@ -38,16 +38,21 @@ export function createPovCamera(dom) {
    *        or for a moon its planet)
    * Writes into `out` = { position: Vector3, quaternion: Quaternion, up, near }.
    */
-  function pose(center, radius, aim, fov, out, aimHeight = 14, ringPole = null) {
-    // Stand round from the point right under `aim`, towards ecliptic north, far
-    // enough that `aim` sits `aimHeight` degrees above the visible horizon. The
-    // ecliptic, where the planets are, then runs along the horizon.
-    const round = (90 + dip() - aimHeight) * DEG;
-    side.copy(ECLIPTIC_NORTH).addScaledVector(aim, -ECLIPTIC_NORTH.dot(aim));
-    if (side.lengthSq() < 1e-6) side.set(1, 0, 0).addScaledVector(aim, -aim.x);
-    side.normalize();
-    if (ringPole) ringSide(aim, ringPole, round);
-    up.copy(aim).multiplyScalar(Math.cos(round)).addScaledVector(side, Math.sin(round)).normalize();
+  function pose(center, radius, aim, fov, out, aimHeight = 14, ringPole = null, stand = null) {
+    if (stand) {
+      // A given place on the ground (`stand` is straight up there), facing `aim`.
+      up.copy(stand);
+    } else {
+      // Stand round from the point right under `aim`, towards ecliptic north, far
+      // enough that `aim` sits `aimHeight` degrees above the visible horizon. The
+      // ecliptic, where the planets are, then runs along the horizon.
+      const round = (90 + dip() - aimHeight) * DEG;
+      side.copy(ECLIPTIC_NORTH).addScaledVector(aim, -ECLIPTIC_NORTH.dot(aim));
+      if (side.lengthSq() < 1e-6) side.set(1, 0, 0).addScaledVector(aim, -aim.x);
+      side.normalize();
+      if (ringPole) ringSide(aim, ringPole, round);
+      up.copy(aim).multiplyScalar(Math.cos(round)).addScaledVector(side, Math.sin(round)).normalize();
+    }
     out.position.copy(center).addScaledVector(up, radius * (1 + state.altitude));
 
     // Level direction towards `aim`, then turn and tilt by yaw and pitch.
