@@ -215,11 +215,16 @@ enum LaunchCheck {
         // Out to a galaxy and home again: one flight all the way down into the solar system. The screen never goes dark,
         // the solar system's camera is seen coming in from far out and only ever nearer, and it ends as a jump there would.
         steps.append((15, {
-            hooks.scopeWeb()?.evaluateJavaScript("window.solarSystem.set('view','galaxy-m31',{remember:false});'ok'", completionHandler: nil)
+            // (The way out too: the camera draws back from the solar system, never dark, then flies on.)
+            let js = "window.__darkOut=0;window.__outBack=0;window.__outLast=0;window.__ivOut=setInterval(function(){var s=window.solarSystem,"
+                + "f=+getComputedStyle(document.getElementById('fade')).opacity;if(f>window.__darkOut)window.__darkOut=f;"
+                + "if(s.away.stage==='leaving'){var d=s.camera.position.distanceTo(s.controls.target);if(d<window.__outLast*0.9999)window.__outBack++;window.__outLast=d;}},30);"
+                + "window.solarSystem.set('view','galaxy-m31',{remember:false});'ok'"
+            hooks.scopeWeb()?.evaluateJavaScript(js, completionHandler: nil)
             say("launch check: in the Space Scope window: flying to Andromeda")
         }))
         steps.append((18, {
-            let js = "window.__dark=0;window.__far=0;window.__back=0;window.__last=1/0;setInterval(function(){var s=window.solarSystem,"
+            let js = "clearInterval(window.__ivOut);window.__dark=0;window.__far=0;window.__back=0;window.__last=1/0;setInterval(function(){var s=window.solarSystem,"
                 + "f=+getComputedStyle(document.getElementById('fade')).opacity,d=s.camera.position.distanceTo(s.controls.target);"
                 + "if(f>window.__dark)window.__dark=f;if(d>500){if(d>window.__far)window.__far=d;if(d>window.__last*1.0001)window.__back++;window.__last=d;}},30);"
                 + "window.solarSystem.set('view','middle',{remember:false});'ok'"
@@ -227,7 +232,7 @@ enum LaunchCheck {
             say("launch check: in the Space Scope window: flying home")
         }))
         steps.append((16, {
-            let js = "(function(){var s=window.solarSystem,c=s.camera;return JSON.stringify({stage:s.away.stage,darkest:window.__dark,flewIn:window.__far>10000,"
+            let js = "(function(){var s=window.solarSystem,c=s.camera;return JSON.stringify({darkestOut:window.__darkOut,drewBack:window.__outLast>10000,outCameBack:window.__outBack,stage:s.away.stage,darkest:window.__dark,flewIn:window.__far>10000,"
                 + "turnedBack:window.__back,home:c.position.distanceTo(s.controls.target)<500&&c.near===0.01&&c.far===3000,"
                 + "names:document.getElementById('labels').style.opacity,leftOver:!!document.getElementById('held')});})()"
             hooks.scopeWeb()?.evaluateJavaScript(js) { result, error in

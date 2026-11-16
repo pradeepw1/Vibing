@@ -463,7 +463,7 @@ export function createLocalGroup(canvas, pixelRatio) {
    * flight (see main.js). { dir: which side of the Sun to come in on, up: which way is up there, distance: how far from
    * it to stop, settleBy: the distance by which the camera is on that side, so the rest is a straight run in }.
    */
-  function flyTo(id, { instant = false, from = null, landing = null } = {}) {
+  function flyTo(id, { instant = false, from = null, landing = null, lookBack = null } = {}) {
     build();
     const place = places.get(id === "home" ? "sun" : id);
     // Where we're going has to be there, in full (the far ones are only a dot until now).
@@ -511,6 +511,9 @@ export function createLocalGroup(canvas, pixelRatio) {
       d1: down ? d1 : Math.max(d1, 1e-3),
       pace: down ? steady : ease,
       rise: rises ? wayUp(end.target, toDir, until, top) : null,
+      // Leaving home: go on looking back at it for the first part of the way, as it shrinks among its galaxy's stars,
+      // then turn to where we are going (turning at once, the camera faces empty space between the two for a second).
+      lookBack: lookBack ? lookBack.clone() : null,
       // How far along the camera has come round to the side it lands on: by the time the solar system is in sight.
       settled: down ? Math.min(1, Math.max(0.05, sight)) : 0,
       fromQuat: camera.quaternion.clone(),
@@ -563,7 +566,19 @@ export function createLocalGroup(canvas, pixelRatio) {
 
   /** What a flight looks at, `e` of the way along: where it is going, except on the way up out of the Milky Way. */
   const aim = new Vector3();
+  const backDir = new Vector3();
+  const aheadDir = new Vector3();
+  const swing = new Quaternion();
+  const swingPart = new Quaternion();
   function aimAt(f, e) {
+    if (f.lookBack) {
+      // (Between the two ways of looking, not between the two places: home and a galaxy are millions of light-years apart.)
+      backDir.subVectors(f.lookBack, camera.position).normalize();
+      aheadDir.subVectors(f.end.target, camera.position).normalize();
+      swing.setFromUnitVectors(backDir, aheadDir);
+      swingPart.identity().slerp(swing, MathUtils.smoothstep(e, 0.3, 0.62));
+      return aim.copy(backDir).applyQuaternion(swingPart).add(camera.position);
+    }
     if (!f.rise) return f.end.target;
     const { until } = f.rise;
     return aim.lerpVectors(centre, f.end.target, MathUtils.smoothstep(e, until * 0.6, until + (f.settled - until) * 0.5));
@@ -724,7 +739,8 @@ export function createLocalGroup(canvas, pixelRatio) {
     if (q.dot(f.turn ?? f.fromQuat) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
     f.turn = (f.turn ?? new Quaternion()).copy(q);
     // (On the way up out of the Milky Way it turns to the galaxy sooner: that is what there is to see.)
-    turnBetween(f.fromQuat, q, f.rise ? MathUtils.smoothstep(e, 0, f.rise.until * 0.3) : 1 - (1 - Math.min(1, e * 3)) ** 2, camera.quaternion);
+    // (Looking back, it faces home from the first frame: it is already, and the start of the flight swings it sideways.)
+    turnBetween(f.fromQuat, q, f.lookBack ? 1 : f.rise ? MathUtils.smoothstep(e, 0, f.rise.until * 0.3) : 1 - (1 - Math.min(1, e * 3)) ** 2, camera.quaternion);
     if (t >= 1) {
       if (f.home) flight = null;
       else finish(f.end);
@@ -909,6 +925,14 @@ export function createLocalGroup(canvas, pixelRatio) {
     },
     get flying() {
       return Boolean(flight);
+    },
+    /** Gets ready to go to a place (its stars made) without going yet. */
+    prepare(id) {
+      build();
+      for (const gid of [id, places.get(id)?.hole?.host]) {
+        const g = GALAXIES.find((x) => x.id === gid);
+        if (g) buildGalaxy(g);
+      }
     },
     /** On a landing: how near the solar system is to coming into sight (1 = it is in sight, and it is a straight run in). */
     get nearing() {

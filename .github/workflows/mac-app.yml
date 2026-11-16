@@ -69,9 +69,10 @@ jobs:
           # While hushed (screen asleep, locked, screen saver) the window is off the screen and the page draws nothing, and it comes back when woken.
           check 'while hushed, the page saw and drew: .*"seen":\["hidden","visible"\].*"drawsWhileHushed":0.*"msHushed":[1-9][0-9][0-9][0-9]'
           check 'launch check: finished'
-          # Home from a galaxy is one flight, down into the solar system: never dark, the camera seen coming in from far out
-          # and only ever nearer, and at the end everything as a jump there would leave it.
-          check 'home from a galaxy, the Space Scope window: {"stage":null,"darkest":0,"flewIn":true,"turnedBack":0,"home":true,"names":"","leftOver":false}'
+          # Out to a galaxy and home again, each one move: never dark, the camera seen drawing back from the solar system (and
+          # never nearer again) on the way out, coming in from far out (and only ever nearer) on the way home, and at the end
+          # everything as a jump there would leave it.
+          check 'home from a galaxy, the Space Scope window: {"darkestOut":0,"drewBack":true,"outCameBack":0,"stage":null,"darkest":0,"flewIn":true,"turnedBack":0,"home":true,"names":"","leftOver":false}'
           grep 'home from a galaxy' run.log | tail -1 | while read -r line; do echo "::notice::$line"; done
           # What the Space Scope window is left showing becomes the wallpaper; Reset puts it back.
           check 'after setting up Saturn in the Space Scope window, the wallpaper shows: {"view":"saturn","drift":false,"cam":\[6,3,8\],"camNow":\[6,3,8\]}'
