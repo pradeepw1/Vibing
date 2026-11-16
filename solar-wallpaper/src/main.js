@@ -13,6 +13,7 @@ import { createMeteors, createVisitors } from "./visitors.js";
 import { createRide, lightTimeText, LIGHT_KM_S, rideAt, ridePlan, rideToNext } from "./ride.js";
 import { SUN } from "./bodies.js";
 import { createShip } from "./ship.js";
+import { createSound } from "./sound.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -183,6 +184,7 @@ function set(key, value, how = {}) {
   if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "constellations") sky.setConstellations(value);
   if (key === "visitors") visitors.group.visible = value;
+  if (key === "sound") playSound();
   if (key === "place" && pov.home) {
     const note = homeNote(new Date(clock.time), homePlace(value));
     showCaption(note.title, note.lines);
@@ -1403,6 +1405,14 @@ function rideFrame(now) {
       : "Out past Pluto, on towards the stars. The nearest, Proxima Centauri, is 4.2 light-years away: over four years more at light speed.";
 }
 
+// A quiet sound (see sound.js): Space Scope only, never the desktop wallpaper.
+const sound = createSound();
+function playSound() {
+  if (settings.sound && !saver) sound.start();
+  else sound.stop();
+}
+playSound();
+
 /**
  * Fly it yourself (see ship.js): the camera is the ship, among the planets as they're drawn. Leaving goes back (through
  * a dissolve) to the view you started from, wherever its planet has got to meanwhile.
@@ -1896,6 +1906,7 @@ function drawFrame(now) {
 
   tickClock(dt);
   noteFrame(now);
+  if (sound.on) sound.setMood(away.stage && away.stage !== "returning" ? "away" : "home");
   dissolveFrame(now);
   if (ride) {
     rideFrame(now);

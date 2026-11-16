@@ -144,7 +144,8 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
     panel.hidden = true; // out of the way, so it can be seen
     menuBtn.setAttribute("aria-expanded", "false");
   });
-  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour", "constellations-on": "constellations", "visitors-on": "visitors" };
+  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour", "constellations-on": "constellations", "visitors-on": "visitors", "sound-on": "sound" };
+  if (settings.saver) $("#sound-label").hidden = true; // (a wallpaper behind the desktop has no way to turn it off again)
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
   // The corner note about where you are would print over the open panel: let it fade while the panel is open.

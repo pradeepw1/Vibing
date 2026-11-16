@@ -179,6 +179,7 @@ These are Space Scope's settings; the Wallpaper has `zoom` (1 to 10, 1 unless yo
 | `labels`, `orbits`, `belts`, `clock`, `drift`, `strange` | `0` or `1` (`strange` is the sightings above) | all `1` |
 | `photos` | `0` for painted planets only (the menu's **Real maps** box). Good for a slow computer or a small download | `1` |
 | `place` | where *Your sky* is seen from: `latitude,longitude` (like `41.85,-87.65`), and a name after if you like. Empty: your time zone's city | your time zone's city |
+| `sound` | `1` for a quiet sound: a low drone that slowly opens and closes, a faint wind and now and then a soft bell, made as it plays (no recordings), deeper out among the galaxies. Space Scope only, never on the desktop wallpaper. It starts with your first click or key press (browsers only allow sound after one) | `0` |
 | `tour` | `1` to take a tour: about every 45 seconds the camera flies off somewhere by itself, to a planet and out to a galaxy, black hole or star with planets in turn, with a note on each (a planet's note says how far it really is from Earth right now). Anything you do makes it wait a full stay again. Also in the menu, and in the Mac app's menu | `0` |
 | `fps` | frames per second, 5 to 240 | 60 in Space Scope, 20 in Wallpaper |
 | `ui` | `0` hides the settings button (works on both pages) | `1` |

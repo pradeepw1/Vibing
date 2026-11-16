@@ -61,6 +61,7 @@ export const DEFAULTS = {
   tour: false, // the camera goes off somewhere by itself now and then (see src/tour.js)
   constellations: false, // their lines and names, and the brightest stars' names
   visitors: true, // comets and spacecraft (see visitors.js)
+  sound: false, // a quiet drone, wind and bells, made as it plays (see sound.js); never on the desktop wallpaper
   place: null, // [latitude, longitude, name?] for "your sky" (null: from the computer's time zone)
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
@@ -68,7 +69,7 @@ export const DEFAULTS = {
 };
 
 const KEY = "solar-wallpaper:v1";
-const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "visitors", "place", "fps"];
+const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "visitors", "sound", "place", "fps"];
 
 function readSaved() {
   try {
@@ -112,6 +113,7 @@ export function parse(key, value) {
     case "tour":
     case "constellations":
     case "visitors":
+    case "sound":
       return bool(value);
     default:
       return parseShared(key, value);
