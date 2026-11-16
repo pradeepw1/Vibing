@@ -48,7 +48,7 @@ To stop the camera going round, untick **Camera goes round**: the picture then h
 | Charon | Real: it always hangs over the same spot on Pluto, the same as in reality |
 | Which way each planet faces and spins | Real, from the official figures for each body's axis and spin. The day side of Earth matches the actual time of day |
 | Tilt of each planet and of Saturn's rings | Real. Saturn's rings open and close over its 29-year orbit |
-| Shadows | Saturn's rings cast a shadow on Saturn and Saturn shades its rings, at the real angle |
+| Shadows | Saturn's rings cast a shadow on Saturn and Saturn shades its rings, at the real angle. The Moon's shadow crosses Earth during eclipses of the Sun (its middle within about a degree of where each eclipse is greatest; a full shadow for a total eclipse, none for a ring of fire), and Jupiter's four big moons, Mars's two and Titan cast theirs on their planets as they cross. Worked out from the real sizes and distances, not the squashed ones drawn |
 | Other moons (Phobos, Titan, Triton, Uranus's moons...) | Real size of orbit, real period, real direction (Triton goes backwards). Where they are along their orbit is made up |
 | Eclipses | Moons go dark in their planet's shadow: Io every 42 hours, our Moon (turning red) during real lunar eclipses |
 | Asteroid belt, Trojans, Kuiper belt | Made-up rocks on real-looking orbits. They move the way real asteroids do, they leave the gaps that Jupiter's pull clears out (the Kirkwood gaps), and the Trojans stay 60° ahead of and behind Jupiter |
@@ -296,7 +296,6 @@ The Solar System Scope maps: *Textures by [Solar System Scope](https://www.solar
 
 ## Next
 
-- The Moon's shadow on Earth during a solar eclipse, and Jupiter's moons' shadows on Jupiter
 - Real starting positions for the smaller moons (from JPL's mean orbital elements)
 - Comets, and real positions for spacecraft like Voyager and JWST
 - Better filling of the parts no probe photographed: on Ganymede, Europa, Callisto and Mercury, orbiting over the poles shows grey patches with straight edges where the map was filled in

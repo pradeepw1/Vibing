@@ -17,6 +17,27 @@ const worldVertex = /* glsl */ `
   }
 `;
 
+// Moons' shadows on a planet (see shadows.js): up to four spots, each where the middle of a shadow is (xyz, from the
+// planet's centre) and how big its part shadow is (w, an angle; 0: none), and its full shadow (negative: a ring of fire).
+const moonShadowChunk = /* glsl */ `
+  uniform vec4 shadowDir[4];
+  uniform float shadowUmbra[4];
+  float moonShadows(vec3 N) {
+    float light = 1.0;
+    for (int i = 0; i < 4; i++) {
+      vec4 s = shadowDir[i];
+      if (s.w <= 0.0) continue;
+      float a = acos(clamp(dot(N, s.xyz), -1.0, 1.0));
+      if (a >= s.w) continue;
+      float u = shadowUmbra[i];
+      // Full shadow inside the umbra; the part shadow fading out to its edge. A ring of fire never goes quite dark.
+      float dark = u > 0.0 ? (a <= u ? 1.0 : 1.0 - smoothstep(u, s.w, a)) : (1.0 - smoothstep(0.0, s.w, a)) * 0.9;
+      light *= 1.0 - 0.97 * dark;
+    }
+    return light;
+  }
+`;
+
 const outputChunks = /* glsl */ `
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -66,6 +87,7 @@ export const planet = {
     varying vec3 vNormal;
     varying vec2 vUv;
     ${ditherFunction}
+    ${moonShadowChunk}
 
     void main() {
       vec3 N = normalize(vNormal);
@@ -74,7 +96,7 @@ export const planet = {
       float ndl = dot(N, L);
       // Straight Lambert light, with the sharp corner at the day/night line rounded off.
       float lit = (ndl + wrap) / (1.0 + wrap);
-      float diffuse = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0);
+      float diffuse = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0) * moonShadows(N);
 
       if (hasRings > 0.5) {
         float facing = dot(L, ringNormal);
@@ -132,13 +154,14 @@ export const clouds = {
     varying vec3 vWorldPos;
     varying vec3 vNormal;
     varying vec2 vUv;
+    ${moonShadowChunk}
     void main() {
       vec3 N = normalize(vNormal);
       float ndl = dot(N, sunDir);
       float c = texture2D(map, vUv).r;
       if (mapMix > 0.0) c = mix(c, texture2D(mapB, vUv).r, mapMix);
       float lit = (ndl + 0.1) / 1.1;
-      float light = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0); // same rounded day/night line as the planet
+      float light = min(0.5 * (lit + sqrt(lit * lit + 0.0025)), 1.0) * moonShadows(N); // same rounded day/night line as the planet
       gl_FragColor = vec4(vec3(0.98) * (light + ambient), c * 0.92);
       ${outputChunks}
     }

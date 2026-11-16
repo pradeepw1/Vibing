@@ -40,6 +40,7 @@ import {
   sceneLongitude,
 } from "./ephemeris.js";
 import { skyLayout, sunlight } from "./pov.js";
+import { CASTERS, moonShadow } from "./shadows.js";
 import * as shaders from "./shaders.js";
 import { ringStrip } from "./surfaces.js";
 
@@ -119,6 +120,8 @@ function planetMaterial(def, isMoon) {
       ringMap: { value: null },
       ringMapB: { value: null }, // a real strip fading in over it
       ringMix: { value: 0 },
+      shadowDir: { value: [new Vector4(), new Vector4(), new Vector4(), new Vector4()] },
+      shadowUmbra: { value: [0, 0, 0, 0] },
     },
     transparent: isMoon,
   });
@@ -239,7 +242,7 @@ export function createSystem(scene, pixelRatio) {
     if (def.id === "earth") {
       const cloudMat = new ShaderMaterial({
         ...shaders.clouds,
-        uniforms: { map: { value: null }, mapB: { value: null }, mapMix: { value: 0 }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 } },
+        uniforms: { map: { value: null }, mapB: { value: null }, mapMix: { value: 0 }, sunDir: { value: new Vector3(1, 0, 0) }, ambient: { value: 0.004 }, shadowDir: { value: [new Vector4(), new Vector4(), new Vector4(), new Vector4()] }, shadowUmbra: { value: [0, 0, 0, 0] } },
         transparent: true,
         depthWrite: false,
       });
@@ -295,6 +298,7 @@ export function createSystem(scene, pixelRatio) {
   markers.frustumCulled = false;
   scene.add(markers);
 
+  const shadowOut = { dir: new Vector3(), umbra: 0, penumbra: 0 };
   // --- Every frame ---
   const tmp = new Vector3();
   const pole = new Vector3();
@@ -473,6 +477,22 @@ export function createSystem(scene, pixelRatio) {
       if (b.halo) b.halo.material.uniforms.sunDir.value.copy(dir);
       if (b.ring) b.ring.material.uniforms.sunDir.value.copy(dir);
       if (b.clouds) b.clouds.material.uniforms.sunDir.value.copy(dir);
+      // Moons' shadows on it (from where everything really is: see shadows.js).
+      const casters = CASTERS[b.id];
+      if (casters) {
+        const u = b.material.uniforms;
+        casters.forEach((id, i) => {
+          const m = bodies.get(id);
+          const shadow = m && moonShadow(real.get(b.id), real.get(id), b.def.radiusKm, m.def.radiusKm, shadowOut);
+          if (shadow) u.shadowDir.value[i].set(shadow.dir.x, shadow.dir.y, shadow.dir.z, shadow.penumbra);
+          else u.shadowDir.value[i].w = 0;
+          u.shadowUmbra.value[i] = shadow ? shadow.umbra : 0;
+        });
+        if (b.clouds) {
+          b.clouds.material.uniforms.shadowDir.value.forEach((v, i) => v.copy(u.shadowDir.value[i]));
+          b.clouds.material.uniforms.shadowUmbra.value.forEach((_, i, a) => (a[i] = u.shadowUmbra.value[i]));
+        }
+      }
     }
 
     // Looking from a body: lay everything else out again around it. A change
