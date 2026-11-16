@@ -14,6 +14,8 @@ import { createRide, lightTimeText, LIGHT_KM_S, rideAt, ridePlan, rideToNext } f
 import { SUN } from "./bodies.js";
 import { createShip } from "./ship.js";
 import { createSound } from "./sound.js";
+import { fitSpan, spanTime } from "./span.js";
+import { takeSnapshot } from "./snapshot.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -106,9 +108,22 @@ const lg = createLocalGroup(renderer.domElement, pixelRatio); // out among the g
 const ex = createExoSystem(renderer.domElement, pixelRatio); // round another star
 const beyond = createElsewhere(renderer.domElement); // through the Gate
 
+/** One picture across all the screens (see span.js): every camera draws this screen's part of it. */
+function fitSpans(...more) {
+  if (!settings.span) return;
+  for (const c of [camera, lg.camera, ex.camera, beyond.camera, ...more]) fitSpan(c, settings.span);
+}
+fitSpans();
+// (Smoothing makes the drift lag by however the page's own frames have fallen: across screens it must be exact.)
+if (settings.span) controls.enableDamping = false;
+
 // --- The clock ---
 // `synced` means "showing right now": the clock just follows the computer's clock.
-const clock = { time: settings.date ?? Date.now(), synced: settings.date === null };
+// (Across several screens, every page's clock runs from the same moment, so they agree.)
+const clock = {
+  time: settings.date ?? (settings.span ? spanTime(settings.span, settings.paused ? 0 : speedRate(settings.speed) * (settings.reverse ? -1 : 1)) : Date.now()),
+  synced: settings.date === null,
+};
 const minTime = Date.UTC(MIN_YEAR, 0, 1);
 const maxTime = Date.UTC(MAX_YEAR, 0, 1);
 
@@ -181,7 +196,7 @@ function set(key, value, how = {}) {
     if (how.remember !== false) savedView = value;
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
-  if (key === "strange") stage.enabled = value && !reducedMotion;
+  if (key === "strange") stage.enabled = value && !reducedMotion && !settings.span;
   if (key === "constellations") sky.setConstellations(value);
   if (key === "visitors") visitors.group.visible = value;
   if (key === "sound") playSound();
@@ -257,7 +272,7 @@ function labelOf(id) {
 // Not by themselves for anyone who has asked for less motion (the button still works).
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const stage = createStage({ scene, builders: [...UFOS, ...SHIPS, ...PHENOMENA], pixelRatio });
-stage.enabled = settings.strange && !reducedMotion;
+stage.enabled = settings.strange && !reducedMotion && !settings.span; // (each screen would see its own: they'd not meet at the edges)
 
 const ui = createUI({
   settings,
@@ -1893,6 +1908,18 @@ document.addEventListener("visibilitychange", () => {
   schedule();
 });
 
+/**
+ * Across several screens, the camera's drift: how far to turn it this frame, counted on the computer's own clock from
+ * the moment all the pages share (see span.js), so however their frames fall, every screen has turned the same way.
+ */
+let spanLast = null;
+function spanTurn() {
+  const now = Date.now();
+  const seconds = (now - (spanLast ?? settings.span.epoch)) / 1000;
+  spanLast = now;
+  return Math.max(0, seconds);
+}
+
 function drawFrame(now) {
   for (const step of painters) step(10 / painters.length);
   const gap = 1000 / settings.fps;
@@ -1939,7 +1966,7 @@ function drawFrame(now) {
   else {
     moveCamera(now);
     controls.autoRotate = settings.drift && !reducedMotion && !flight && !stage.running && !landing && !takeoff; // a sighting would drift out of view
-    controls.update(dt);
+    controls.update(settings.span ? spanTurn() : dt);
   }
   updateSkyCentre();
   if (settle) settleSky(now, date, (now - startTime) / 1000);
@@ -1950,7 +1977,7 @@ function drawFrame(now) {
   else if (away.stage === "unturning") unturnFrame(now);
   else if (landing?.shown) placeLanding();
   fadeStarsWhenSpinning(dt);
-  meteors.update(now, dt, A.SunPosition(date).elon, pov.id === "earth" && !tween && settings.visitors);
+  meteors.update(now, dt, A.SunPosition(date).elon, pov.id === "earth" && !tween && settings.visitors && !settings.span);
   if (landing?.shown) sky.setStarFade(landing.sky);
   else if (takeoff) sky.setStarFade(takeoff.sky);
   sky.group.position.copy(camera.position);
@@ -1998,6 +2025,7 @@ addEventListener("resize", () => {
   rideScene?.resize();
   ex.resize();
   beyond.resize();
+  fitSpans(rideScene?.camera);
   renderer.setSize(innerWidth, innerHeight);
 });
 
@@ -2074,7 +2102,42 @@ if (sceneOut) {
 }
 
 // Handy for poking at things from the browser console.
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail };
+/** Things sized in screen pixels (stars, asteroids, markers), drawn for this many device pixels to a screen one. */
+function setPointRatio(ratio) {
+  sky.starMat.uniforms.pixelRatio.value = ratio;
+  for (const p of belts.parts) p.material.uniforms.pixelRatio.value = ratio;
+  system.markers.material.uniforms.pixelRatio.value = ratio;
+}
+
+/**
+ * A picture of what's on the screen now at `width` × `height` pixels (4K, 8K...), as a PNG data: address, for the Mac
+ * app's "Save a picture" (see snapshot.js). Nothing moves on while it is drawn.
+ */
+function snapshot(width, height) {
+  const now = performance.now();
+  return takeSnapshot({
+    renderer,
+    width,
+    height,
+    cssWidth: innerWidth,
+    cssHeight: innerHeight,
+    cameras: [camera, lg.camera, ex.camera, beyond.camera, rideScene?.camera],
+    draw: () => {
+      lastFrame = now - 1e6; // (so this frame isn't skipped as too soon after the last)
+      lastTick = now; // (and nothing moves on)
+      drawFrame(now);
+    },
+    pointScale: (s) => setPointRatio(s ?? pixelRatio),
+  });
+}
+
+/** Goes to the moment `ms`, and to whatever is happening then if anything is (for the Mac app's menu: an eclipse, say). */
+function goToMoment(ms) {
+  const event = upcomingEvents(new Date(ms - 3600000), 1).find((e) => Math.abs(e.when - ms) < 3600000);
+  goTo(ms, event?.view, event);
+}
+
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail, snapshot, goToMoment };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);

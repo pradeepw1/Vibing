@@ -15,6 +15,8 @@ import { createBelts } from "./belts.js";
 import { createMaps } from "./maps.js";
 import { createModeGate, pageAddress, SCOPE_PAGE, scopeAddress, wantsScope } from "./modes.js";
 import { hostSearch, SPEEDS, speedRate } from "./options.js";
+import { fitSpan, spanTime } from "./span.js";
+import { takeSnapshot } from "./snapshot.js";
 import { startPainting } from "./painter.js";
 import { nextWait } from "./saver.js";
 import { createSky } from "./sky.js";
@@ -68,6 +70,7 @@ function start() {
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 3000);
+  if (settings.span) fitSpan(camera, settings.span); // this screen's part of one picture across all of them
   const sky = createSky(pixelRatio, { places: BLACK_HOLE_PLACES });
   sky.cullGalaxies();
   scene.add(sky.group);
@@ -113,7 +116,8 @@ function start() {
   });
 
   // --- The clock ---
-  const clock = { time: settings.date ?? Date.now(), synced: settings.date === null };
+  // (Across several screens, every page's clock runs from the same moment, so they agree.)
+  const clock = { time: settings.date ?? (settings.span ? spanTime(settings.span, speedRate(settings.speed)) : Date.now()), synced: settings.date === null };
 
   function tickClock(dt) {
     if (clock.synced && settings.speed === "live") {
@@ -298,7 +302,10 @@ function start() {
   let lastTick = startTime;
   let lastFrame = startTime;
   let lastLayout = -Infinity;
-  let cameraTime = 0; // seconds the camera has been going round (it stands still while that is switched off)
+  // Seconds the camera has been going round (it stands still while that is switched off). Across several screens it is
+  // counted from the moment they share, on the computer's clock, so every screen's part of the picture keeps in step.
+  const spanSeconds = () => (Date.now() - settings.span.epoch) / 1000;
+  let cameraTime = settings.span ? spanSeconds() : 0;
   const eye = { ready: false, settling: false }; // the camera is in place; it is still easing to a new zoom
   const zoomNow = zoomState(settings.zoom); // the zoom as it is on screen, easing towards the one picked
   const wantedMoons = new Set(); // moons that have been drawn, so their maps have been asked for
@@ -391,7 +398,7 @@ function start() {
       tickClock(dt);
       if (settings.speed !== "live" || now < busyUntil || !loadedShown || system.fading || now - lastLayout >= LAYOUT_EVERY) layOut(now, new Date(clock.time));
       sunMaterial.uniforms.time.value = (now - startTime) / 1000; // the Sun's surface keeps moving between layouts
-      if (settings.drift) cameraTime += dt;
+      if (settings.drift) cameraTime = settings.span ? spanSeconds() : cameraTime + dt;
       for (const step of painters) step(10 / painters.length);
       draw(dt);
 
@@ -459,6 +466,7 @@ function start() {
     renderer.setSize(innerWidth, innerHeight);
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
+    if (settings.span) fitSpan(camera, settings.span);
     sky.starMat.uniforms.pixelRatio.value = pixelRatio;
     for (const p of belts.parts) p.material.uniforms.pixelRatio.value = pixelRatio;
     system.markers.material.uniforms.pixelRatio.value = pixelRatio;
@@ -495,8 +503,22 @@ function start() {
   };
 
   // Handy for poking at things from the browser console.
+  /** Things sized in screen pixels (stars, asteroids, markers), drawn for this many device pixels to a screen one. */
+  function setPointRatio(ratio) {
+    sky.starMat.uniforms.pixelRatio.value = ratio;
+    for (const p of belts.parts) p.material.uniforms.pixelRatio.value = ratio;
+    system.markers.material.uniforms.pixelRatio.value = ratio;
+  }
+
   window.solarWallpaper = {
     camera, settings, clock, system, sky, renderer, photos, set, labels,
+    /** A picture of the view at `width` × `height` pixels, as a PNG data: address (see snapshot.js). */
+    snapshot: (width, height) =>
+      takeSnapshot({
+        renderer, width, height, cssWidth: innerWidth, cssHeight: innerHeight, cameras: [camera],
+        draw: () => draw(0),
+        pointScale: (s) => setPointRatio(s ?? pixelRatio),
+      }),
     seek: (seconds, snap = true) => {
       cameraTime = seconds;
       if (snap) eye.ready = false; // put the camera there at once (for testing)

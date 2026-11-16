@@ -153,6 +153,18 @@ final class Settings {
         set { store.set(newValue, forKey: "allScreens") }
     }
 
+    /// One picture across all the screens (each screen shows its own part of it, see src/span.js), not one each.
+    var span: Bool {
+        get { store.object(forKey: "span") as? Bool ?? false }
+        set { store.set(newValue, forKey: "span") }
+    }
+
+    /// The Moon's phase tonight as the menu bar icon (otherwise a globe).
+    var moonIcon: Bool {
+        get { store.object(forKey: "moonIcon") as? Bool ?? true }
+        set { store.set(newValue, forKey: "moonIcon") }
+    }
+
     /// Where the camera was left in Space Scope ("x,y,z" from what it looks at), and, standing on a body, how
     /// ("height,turn,tilt"). Nil: the view's own framing.
     var camera: String? {
@@ -193,7 +205,7 @@ final class Settings {
 
 // MARK: - The app
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler, NSMenuDelegate {
     private let settings = Settings()
     private var statusItem: NSStatusItem!
     private var wallpapers: [(window: NSWindow, web: WKWebView, screen: UInt32)] = []
@@ -219,6 +231,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var powerTimer: Timer?
     /// Why nothing is being drawn right now: "sleep", "locked", "screensaver", "session", "battery". Empty: drawing.
     private var quiet = Set<String>()
+    /// The sky facts at the top of the menu (the Moon, eclipses, what's coming up), and the items showing them.
+    private lazy var facts = Facts(script: webRoot.appendingPathComponent("facts.js"))
+    private var skyItems: [NSMenuItem] = []
+    private var skyTimer: Timer?
+    /// The moment every screen's part of one picture counts from (see `span(for:)`).
+    private var spanEpoch = Date()
 
     /// Where the web page is: a folder called "web" inside the app.
     private lazy var webRoot: URL = {
@@ -247,14 +265,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         }
         installMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "globe.americas.fill", accessibilityDescription: "Solar System Live") {
-                image.isTemplate = true
-                button.image = image
-            } else {
-                button.title = "SSL"
-            }
-        }
+        updateIcon()
+        // (The Moon's phase changes slowly: every half hour is plenty.)
+        skyTimer = Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { [weak self] _ in self?.updateIcon() }
         LaunchCheck.log("menu bar item made")
         applyPower(initial: true)
         rebuildMenu()
@@ -403,8 +416,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     /// The settings as a page address would say them.
     /// `window`: for the Space Scope window, which opens on what the wallpaper shows but is the full app (no wallpaper
     /// savings, its own frame rate).
-    private func search(for style: Style, window: Bool = false) -> String {
+    private func search(for style: Style, window: Bool = false, span: String? = nil) -> String {
         var items = window ? ["speed=\(settings.speed)"] : ["wallpaper=1", "speed=\(settings.speed)", "fps=\(frames(for: style))"]
+        if let span = span { items.append("span=\(span)") }
         for choice in switchChoices + (style == .scope ? scopeSwitches : []) {
             if let picked = settings.picked(choice.key) { items.append("\(choice.key)=\(picked ? 1 : 0)") }
         }
@@ -470,7 +484,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         window.ignoresMouseEvents = true // clicks go through to the desktop
         window.isReleasedWhenClosed = false
         window.setFrame(screen.frame, display: false)
-        let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size), search: search(for: style))
+        let web = makeWebView(frame: NSRect(origin: .zero, size: screen.frame.size), search: search(for: style, span: span(for: screen)))
         web.navigationDelegate = self
         window.contentView?.addSubview(web)
         LaunchCheck.log("web view added to the window")
@@ -481,9 +495,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         return (window, web, screenID(screen))
     }
 
+    /// One picture across all the screens: where this screen is in the whole (as the page reads it, see src/span.js:
+    /// "x,y,w,h,W,H,epoch" in points from the top left), or nil for a picture of its own.
+    private func span(for screen: NSScreen) -> String? {
+        let screens = NSScreen.screens
+        guard settings.span, settings.allScreens, screens.count > 1 else { return nil }
+        let frames = screens.map { $0.frame }
+        let minX = frames.map { $0.minX }.min() ?? 0, maxX = frames.map { $0.maxX }.max() ?? 0
+        let minY = frames.map { $0.minY }.min() ?? 0, maxY = frames.map { $0.maxY }.max() ?? 0
+        let f = screen.frame
+        let numbers = [f.minX - minX, maxY - f.maxY, f.width, f.height, maxX - minX, maxY - minY].map { String(Int($0.rounded())) }
+        return (numbers + [String(Int64(spanEpoch.timeIntervalSince1970 * 1000))]).joined(separator: ",")
+    }
+
     private func buildWallpapers() {
         screenLayout = layoutOfScreens()
         guard !paused, wallpapers.isEmpty else { return }
+        spanEpoch = Date() // (every screen's part counts from now)
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
         for screen in screens where !gaveUp.contains(screenID(screen)) {
             let id = screenID(screen)
@@ -533,7 +561,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         noteScreens()
         let screens = settings.allScreens ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
         let wanted = Set(screens.map { screenID($0) }).subtracting(gaveUp)
-        if !wallpapers.isEmpty && Set(wallpapers.map { $0.screen }) == wanted {
+        // (One picture across the screens is cut up by where they are, so a screen moved means the pages start again.)
+        if !wallpapers.isEmpty && Set(wallpapers.map { $0.screen }) == wanted && span(for: screens[0]) == nil {
             for entry in wallpapers {
                 if let screen = screens.first(where: { screenID($0) == entry.screen }) { entry.window.setFrame(screen.frame, display: true) }
             }
@@ -706,7 +735,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     private func rebuildMenu() {
         let menu = NSMenu()
+        menu.delegate = self
         menu.addItem(item("Solar System Live \(buildName)", nil))
+        skyItems = makeSkyItems()
+        for it in skyItems { menu.addItem(it) }
         if !fellBack.isEmpty || !gaveUp.isEmpty {
             menu.addItem(item("Space Scope kept stopping on a screen, so it shows the lean picture there", nil))
         }
@@ -778,11 +810,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         batteryItem.submenu = batteryMenu
         menu.addItem(batteryItem)
         menu.addItem(item("Show on every screen", #selector(toggleAllScreens), on: settings.allScreens))
+        if NSScreen.screens.count > 1 {
+            menu.addItem(item("One picture across all the screens", settings.allScreens ? #selector(toggleSpan) : nil,
+                              on: settings.span && settings.allScreens))
+        }
+        menu.addItem(item("The Moon's phase in the menu bar", #selector(toggleMoonIcon), on: settings.moonIcon))
         menu.addItem(item("Pause the wallpaper", #selector(togglePause), on: paused))
         if #available(macOS 13.0, *) {
             menu.addItem(item("Open at login", #selector(toggleLogin), on: launchesAtLogin))
         }
         menu.addItem(.separator())
+        let pictureMenu = NSMenu()
+        let main = NSScreen.screens.first
+        let sharp = main.map { [Int($0.frame.width * $0.backingScaleFactor), Int($0.frame.height * $0.backingScaleFactor)] } ?? [2880, 1800]
+        for (label, size) in [("4K (3840 × 2160)", [3840, 2160]), ("5K (5120 × 2880)", [5120, 2880]), ("8K (7680 × 4320)", [7680, 4320]),
+                              ("This screen's shape, sharp (\(sharp[0]) × \(sharp[1]))", sharp)] {
+            let it = item(label, #selector(savePicture(_:)))
+            it.representedObject = size
+            pictureMenu.addItem(it)
+        }
+        pictureMenu.addItem(.separator())
+        pictureMenu.addItem(item("Saved in Pictures, in a folder called Solar System Live", nil))
+        let pictureItem = NSMenuItem(title: "Save a picture of the wallpaper", action: nil, keyEquivalent: "")
+        pictureItem.submenu = pictureMenu
+        menu.addItem(pictureItem)
         menu.addItem(item("Set up the wallpaper in Space Scope…", #selector(openScope)))
         menu.addItem(item("Reset the wallpaper…", #selector(askToReset)))
         menu.addItem(item("Credits", #selector(openCredits)))
@@ -910,6 +961,127 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// Paused means the pages are gone altogether, so nothing is drawn and the memory is given back.
+    /// One picture across all the screens, or one each: the pages start again either way.
+    @objc private func toggleSpan() {
+        settings.span.toggle()
+        Journal.note(settings.span ? "one picture across all the screens" : "a picture on each screen")
+        removeWallpapers()
+        buildWallpapers()
+        rebuildMenu()
+    }
+
+    @objc private func toggleMoonIcon() {
+        settings.moonIcon.toggle()
+        updateIcon()
+        rebuildMenu()
+    }
+
+    /// The menu bar icon: tonight's Moon (macOS has a symbol for each phase), or the globe.
+    private func updateIcon() {
+        guard let button = statusItem?.button else { return }
+        let moon = settings.moonIcon ? facts.read() : nil
+        let image = moon.flatMap { NSImage(systemSymbolName: $0.moonSymbol, accessibilityDescription: "Solar System Live: \($0.moonName)") }
+            ?? NSImage(systemSymbolName: "globe.americas.fill", accessibilityDescription: "Solar System Live")
+        if let image = image {
+            image.isTemplate = true
+            button.image = image
+            button.title = ""
+        } else {
+            button.image = nil
+            button.title = "SSL"
+        }
+    }
+
+    /// The sky facts at the top of the menu: tonight's Moon, the next eclipses, and a list of what else is coming up.
+    /// Clicking one opens Space Scope at that moment, looking at it.
+    private func makeSkyItems() -> [NSMenuItem] {
+        guard let sky = facts.read() else { return [] }
+        var items: [NSMenuItem] = [.separator()]
+        let moon = item("\(sky.moonName), \(Int((sky.lit * 100).rounded()))% lit · full \(soonText(sky.nextFull)), \(dayText(sky.nextFull))",
+                        #selector(openSkyMoment(_:)))
+        moon.representedObject = sky.nextFull
+        if let image = NSImage(systemSymbolName: sky.moonSymbol, accessibilityDescription: sky.moonName) {
+            image.isTemplate = true
+            moon.image = image
+        }
+        items.append(moon)
+        for (i, eclipse) in sky.eclipses.enumerated() {
+            let it = item("\(i == 0 ? "Next eclipse" : "Then"): \(eclipse.title), \(dayText(eclipse.when)) (\(soonText(eclipse.when)))",
+                          #selector(openSkyMoment(_:)))
+            it.representedObject = eclipse.when
+            items.append(it)
+        }
+        if !sky.coming.isEmpty {
+            let coming = NSMenu()
+            for event in sky.coming {
+                let it = item("\(event.title): \(dayText(event.when)) (\(soonText(event.when)))", #selector(openSkyMoment(_:)))
+                it.representedObject = event.when
+                coming.addItem(it)
+            }
+            let comingItem = NSMenuItem(title: "Coming up in the sky", action: nil, keyEquivalent: "")
+            comingItem.submenu = coming
+            items.append(comingItem)
+        }
+        return items
+    }
+
+    /// Just before the menu opens: the sky facts as they are now (the menu itself is only made again when a choice changes).
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === statusItem.menu else { return }
+        for it in skyItems where it.menu === menu { menu.removeItem(it) }
+        skyItems = makeSkyItems()
+        for (i, it) in skyItems.enumerated() { menu.insertItem(it, at: 1 + i) }
+        updateIcon()
+    }
+
+    /// Space Scope, at the moment of something in the sky (and looking at it).
+    @objc private func openSkyMoment(_ sender: NSMenuItem) {
+        guard let when = sender.representedObject as? Date else { return }
+        let ms = Int64(when.timeIntervalSince1970 * 1000)
+        let js = "window.solarSystem && window.solarSystem.goToMoment(\(ms))"
+        if let web = scopeWindow?.contentView?.subviews.first as? WKWebView {
+            web.evaluateJavaScript(js, completionHandler: nil)
+            scopeWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            showScope(then: js)
+        }
+    }
+
+    /// A picture of the wallpaper (on the main screen, or the whole of it across all of them) at the size picked, saved
+    /// in Pictures. The page draws it a piece at a time (see src/snapshot.js), so the wallpaper never stops.
+    @objc private func savePicture(_ sender: NSMenuItem) {
+        guard let size = sender.representedObject as? [Int], size.count == 2 else { return }
+        guard let web = wallpapers.first?.web else {
+            tell("There's no wallpaper showing", "Turn the wallpaper on again (it's paused, or off on the battery), then save a picture.")
+            return
+        }
+        let width = min(size[0], 8192), height = min(size[1], 8192)
+        Journal.note("saving a picture, \(width) x \(height)")
+        web.evaluateJavaScript("(window.solarSystem || window.solarWallpaper).snapshot(\(width), \(height))") { [weak self] result, error in
+            guard let self = self else { return }
+            guard let address = result as? String, let comma = address.firstIndex(of: ","),
+                  let data = Data(base64Encoded: String(address[address.index(after: comma)...])) else {
+                Journal.note("the picture didn't come: \(error?.localizedDescription ?? "nothing came back")")
+                self.tell("Couldn't save the picture", error?.localizedDescription ?? "The page didn't give one back.")
+                return
+            }
+            let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Solar System Live", isDirectory: true)
+            let format = DateFormatter()
+            format.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+            let file = folder.appendingPathComponent("Solar System \(format.string(from: Date())) (\(width)x\(height)).png")
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try data.write(to: file)
+                Journal.note("picture saved: \(file.path)")
+                NSWorkspace.shared.activateFileViewerSelecting([file])
+            } catch {
+                self.tell("Couldn't save the picture", error.localizedDescription)
+            }
+        }
+    }
+
     @objc private func togglePause() {
         paused.toggle()
         if paused { removeWallpapers() } else { buildWallpapers() }
@@ -931,6 +1103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     @objc private func openScope() {
+        showScope(then: nil)
+    }
+
+    /// The Space Scope window; `then`: something for its page to do once it has started (go to a moment, say).
+    private func showScope(then: String?) {
         if scopeWindow == nil {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
@@ -943,6 +1120,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             if let content = window.contentView {
                 // It opens on what the wallpaper shows, and whatever it is left showing becomes the wallpaper.
                 let web = makeWebView(frame: content.bounds, search: search(for: .scope, window: true), setUp: true)
+                if let then = then {
+                    // (Once the page has made itself: it is ready a moment after it loads.)
+                    let wait = "addEventListener('load',function(){var n=0;(function go(){if(window.solarSystem){\(then);}else if(n++<50){setTimeout(go,200);}})();});"
+                    web.configuration.userContentController.addUserScript(WKUserScript(source: wait, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+                }
                 content.addSubview(web)
                 load(web, page: "scope.html")
             }

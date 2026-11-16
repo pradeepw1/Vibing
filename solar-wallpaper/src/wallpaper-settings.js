@@ -17,6 +17,7 @@ export const DEFAULTS = {
   ui: true, // false hides the settings button completely
   fps: 20, // low on purpose: the camera moves slowly, and every frame costs battery
   date: null, // start at this date instead of now
+  span: null, // this screen's part of one picture across all the screens (see span.js), from the Mac app
 };
 
 const KEY = "solar-wallpaper:wallpaper:v1";

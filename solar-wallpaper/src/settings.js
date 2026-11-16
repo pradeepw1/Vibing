@@ -66,6 +66,7 @@ export const DEFAULTS = {
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
   date: null, // start at this date instead of now
+  span: null, // this screen's part of one picture across all the screens (see span.js), from the Mac app
 };
 
 const KEY = "solar-wallpaper:v1";

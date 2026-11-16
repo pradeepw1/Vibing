@@ -3,6 +3,7 @@
 //   dist/solar.js              Space Scope (dist/scope.html): everything
 //   dist/wallpaper.js          the Wallpaper page (dist/index.html): the planets and the sky,
 //                              without flying, galaxies up close, other stars' planets or sightings
+//   dist/facts.js              the Mac app's menu: the Moon's phase and what's coming up (run in JavaScriptCore)
 //   dist/LivelyProperties.json Lively Wallpaper's settings, made from the same lists the pages use
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
@@ -13,6 +14,7 @@ const MAPS = "Planet maps: NASA, USGS, Solar System Scope (CC BY 4.0), Natural E
 const BANNERS = {
   "dist/solar.js": `/*! Solar System Live (Space Scope). Bundles ${THREE} and data from the Open Exoplanet Catalogue (MIT, Copyright (C) 2012 Hanno Rein). ${MAPS} */`,
   "dist/wallpaper.js": `/*! Solar System Live (Wallpaper). Bundles ${THREE}. ${MAPS} */`,
+  "dist/facts.js": "/*! Solar System Live (the Mac menu's sky facts). Bundles astronomy-engine (MIT, Don Cross). */",
 };
 
 export async function makeBundles() {
@@ -41,7 +43,7 @@ export async function makeBundles() {
   const define = { PAINT_WORKER_SOURCE: JSON.stringify(worker.outputFiles[0].text), MAP_MANIFEST: JSON.stringify(maps) };
 
   const files = {};
-  for (const [entry, outfile] of [["src/main.js", "dist/solar.js"], ["src/wallpaper.js", "dist/wallpaper.js"]]) {
+  for (const [entry, outfile] of [["src/main.js", "dist/solar.js"], ["src/wallpaper.js", "dist/wallpaper.js"], ["src/facts.js", "dist/facts.js"]]) {
     const result = await build({
       absWorkingDir: root.pathname,
       entryPoints: [entry],

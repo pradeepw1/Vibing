@@ -2,7 +2,8 @@
 # Builds "Solar System Live.app" from the web pages in ../dist and the .swift files here, on a Mac.
 #
 #   ./build.sh                 build the app into mac/build/
-#   ./build.sh install         build it, put it in /Applications (or ~/Applications) and open it
+#   ./build.sh install         build it, put it in /Applications (or ~/Applications) and open it, and put the screen
+#                              saver in ~/Library/Screen Savers
 #   ./build.sh dmg zip         also make a disk image and a zip to hand to someone else
 #
 # It needs the Command Line Tools (a window offers them if you run `xcode-select --install`).
@@ -79,15 +80,37 @@ codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict "$app"
 echo "Built: $app"
 
+# The screen saver (mac/saver): Space Scope on its tour, from the same pages, in a bundle of its own.
+saver="$out/$name.saver"
+mkdir -p "$saver/Contents/MacOS" "$saver/Contents/Resources"
+sbins=()
+for arch in $archs; do
+  swiftc -O -target "$arch-apple-macos$target" -module-name SolarSaver -o "$out/SolarSaver-$arch" "$here/saver/SolarSaver.swift" -Xlinker -bundle
+  sbins+=("$out/SolarSaver-$arch")
+done
+if [ "${#sbins[@]}" -gt 1 ]; then
+  lipo -create "${sbins[@]}" -output "$saver/Contents/MacOS/SolarSaver"
+else
+  cp "${sbins[0]}" "$saver/Contents/MacOS/SolarSaver"
+fi
+rm -f "${sbins[@]}"
+cp "$here/saver/Info.plist" "$saver/Contents/Info.plist"
+cp -R "$app/Contents/Resources/web" "$saver/Contents/Resources/web"
+codesign --force --deep --sign - "$saver"
+codesign --verify --deep --strict "$saver"
+echo "Built: $saver"
+
 if [ "$want_zip" = 1 ]; then
   ditto -c -k --keepParent "$app" "$out/SolarSystemLive.zip"
-  echo "Zip:   $out/SolarSystemLive.zip"
+  ditto -c -k --keepParent "$saver" "$out/SolarSystemLive-ScreenSaver.zip"
+  echo "Zip:   $out/SolarSystemLive.zip, $out/SolarSystemLive-ScreenSaver.zip"
 fi
 
 if [ "$want_dmg" = 1 ]; then
   stage="$out/dmg"
   mkdir -p "$stage"
   cp -R "$app" "$stage/"
+  cp -R "$saver" "$stage/"
   ln -s /Applications "$stage/Applications"
   hdiutil create -volname "$name" -srcfolder "$stage" -ov -format UDZO "$out/SolarSystemLive.dmg" >/dev/null
   rm -rf "$stage"
@@ -104,5 +127,12 @@ if [ "$want_install" = 1 ]; then
   # Built on this Mac, so macOS has nothing to warn about; this just makes sure of it.
   xattr -dr com.apple.quarantine "$dest/$name.app" 2>/dev/null || true
   echo "Installed in $dest"
+  # The screen saver: picked in System Settings, under Screen Saver.
+  savers="$HOME/Library/Screen Savers"
+  mkdir -p "$savers"
+  rm -rf "$savers/$name.saver"
+  cp -R "$saver" "$savers/"
+  xattr -dr com.apple.quarantine "$savers/$name.saver" 2>/dev/null || true
+  echo "Screen saver installed in $savers"
   open "$dest/$name.app"
 fi

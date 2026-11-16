@@ -1,6 +1,7 @@
 // The settings both pages share: how fast time runs, and how plain values from the
 // address or a wallpaper app are cleaned up. Kept free of the galaxy and star lists so
 // the Wallpaper page doesn't have to carry them.
+import { parseSpan } from "./span.js";
 
 // "live" runs at real speed. If the clock is on today's date, it stays locked to now.
 export const SPEEDS = [
@@ -39,6 +40,9 @@ export function parseShared(key, value) {
       const d = new Date(value);
       return Number.isNaN(d.getTime()) ? undefined : d.getTime();
     }
+    case "span":
+      // This screen's part of one picture across all the screens (see span.js). Only ever given, never saved.
+      return parseSpan(value) ?? undefined;
     case "labels":
     case "orbits":
     case "belts":
