@@ -194,6 +194,8 @@ A view you reach by clicking isn't saved, so a stray click on your desktop won't
 
 **Coming up** in the menu lists what's on in the sky over the next three months, from whatever date the clock says: eclipses of the Sun and Moon, full moons, planets opposite the Sun (up all night, at their closest), Mercury and Venus at their furthest from the Sun, and planets close together. All worked out by astronomy-engine, the same as the planets' places. Click one to go to it: the clock jumps there and the view turns to it. **Go to a date** takes the clock to any date and time (your birthday, say), and it carries on from there. On the night something is happening, a note says so.
 
+**Ride a beam of light** (in the menu) is the solar system at its true size and true distance, nothing squashed: you leave the Sun's surface at the speed of light and go out past each planet in turn, to Neptune and Pluto, and on towards the stars. The readout says how far from the Sun you are and how long its light really takes to get that far (8 minutes 19 seconds to Earth, over 4 hours to Neptune). At light speed a planet would go by in a blink, so near each one the ride slows down to look, and says so; otherwise it keeps to light speed, or ×10, ×100 or ×1000 if you pick those. From far off a planet is a coloured dot, as it would be in real life (a bright star), and the Moon and the other big moons are out at their real distances too. **Look back** turns you round to see the Sun shrink. <kbd>Esc</kbd> or **Leave** brings you back. The way goes from planet to planet where they really are, so it can swing back nearer the Sun when the next planet is on the other side.
+
 Time can run from 1600 to 2400. Outside that, the models for the moons and Pluto get shaky, so it stops.
 
 ## Changing it
@@ -251,6 +253,7 @@ The built files are in git, but the originals are not.
 | `src/oddities/` | The strange sightings: `stage.js` decides when and where one appears; `ufo.js`, `ships.js` and `phenomena.js` draw them |
 | `src/noise.js` | The noise functions the painted surfaces, the galaxies and the Gate are made from |
 | `src/gate.js`, `src/elsewhere.js` | The Gate (made up) and the endless hall beyond it, with its doorways and changing places |
+| `src/ride.js` | Riding a beam of light: the way out past each planet, and its own scene at true size and distance |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |
 | `dist/index.html`, `src/wallpaper.js` | Wallpaper mode: the page, and the lean program that draws the planets and sky with no click handling at all. It also sends old full-app addresses on to Space Scope |

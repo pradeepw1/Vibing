@@ -10,6 +10,8 @@ import { placeNote, TOUR_FIRST, TOUR_STAY, tourStop } from "./tour.js";
 import { tonight, upcomingEvents, whenText } from "./events.js";
 import { homeFacing, homeNote, homePlace, homeUp } from "./home.js";
 import { createMeteors, createVisitors } from "./visitors.js";
+import { createRide, lightTimeText, LIGHT_KM_S, rideAt, ridePlan, rideToNext } from "./ride.js";
+import { SUN } from "./bodies.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -228,6 +230,7 @@ function goTo(ms, view, event) {
 
 /** Leave a galaxy or the view from a body, back to whatever you were looking at before. */
 function goBack() {
+  if (ride) return endRide();
   if (away.stage === "returning" || away.stage === "unturning") return; // on the way back already
   // Only saved if the view we're leaving was (not one reached by a click).
   const remember = savedView === settings.view;
@@ -255,6 +258,7 @@ const ui = createUI({
   galaxies: sky.galaxies,
   skyNames: sky.names,
   things: visitors.things,
+  ride: { start: startRide, end: endRide, speed: (x) => ride && (ride.speed = x), back: (on) => ride && (ride.back = on) },
   set,
   goLive,
   jumpToNow,
@@ -1119,7 +1123,7 @@ function slerpAlong(a, b, t, out) {
 }
 
 const rel0 = new Vector3();
-const ride = new Vector3();
+const carried = new Vector3();
 const rel1 = new Vector3();
 const dir0 = new Vector3();
 /**
@@ -1166,8 +1170,8 @@ function movePovCamera(now, dt) {
     // round the old sky), so it mustn't be left behind in the first frames.
     const left = tween.left && bodies.get(tween.left);
     if (left) {
-      ride.copy(tween.from.position).add(left.group.position).sub(tween.leftStart);
-      camera.position.lerpVectors(ride, camera.position, MathUtils.smoothstep(e, 0, 0.35));
+      carried.copy(tween.from.position).add(left.group.position).sub(tween.leftStart);
+      camera.position.lerpVectors(carried, camera.position, MathUtils.smoothstep(e, 0, 0.35));
     }
     // Never pass through anything on the way (the planet two of its moons go
     // round, say). Keep the near plane as far out as the nearest surface
@@ -1314,6 +1318,85 @@ let tourIdle = performance.now(); // since when nothing has moved (or you last d
 let tourNext = Math.floor(Date.now() / TOUR_STAY) % 2 === 0 ? 0 : 2; // (not always the same place first)
 let tourNoted = null; // the place whose note has been shown
 for (const type of ["pointerdown", "keydown", "wheel"]) addEventListener(type, () => (tourIdle = performance.now()), { capture: true, passive: true });
+/**
+ * The light-speed ride (see ride.js): its own scene, at true size and distance. In and out through a dissolve, as into a
+ * star's system. Only from the solar system.
+ */
+let ride = null; // { plan, km, speed, last }
+let rideScene = null;
+const rideEye = new Vector3();
+const rideNext = new Vector3();
+const rideEls = { box: document.getElementById("ride"), far: document.getElementById("ride-far"), note: document.getElementById("ride-note"), clock: document.getElementById("clock") };
+
+function startRide() {
+  if (ride || away.stage || landing || takeoff) return false;
+  rideScene ??= createRide(bodies, system.real);
+  renderer.autoClear = true;
+  render(); // (drawn again here, to be there to copy)
+  holdPicture();
+  settleMoves();
+  ride = { plan: ridePlan(new Date(clock.time)), km: 0, speed: 1, back: false, last: performance.now(), first: true };
+  rideScene.skyScene.add(sky.group); // (the same stars: an object is in one scene at a time)
+  controls.enabled = false;
+  povCam.state.enabled = false;
+  ui.setAway(new Map());
+  rideEls.box.hidden = false;
+  rideEls.clock.style.visibility = "hidden"; // (the ride is at one moment, and the date would be in the way)
+  showCaption(null);
+  return true;
+}
+
+function endRide() {
+  if (!ride) return;
+  rideScene.render(renderer);
+  holdPicture();
+  ride = null;
+  scene.add(sky.group);
+  rideEls.box.hidden = true;
+  rideEls.clock.style.visibility = "";
+  ui.setAway(null);
+  controls.enabled = !pov.id && !flight;
+  povCam.state.enabled = Boolean(pov.id);
+  ui.sync();
+}
+
+function rideFrame(now) {
+  const R = ride;
+  const dt = Math.min(0.25, (now - R.last) / 1000);
+  R.last = now;
+  const { at, stop, leg } = rideAt(R.plan, R.km, rideEye);
+  // The planet you're nearest, of the one ahead and the one just passed (in its own radii).
+  const next = R.plan.stops[stop];
+  let closer = null;
+  let gap = Infinity;
+  for (const s of [next, R.plan.stops[stop - 1]]) {
+    const g = s ? at.distanceTo(s.at) / s.radiusKm : Infinity;
+    if (g < gap) (gap = g), (closer = s);
+  }
+  // Near a planet, slow down to look (at light speed it would be gone in a blink): about 3 seconds for its last 60
+  // radii in and the same out, and no slower than 3 radii a second; further off, quickly catching up with light speed.
+  const full = LIGHT_KM_S * R.speed;
+  const speed = closer ? Math.min(full, closer.radiusKm * (gap < 60 ? Math.max(gap * 0.8, 3) : 48 + (gap - 60) * 3)) : full;
+  R.km += speed * dt;
+  // Look a little way along the road ahead (so it turns smoothly at each planet), or at the planet you're passing.
+  rideAt(R.plan, R.km + Math.max(speed * 2, (closer?.radiusKm ?? 0) * 30), rideNext);
+  rideScene.place(rideEye, rideNext, { near: closer, back: R.back, dt: R.first ? null : dt });
+  R.first = false;
+  sky.group.position.set(0, 0, 0);
+  sky.setStarFade(1);
+  rideScene.render(renderer);
+  if (held?.from === Infinity) held.from = performance.now();
+  const far = rideEye.length();
+  // (Light leaves from the Sun's surface.)
+  rideEls.far.textContent = `${Math.round(far / 1e6).toLocaleString("en-US")} million km from the Sun. Its light takes ${lightTimeText(far - SUN.radiusKm)} to get this far.`;
+  const passing = gap < 400 ? closer : null;
+  rideEls.note.textContent = passing
+    ? `Passing ${passing.name}${speed < full * 0.999 ? ", slowed down to look (at light speed it would be gone in a blink)" : ""}.`
+    : next
+      ? `Next: ${next.name}${R.plan.legs[leg].round ? " (on the far side of the Sun, so round it)" : ""}, ${lightTimeText(rideToNext(R.plan, R.km))} away at light speed.`
+      : "Out past Pluto, on towards the stars. The nearest, Proxima Centauri, is 4.2 light-years away: over four years more at light speed.";
+}
+
 /**
  * Something on in the sky tonight (by the clock's date): a note about it, once, when nothing else is being said. Looked
  * for every half minute or so.
@@ -1670,7 +1753,7 @@ function mustLayOut(now) {
 function still() {
   return (
     !(settings.drift && !reducedMotion) && (settings.paused || (settings.speed === "live" && !settings.reverse)) &&
-    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held && !landing
+    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held && !landing && !ride
   );
 }
 
@@ -1745,6 +1828,10 @@ function drawFrame(now) {
   tickClock(dt);
   noteFrame(now);
   dissolveFrame(now);
+  if (ride) {
+    rideFrame(now);
+    return;
+  }
   tourFrame(now);
   tonightFrame(now);
   ui.updateClock(clock.time, clock.synced && !settings.paused);
@@ -1827,6 +1914,7 @@ addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   lg.resize();
+  rideScene?.resize();
   ex.resize();
   beyond.resize();
   renderer.setSize(innerWidth, innerHeight);

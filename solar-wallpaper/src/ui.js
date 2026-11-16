@@ -6,7 +6,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id, view) => (view === "from-home" ? "Your sky" : id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], skyNames = [], things = [], set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
+export function createUI({ settings, bodies, galaxies = [], skyNames = [], things = [], ride = null, set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -69,6 +69,31 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
+  // The light-speed ride (see ride.js): in from the panel, out with its own Leave (or Esc), and how fast.
+  if (ride) {
+    $("#ride-start").addEventListener("click", () => {
+      if (ride.start() === false) {
+        $("#ride-start").textContent = "Only from the solar system";
+        setTimeout(() => ($("#ride-start").textContent = "Ride a beam of light"), 2500);
+        return;
+      }
+      panel.hidden = true;
+      menuBtn.setAttribute("aria-expanded", "false");
+      for (const x of document.querySelectorAll("#ride-speeds [aria-pressed]")) x.setAttribute("aria-pressed", String(x.dataset.speed === "1"));
+    });
+    $("#ride-leave").addEventListener("click", () => ride.end());
+    $("#ride-back").addEventListener("click", (e) => {
+      const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
+      e.currentTarget.setAttribute("aria-pressed", String(on));
+      ride.back(on);
+    });
+    for (const b of document.querySelectorAll("#ride-speeds [data-speed]")) {
+      b.addEventListener("click", () => {
+        ride.speed(Number(b.dataset.speed));
+        for (const x of document.querySelectorAll("#ride-speeds [data-speed]")) x.setAttribute("aria-pressed", String(x === b));
+      });
+    }
+  }
   // Where "your sky" is seen from: "latitude, longitude" (empty: from the time zone).
   const placeEl = $("#place");
   placeEl.addEventListener("change", () => set("place", placeEl.value.trim() === "" ? "" : placeEl.value));
