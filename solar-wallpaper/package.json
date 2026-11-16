@@ -11,7 +11,8 @@
     "test": "node --test test/*.test.mjs",
     "textures": "esbuild tools/texture-preview.js --bundle --format=iife --outfile=tools/textures.js",
     "stars": "node tools/make-stars.mjs",
-    "zones": "node tools/make-zones.mjs"
+    "zones": "node tools/make-zones.mjs",
+    "visitors": "node tools/make-visitors.mjs"
   },
   "dependencies": {
     "astronomy-engine": "2.1.19",

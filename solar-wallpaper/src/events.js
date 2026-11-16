@@ -1,6 +1,8 @@
 // What's on in the sky: eclipses, full moons, planets opposite the Sun, Mercury and Venus at their furthest from it, and
 // planets close together, worked out (by astronomy-engine, as the planets' places are) for whatever date the clock says.
 import * as A from "astronomy-engine";
+import { COMETS } from "./visitors-data.js";
+import { cometPosition, nextPerihelion, SHOWERS } from "./visitors.js";
 
 const DAY = 86400000;
 const OUTER = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune"];
@@ -96,6 +98,28 @@ function closePairs(from, until, add) {
   }
 }
 
+function meteorShowers(from, until, add) {
+  for (const s of SHOWERS) {
+    const peak = A.SearchSunLongitude(s.sun, from, 370);
+    if (!peak || peak.date > until) continue;
+    add(peak.date, {
+      kind: "meteors",
+      title: `${s.name} meteor shower at its best`,
+      about: `Up to ${s.zhr} meteors an hour from somewhere dark, best after midnight: dust from ${s.from}, burning up as Earth runs through it.`,
+      view: "from-home",
+    });
+  }
+}
+
+function comets(from, until, add) {
+  for (const c of COMETS) {
+    const when = nextPerihelion(c, from);
+    if (when > until) continue;
+    const km = cometPosition(c, when).length() * A.KM_PER_AU;
+    add(when, { kind: "comet", title: `${c.name} nearest the Sun`, about: `${Math.round(km / 1e6)} million km from it, its tail at its longest.`, view: "inner" });
+  }
+}
+
 /**
  * Everything on in the sky from `from` for `days` days, soonest first: { when, kind, title, about, view, id }.
  * `view` is what to look at to see it.
@@ -113,6 +137,8 @@ export function upcomingEvents(from, days = 60) {
   oppositions(start, until, add);
   elongations(start, until, add);
   closePairs(start, until, add);
+  meteorShowers(start, until, add);
+  comets(start, until, add);
   // (A full moon on the night of a lunar eclipse is the same thing: the eclipse says it.)
   const eclipses = out.filter((e) => e.kind === "lunar-eclipse");
   return out.filter((e) => e.kind !== "full-moon" || !eclipses.some((x) => Math.abs(x.when - e.when) < DAY)).sort((x, y) => x.when - y.when);

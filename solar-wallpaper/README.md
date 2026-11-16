@@ -54,6 +54,9 @@ To stop the camera going round, untick **Camera goes round**: the picture then h
 | Asteroid belt, Trojans, Kuiper belt | Made-up rocks on real-looking orbits. They move the way real asteroids do, they leave the gaps that Jupiter's pull clears out (the Kirkwood gaps), and the Trojans stay 60° ahead of and behind Jupiter |
 | Stars | Real: every star you could see on a dark night (about 5,000, to magnitude 6), where it is, as bright as it is and its colour. **Constellations** in the menu (or <kbd>C</kbd>) draws their lines and names, with the brightest stars' names |
 | Milky Way | Placed where the real one is in the sky. Its glow is painted |
+| Comets | Real orbits from NASA JPL's Small-Body Database (Halley's, Encke, 67P, Swift-Tuttle, Tempel-Tuttle, Hale-Bopp, Pons-Brooks, Giacobini-Zinner), followed round by the Sun's pull alone: within a fraction of a degree of JPL's own places for most, about 2 degrees for 67P, whose orbit dates from 2015. Near the Sun each grows a tail pointing straight away from it, longer the nearer it gets. Their returns are in *Coming up* |
+| Spacecraft | Voyager 1, Voyager 2 and New Horizons, where NASA JPL's Horizons has them on 1 January 2026, coasting on from there (they are far enough out that they go in a straight line). Their names show where they are |
+| Meteor showers | The year's main showers at their real peaks (in *Coming up*), and on those nights, standing on Earth, meteors streak from the right part of the sky: about three times as often as you'd see them from somewhere dark, so there is something to watch |
 | Nearest galaxies | The Large and Small Magellanic Clouds, the Sagittarius Dwarf, Andromeda (with its two small companions) and Triangulum, at their real places in the sky, real sizes and real tilt, each with its name and distance. Their look is painted in code |
 | Famous galaxies far away | Bode's Galaxy, the Cigar, Centaurus A, the Sculptor, Pinwheel, Whirlpool, Sombrero, M87, NGC 1300, the Antennae and the Cartwheel: 11 to 500 million light-years out, at their real places and real sizes. Their shapes (a ring, a collision, a dust lane, a jet, gas blown out of a starburst) and colours follow the real ones; the individual stars are made up |
 | Black holes | Sagittarius A* (the middle of the Milky Way), Cygnus X-1 and M87*, at their real places and distances. **Drawn far bigger than they are** (from about 170,000 times for M87\* to billions of times for Cygnus X-1), or you'd never see them. The bending of light around them follows the real rule for light past a black hole. The disc, its colours and the star crowds round them are made up |
@@ -261,6 +264,8 @@ The built files are in git, but the originals are not.
 | `tools/build.mjs`, `tools/bundles.mjs` | Build `dist/solar.js` and `dist/wallpaper.js`, and write `dist/LivelyProperties.json` from the same lists the pages use. `test/dist.test.mjs` makes them again and fails if the committed ones are out of date |
 
 ## Credits
+
+The comets' orbits come from [NASA JPL's Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html) and the spacecraft's places from [JPL's Horizons](https://ssd.jpl.nasa.gov/horizons/) (both public), by `tools/make-visitors.mjs` (`npm run visitors`). The meteor showers' dates, radiants and rates are from the International Meteor Organization's calendar.
 
 The time zones' cities (for *Your sky*) come from the tz database's `zone.tab` (public domain), by `tools/make-zones.mjs` (`npm run zones`).
 

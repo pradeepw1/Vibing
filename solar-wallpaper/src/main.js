@@ -9,6 +9,7 @@ import { createLocalGroup } from "./localgroup.js";
 import { placeNote, TOUR_FIRST, TOUR_STAY, tourStop } from "./tour.js";
 import { tonight, upcomingEvents, whenText } from "./events.js";
 import { homeFacing, homeNote, homePlace, homeUp } from "./home.js";
+import { createMeteors, createVisitors } from "./visitors.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -89,6 +90,10 @@ const system = createSystem(scene, pixelRatio);
 const belts = createBelts(pixelRatio);
 scene.add(...belts.parts);
 const { bodies } = system;
+// Comets and spacecraft, and meteor showers' streaks in the sky from Earth.
+const visitors = createVisitors(scene, pixelRatio);
+visitors.group.visible = settings.visitors;
+const meteors = createMeteors(sky.group);
 // A wallpaper: lighter spheres, and a moon is drawn only once it is big enough to see (see saver.js).
 const detail = saver ? createDetail(bodies) : null;
 const sunMaterial = bodies.get("sun").mesh.material;
@@ -171,6 +176,7 @@ function set(key, value, how = {}) {
   }
   if (key === "strange") stage.enabled = value && !reducedMotion;
   if (key === "constellations") sky.setConstellations(value);
+  if (key === "visitors") visitors.group.visible = value;
   if (key === "place" && pov.home) {
     const note = homeNote(new Date(clock.time), homePlace(value));
     showCaption(note.title, note.lines);
@@ -248,6 +254,7 @@ const ui = createUI({
   bodies,
   galaxies: sky.galaxies,
   skyNames: sky.names,
+  things: visitors.things,
   set,
   goLive,
   jumpToNow,
@@ -1619,6 +1626,7 @@ let lastTick = startTime;
 
 /** Moves everything to `date` (and the asteroids). */
 function layOut(date, dt, seconds) {
+  if (settings.visitors) visitors.update(date);
   // (Before the move, so a moon that has just come into view is put in its place at once.)
   if (detail) for (const id of detail.update(camera, pixelsPerUnit(innerHeight * pixelRatio, camera.fov), { showAll: Boolean(pov.id) })) wantMoon(id);
   system.update(date, dt, rate(), camera, innerHeight * pixelRatio, settings.orbits, seconds, pov.id ? pov : null);
@@ -1774,6 +1782,7 @@ function drawFrame(now) {
   else if (away.stage === "unturning") unturnFrame(now);
   else if (landing?.shown) placeLanding();
   fadeStarsWhenSpinning(dt);
+  meteors.update(now, dt, A.SunPosition(date).elon, pov.id === "earth" && !tween && settings.visitors);
   if (landing?.shown) sky.setStarFade(landing.sky);
   else if (takeoff) sky.setStarFade(takeoff.sky);
   sky.group.position.copy(camera.position);

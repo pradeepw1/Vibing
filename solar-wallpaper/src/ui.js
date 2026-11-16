@@ -6,7 +6,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id, view) => (view === "from-home" ? "Your sky" : id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
+export function createUI({ settings, bodies, galaxies = [], skyNames = [], things = [], set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -119,7 +119,7 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
     panel.hidden = true; // out of the way, so it can be seen
     menuBtn.setAttribute("aria-expanded", "false");
   });
-  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour", "constellations-on": "constellations" };
+  const toggles = { "labels-on": "labels", "orbits-on": "orbits", "belts-on": "belts", "clock-on": "clock", "drift-on": "drift", "strange-on": "strange", "photos-on": "photos", "tour-on": "tour", "constellations-on": "constellations", "visitors-on": "visitors" };
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
   // The corner note about where you are would print over the open panel: let it fade while the panel is open.
@@ -310,6 +310,15 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
     return { galaxy: n, el, shown: null, x: 0, y: 0, width: n.name.length * (n.star ? 6 : 7) + 6, height: 14, only: () => settings.constellations };
   });
   const skyLabels = [...galaxyLabels, ...nameLabels];
+  // Comets and spacecraft: in the solar system, so at their own place (not off at the sky's distance). Nothing to click.
+  const thingLabels = things.map((t) => {
+    const el = document.createElement("div");
+    el.className = "label thing";
+    el.textContent = t.name;
+    el.style.opacity = "0";
+    solarEl.append(el);
+    return { thing: t, el, shown: null, x: 0, y: 0, width: t.name.length * 6.5 + 6 };
+  });
 
   const v = new Vector3();
   const camDir = new Vector3();
@@ -381,6 +390,27 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
 
     // Galaxies are as good as infinitely far away: in the same direction from
     // wherever the camera is.
+    for (const l of thingLabels) {
+      let show = settings.visitors && l.thing.shown && skyFade > 0.5 && !standingOn;
+      if (show) {
+        v.copy(l.thing.position);
+        show = v.clone().sub(camera.position).dot(camDir) > 0.01;
+        v.project(camera);
+        const x = Math.round(((v.x + 1) / 2) * width + 7);
+        const y = Math.round(((1 - v.y) / 2) * height + 3);
+        show &&= x > -100 && x < width + 20 && y > -30 && y < height + 20 && !overlaps(x, y, l.width, 14);
+        if (show) placed.push({ x, y, w: l.width, h: 14 });
+        if (show && (x !== l.x || y !== l.y)) {
+          l.el.style.transform = `translate(${x}px, ${y}px)`;
+          l.x = x;
+          l.y = y;
+        }
+      }
+      if (show !== l.shown) {
+        l.el.style.opacity = show ? "1" : "0";
+        l.shown = show;
+      }
+    }
     for (const l of skyLabels) {
       const { direction, distance } = l.galaxy;
       // Not while the sky is faded out because the view is spinning.
