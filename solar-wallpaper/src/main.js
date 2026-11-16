@@ -408,7 +408,6 @@ function arriveAmongGalaxies(instant) {
 }
 
 // --- Diving into a star's own system ---
-const DIVE_MS = 700;
 /** Goes down from the galaxy view into the planets of the star we've flown up to. */
 function enterSystem() {
   const place = lg.places.get(away.galaxy);
@@ -437,8 +436,16 @@ function enterInner() {
 }
 /** Back up out of a system, or back through the Gate. */
 function leaveInner() {
+  if (away.scene === "galaxies") return;
+  if (away.stage) {
+    // Its last picture dissolves into the galaxies', not through black. (Drawn again here, to be there to copy.)
+    renderer.autoClear = true;
+    if (away.scene === "system") renderer.render(ex.scene, ex.camera);
+    else beyond.render(renderer, 1000 / settings.fps);
+    holdPicture();
+  }
   if (away.scene === "system") leaveSystem();
-  else if (away.scene === "elsewhere") leaveGate();
+  else leaveGate();
 }
 
 // --- Through the Gate ---
@@ -468,6 +475,10 @@ function leaveGate() {
 /** Back up out of an inner scene (still out among the galaxies): dark for a moment, then the galaxy view fades in. */
 function fadeInAfterLeaving() {
   if (!away.stage) return;
+  if (held) {
+    away.arrived = -Infinity; // (its last picture is dissolving instead)
+    return;
+  }
   away.arrived = Infinity; // the fade-in starts once the first picture is drawn
   setFade(1);
 }
@@ -708,6 +719,7 @@ function landingFrame(now, t) {
   if (L.sky < 1) {
     renderer.autoClear = true;
     lg.render(renderer, 1000 / settings.fps);
+    if (held?.from === Infinity) held.from = performance.now();
   }
   if (away.arrived === Infinity) away.arrived = performance.now();
   if (!L.shown) {
@@ -802,15 +814,14 @@ function galaxyFrame(now) {
     const lines = place && arrivalNote(place);
     if (lines) showCaption(place.name, lines);
   }
-  // Arrived at a star with planets: sink into it.
+  // Arrived at a star with planets, or the Gate: into it. Its picture dissolves in over this one, not through black.
   if (away.stage === "there" && t >= 1 && !lg.flying && (lg.places.get(away.galaxy)?.system || lg.places.get(away.galaxy)?.gate)) {
-    away.dive ??= now;
-    setFade((now - away.dive) / DIVE_MS);
-    if (now - away.dive >= DIVE_MS) {
-      enterInner();
-      away.arrived = Infinity;
-      return true; // stay dark: the new scene draws its first picture next frame, and the fade-in starts after that
-    }
+    renderer.autoClear = true;
+    lg.render(renderer, 1000 / settings.fps);
+    holdPicture(); // (now: only straight after drawing is the picture there to copy)
+    enterInner();
+    away.arrived = -Infinity;
+    return true;
   }
   if (away.dive === null) setFade(1 - (now - away.arrived) / DIP_MS); // (not while sinking in: that fade is the dive's)
   if (landing) return landingFrame(now, t);
@@ -820,6 +831,7 @@ function galaxyFrame(now) {
   lg.render(renderer, 1000 / settings.fps);
   // Getting ready (making the stars, the first picture) is done in the dark.
   if (away.arrived === Infinity) away.arrived = performance.now();
+  if (held?.from === Infinity) held.from = performance.now();
   if (away.stage === "returning" && t >= 1) {
     holdPicture(); // (now: only straight after drawing is the picture there to copy)
     finishHome(false);
@@ -869,6 +881,7 @@ function elsewhereFrame(now) {
   renderer.autoClear = true;
   beyond.render(renderer, 1000 / settings.fps);
   if (away.arrived === Infinity) away.arrived = performance.now();
+  if (held?.from === Infinity) held.from = performance.now();
   return true;
 }
 
@@ -882,6 +895,7 @@ function systemFrame(now) {
   renderer.autoClear = true;
   renderer.render(ex.scene, ex.camera);
   if (away.arrived === Infinity) away.arrived = performance.now();
+  if (held?.from === Infinity) held.from = performance.now();
   ui.updateAwayLabels(ex.camera, innerWidth, innerHeight, null);
   return true;
 }
