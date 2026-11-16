@@ -74,7 +74,7 @@ test("every sighting follows the contract and has its own id", () => {
     for (const fn of ["start", "update", "dispose"]) assert.equal(typeof s[fn], "function", `${s.id}.${fn}`);
     s.dispose();
   }
-  assert.equal(ids.size, 13);
+  assert.equal(ids.size, 16);
 });
 
 test("only the Voyager probes are real", () => {

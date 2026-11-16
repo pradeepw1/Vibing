@@ -721,4 +721,297 @@ function createDimming(pixelRatio) {
   };
 }
 
-export const SIGHTINGS = [createSeam, createEcho, createCount, createCurtains, createDimming];
+// --- The Wanderer -----------------------------------------------------------------
+// A planet with no star, drifting through. It gives no light you could see by,
+// only a dull red warmth of its own, so what shows is the stars going out behind
+// it and coming back after. It has a moon. (Rogue planets are real, and there
+// may be billions of them; none is known anywhere near the Sun.)
+
+const wandererShader = /* glsl */ `
+  uniform vec2 at;     // the planet's middle
+  uniform float rad;   // its radius
+  uniform float life;  // 0..1
+  uniform float seed;
+  uniform vec3 moon;   // its moon: x, y from the planet's middle; z > 0 in front of it
+
+  void main() {
+    float pxl = max(fwidth(vP.x), 1e-5);
+    float px = pxl * pr;
+    float pxa = pxl * vAng * pr;
+    float edge = (1.0 - smoothstep(0.6, 0.95, abs(vP.x))) * (1.0 - smoothstep(0.6, 0.95, abs(vP.y)));
+    vec2 d = vP - at;
+    float r = length(d);
+    float disc = 1.0 - smoothstep(rad - px, rad + px, r);
+    // Faint stars behind (looked up by direction, so they keep still against the real ones as it moves).
+    vec3 w = normalize(vDir);
+    vec2 a = starfield(TURN1 * w, 50.0, 0.2, 0.9 * pxa);
+    vec2 b = starfield(TURN2 * w, 110.0, 0.08, 0.75 * pxa);
+    vec3 stars = mix(vec3(1.0, 0.86, 0.72), vec3(0.72, 0.84, 1.0), a.y) * a.x
+               + mix(vec3(1.0, 0.9, 0.8), vec3(0.8, 0.88, 1.0), b.y) * b.x * 0.6;
+    vec3 light = stars * 0.5 * edge * (1.0 - disc);
+    // Its own warmth: a dull red, banded, dimmer to the edge, and a thin rim where its air catches it.
+    float mu = sqrt(max(0.0, 1.0 - r * r / (rad * rad)));
+    vec2 q = d / rad;
+    float bands = 0.7 + 0.3 * sin(q.y * 9.0 + 1.6 * vnoise2(q * 3.0 + seed, seed));
+    light += vec3(0.032, 0.007, 0.004) * mu * bands * disc;
+    light += vec3(0.22, 0.05, 0.03) * exp(-abs(r - rad) / (1.5 * px)) * 0.2;
+    // Its moon: a grey point, hidden while it's behind.
+    vec2 md = vP - at - moon.xy;
+    float mlit = exp(-dot(md, md) / (px * px * 2.2)) * (moon.z > 0.0 ? 1.0 : 1.0 - disc);
+    light += vec3(0.55, 0.52, 0.5) * mlit * 0.45;
+    finish(light * life, disc * life);
+  }
+`;
+
+function createWanderer(pixelRatio) {
+  const u = { at: { value: new Vector2() }, rad: { value: 0.15 }, life: { value: 0 }, seed: { value: 0 }, moon: { value: new Vector3() } };
+  const c = card(wandererShader, u, 1.0, pixelRatio);
+  const seconds = 84;
+  const from = new Vector2();
+  const to = new Vector2();
+  let time = 0;
+  let moonAt = 0;
+  let moonRate = 0;
+  function update(dt) {
+    time += dt;
+    const T = time;
+    c.u.t.value = T;
+    u.life.value = smooth(0, 5, T) * (1 - smooth(seconds - 7, seconds, T));
+    u.at.value.lerpVectors(from, to, Math.min(1, T / seconds));
+    // The moon goes round it on an orbit seen nearly edge-on.
+    const a = moonAt + T * moonRate;
+    u.moon.value.set(Math.cos(a) * 0.3, Math.sin(a) * 0.3 * 0.2, -Math.sin(a));
+    if (T >= seconds) {
+      c.group.visible = false;
+      return false;
+    }
+    return true;
+  }
+  return {
+    id: "wanderer",
+    name: "The Wanderer",
+    about: "A planet with no star drifts past, seen only by the stars it hides and a dull red glow of its own warmth. Real ones (rogue planets) may number in the billions, but none is known anywhere near the Sun.",
+    group: c.group,
+    angle: 34,
+    seconds,
+    start(ctx) {
+      const r = ctx.random;
+      time = 0;
+      u.seed.value = Math.floor(r() * 70);
+      const way = r() < 0.5 ? -1 : 1;
+      const y = (r() - 0.5) * 0.3;
+      const slope = (r() - 0.5) * 0.3;
+      from.set(-0.72 * way, y - slope / 2);
+      to.set(0.72 * way, y + slope / 2);
+      moonAt = r() * 6.28;
+      moonRate = (2 * Math.PI) / (34 + 12 * r());
+      c.group.visible = true;
+      update(0);
+    },
+    update,
+    setPixelRatio: c.setPixelRatio,
+    dispose: c.dispose,
+  };
+}
+
+// --- The Lens -------------------------------------------------------------------
+// Nothing you can see crosses in front of a star, and bends its light: the star
+// brightens, splits into two arcs, and for a moment is a ring of light round an
+// empty middle; the faint stars round about swing aside and come back. (Real
+// gravitational lensing does exactly this, Einstein rings and all, but it takes
+// far more mass than anything so near could have.)
+
+const lensShader = /* glsl */ `
+  uniform vec2 lens;   // where the unseen mass is
+  uniform float re;    // the ring's radius (its Einstein radius)
+  uniform vec2 src;    // the star it passes in front of
+  uniform float life;
+  uniform float seed;
+
+  // Faint stars laid over the card, as they would be with nothing in the way.
+  float field(vec2 q, float size) {
+    vec2 p = q * 34.0;
+    vec2 c = floor(p);
+    vec3 h = hash33(vec3(c, seed));
+    if (h.x > 0.3) return 0.0;
+    vec2 dl = p - (c + 0.2 + 0.6 * hash33(vec3(c, seed + 5.0)).xy);
+    float r = size * 34.0;
+    return exp(-dot(dl, dl) / (r * r)) * (0.15 + 0.85 * h.y * h.y * h.y);
+  }
+
+  void main() {
+    float px = max(fwidth(vP.x), 1e-5) * pr;
+    float edge = (1.0 - smoothstep(0.55, 0.95, abs(vP.x))) * (1.0 - smoothstep(0.55, 0.95, abs(vP.y)));
+    vec2 th = vP - lens;
+    float r2 = max(dot(th, th), 1e-9);
+    // Where the light reaching this point really comes from: bent in round the mass.
+    vec2 from = vP - re * re * th / r2;
+    // Right in by the mass its images shrink to nothing.
+    float keep = smoothstep(0.08 * re, 0.3 * re, sqrt(r2));
+    vec3 light = vec3(0.85, 0.9, 1.0) * field(from, 0.8 * px) * 0.7;
+    // The star: a point, until the mass comes in front and spreads it into arcs and a ring.
+    vec2 ds = from - src;
+    float s = 1.3 * px;
+    light += vec3(1.0, 0.93, 0.82) * exp(-dot(ds, ds) / (s * s)) * 2.2;
+    finish(light * keep * edge * life, 0.0);
+  }
+`;
+
+function createLens(pixelRatio) {
+  const u = { lens: { value: new Vector2() }, re: { value: 0.11 }, src: { value: new Vector2() }, life: { value: 0 }, seed: { value: 0 } };
+  const c = card(lensShader, u, 1.0, pixelRatio);
+  const seconds = 80;
+  const from = new Vector2();
+  const to = new Vector2();
+  let time = 0;
+  function update(dt) {
+    time += dt;
+    const T = time;
+    c.u.t.value = T;
+    u.life.value = smooth(0, 5, T) * (1 - smooth(seconds - 7, seconds, T));
+    u.lens.value.lerpVectors(from, to, Math.min(1, T / seconds)); // (closest halfway)
+    if (T >= seconds) {
+      c.group.visible = false;
+      return false;
+    }
+    return true;
+  }
+  return {
+    id: "lens",
+    name: "The Lens",
+    about: "Something you can't see crosses in front of a star and bends its light into arcs and then a ring, as real gravitational lensing does (an Einstein ring). Doing it this close would take far more mass than anything near the Sun has.",
+    group: c.group,
+    angle: 26,
+    seconds,
+    start(ctx) {
+      const r = ctx.random;
+      time = 0;
+      u.seed.value = Math.floor(r() * 90);
+      u.src.value.set((r() - 0.5) * 0.2, (r() - 0.5) * 0.15);
+      const a = (r() - 0.5) * 1.2;
+      const dir = new Vector2(Math.cos(a), Math.sin(a));
+      const miss = (0.1 + 0.15 * r()) * u.re.value; // (near enough for a ring, nearly closed)
+      from.copy(u.src.value).addScaledVector(dir, -0.5).add(new Vector2(-dir.y, dir.x).multiplyScalar(miss));
+      to.copy(from).addScaledVector(dir, 1);
+      c.group.visible = true;
+      update(0);
+    },
+    update,
+    setPixelRatio: c.setPixelRatio,
+    dispose: c.dispose,
+  };
+}
+
+// --- The Lighthouse ---------------------------------------------------------------
+// A spinning point that sweeps two beams round, and flashes each time one comes
+// round to face you, in a little cloud of its own blown-out wind. It slows down
+// all the time, a little, until all at once it spins faster (a "glitch"), then
+// slows again. (Pulsars are real and do all of this; this one is made up, and
+// far too close.)
+
+const lighthouseShader = /* glsl */ `
+  uniform vec3 beam;    // which way one beam points (the other is opposite); z is towards you
+  uniform float flash;  // how straight at you a beam points, 0..1
+  uniform float jolt;   // the glitch's flare
+  uniform float life;
+  uniform float seed;
+
+  float ray(vec2 p, vec2 dir, float len, float px) {
+    float along = dot(p, dir);
+    if (along <= 0.0) return 0.0;
+    float across = abs(p.x * dir.y - p.y * dir.x);
+    float w = 0.9 * px + along * 0.06;
+    return exp(-across * across / (w * w)) * exp(-along / max(len, 1e-4)) * (1.2 * px / w + 0.15);
+  }
+
+  void main() {
+    float px = max(fwidth(vP.x), 1e-5) * pr;
+    float r = length(vP);
+    float edge = 1.0 - smoothstep(0.45, 0.68, max(abs(vP.x), abs(vP.y)));
+    // The cloud round it: faint violet-blue, with a brighter ring where its wind meets the gas outside.
+    float n = fbm(vec3(vP * 5.0, seed + t * 0.015));
+    float cloud = exp(-r / 0.14) * (0.4 + 0.9 * n * n) + 0.5 * exp(-pow((r - 0.11 - 0.02 * n) / 0.012, 2.0));
+    vec3 light = vec3(0.25, 0.3, 0.75) * cloud * 0.06;
+    // The beams, one each way, as they swing round (short when they point near you).
+    float lp = length(beam.xy);
+    if (lp > 1e-4) {
+      vec2 dir = beam.xy / lp;
+      float len = 0.35 * lp;
+      light += vec3(0.7, 0.85, 1.0) * (ray(vP, dir, len, px) + ray(vP, -dir, len, px)) * 0.35;
+    }
+    // The point, and the flash each time a beam comes round to you.
+    float f = flash + jolt;
+    float core = exp(-r * r / (px * px * 1.8));
+    float glow = exp(-r / (0.012 + 0.03 * flash));
+    float spikes = exp(-abs(vP.x) / (0.8 * px)) * exp(-abs(vP.y) / 0.08) + exp(-abs(vP.y) / (0.8 * px)) * exp(-abs(vP.x) / 0.08);
+    light += vec3(0.85, 0.93, 1.0) * (core * (0.6 + 2.5 * f) + glow * f * 0.5 + spikes * f * 0.35);
+    finish(light * edge * life, 0.0);
+  }
+`;
+
+function createLighthouse(pixelRatio) {
+  const u = { beam: { value: new Vector3() }, flash: { value: 0 }, jolt: { value: 0 }, life: { value: 0 }, seed: { value: 0 } };
+  const c = card(lighthouseShader, u, 0.7, pixelRatio);
+  const seconds = 76;
+  const GLITCH = 47; // seconds in
+  const CONE = (47 * Math.PI) / 180; // the beams' angle from the spin axis
+  const AXIS = (50 * Math.PI) / 180; // the spin axis's angle from the way to you
+  const WIDE = (7 * Math.PI) / 180; // how wide a beam is
+  const spin = new Vector3();
+  const e1 = new Vector3();
+  const e2 = new Vector3();
+  let time = 0;
+  let phase = 0;
+  let rate = 0; // turns a second
+  let glitched = false;
+  function update(dt) {
+    time += dt;
+    const T = time;
+    c.u.t.value = T;
+    u.life.value = smooth(0, 4, T) * (1 - smooth(seconds - 6, seconds, T));
+    // Slowing down all the time; then the glitch: suddenly faster.
+    rate = Math.max(0.2, rate - 0.004 * dt);
+    if (!glitched && T >= GLITCH) {
+      glitched = true;
+      rate *= 1.18;
+    }
+    u.jolt.value = glitched ? 1.5 * Math.exp(-(T - GLITCH) / 1.2) : 0;
+    phase += 2 * Math.PI * rate * dt;
+    const b = u.beam.value.copy(spin).multiplyScalar(Math.cos(CONE));
+    b.addScaledVector(e1, Math.sin(CONE) * Math.cos(phase)).addScaledVector(e2, Math.sin(CONE) * Math.sin(phase));
+    const off = Math.acos(Math.min(1, Math.abs(b.z)));
+    u.flash.value = Math.exp(-((off / WIDE) ** 2));
+    if (T >= seconds) {
+      c.group.visible = false;
+      return false;
+    }
+    return true;
+  }
+  return {
+    id: "lighthouse",
+    name: "The Lighthouse",
+    about: "A spinning point sweeps two beams round and flashes each time one faces you, slowing all the time until it suddenly spins faster (a glitch), as real pulsars do. This one is made up, and far too close.",
+    group: c.group,
+    angle: 30,
+    seconds,
+    start(ctx) {
+      const r = ctx.random;
+      time = 0;
+      glitched = false;
+      u.seed.value = Math.floor(r() * 60);
+      phase = r() * 6.28;
+      rate = 0.8 + 0.3 * r();
+      const az = r() * 6.28;
+      spin.set(Math.sin(AXIS) * Math.cos(az), Math.sin(AXIS) * Math.sin(az), Math.cos(AXIS));
+      e1.set(-Math.sin(az), Math.cos(az), 0);
+      e2.crossVectors(spin, e1);
+      c.group.visible = true;
+      update(0);
+    },
+    update,
+    setPixelRatio: c.setPixelRatio,
+    dispose: c.dispose,
+  };
+}
+
+export const SIGHTINGS = [createSeam, createEcho, createCount, createCurtains, createDimming, createWanderer, createLens, createLighthouse];
