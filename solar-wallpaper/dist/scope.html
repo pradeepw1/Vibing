@@ -77,6 +77,14 @@
   #panel[hidden] { display: none; }
   #panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
   #panel section + section { margin-top: 16px; }
+  .goto { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .goto input { background: var(--chip); color: var(--text); border: 1px solid var(--panel-line); border-radius: 6px; padding: 3px 6px; font: inherit; color-scheme: dark; }
+  .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .events button { all: unset; display: grid; width: 100%; box-sizing: border-box; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .events button:hover, .events button:focus-visible { background: var(--chip); }
+  .events .when { font-size: 10px; color: var(--muted); letter-spacing: .04em; }
+  .events .what { font-size: 12px; color: var(--text); }
+  .events .none { font-size: 12px; color: var(--muted); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { border: 1px solid var(--panel-line); background: var(--chip); color: var(--text); border-radius: 999px; padding: 5px 10px;
     font: inherit; font-size: 12px; cursor: pointer; }
@@ -149,6 +157,11 @@
       <button class="chip" id="reverse" type="button" aria-pressed="false">Run backwards</button>
       <button class="chip" id="now" type="button">Back to now</button>
     </div>
+    <label class="goto">Go to a date <input type="datetime-local" id="goto-date" min="1600-01-01T00:00" max="2399-12-31T23:59"></label>
+  </section>
+  <section>
+    <h2>Coming up</h2>
+    <ul id="events" class="events"></ul>
   </section>
   <section>
     <h2>View</h2>

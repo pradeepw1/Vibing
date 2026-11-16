@@ -186,6 +186,8 @@ Drag to turn the view, scroll to zoom, click a planet or moon to see the sky fro
 
 A view you reach by clicking isn't saved, so a stray click on your desktop won't change the wallpaper after a restart. Pick it in the settings panel (or the address) to keep it. In Lively, the settings have a **Look at** list and a **Look from** list; set Look from to *Nothing* to go back to the Look at view.
 
+**Coming up** in the menu lists what's on in the sky over the next three months, from whatever date the clock says: eclipses of the Sun and Moon, full moons, planets opposite the Sun (up all night, at their closest), Mercury and Venus at their furthest from the Sun, and planets close together. All worked out by astronomy-engine, the same as the planets' places. Click one to go to it: the clock jumps there and the view turns to it. **Go to a date** takes the clock to any date and time (your birthday, say), and it carries on from there. On the night something is happening, a note says so.
+
 Time can run from 1600 to 2400. Outside that, the models for the moons and Pluto get shaky, so it stops.
 
 ## Changing it

@@ -7,6 +7,7 @@ import { createPovCamera, povFov } from "./povcam.js";
 import { createExoSystem } from "./exosystem.js";
 import { createLocalGroup } from "./localgroup.js";
 import { placeNote, TOUR_FIRST, TOUR_STAY, tourStop } from "./tour.js";
+import { tonight, upcomingEvents, whenText } from "./events.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -195,6 +196,24 @@ function jumpToNow() {
   ui.sync();
 }
 
+/**
+ * The time machine: the clock to `ms` (from where it carries on at its speed), and, for something on in the sky, the
+ * view to see it from, with a note about it.
+ */
+function goTo(ms, view, event) {
+  clock.time = Math.min(maxTime, Math.max(minTime, ms));
+  clock.synced = false;
+  settings.paused = false;
+  if (view && view !== settings.view) set("view", view, { remember: false });
+  if (event) {
+    ui.setCaption(event.title, [event.about, whenText(event.when, new Date(clock.time))]);
+    noteUntil = performance.now() + 15000;
+  }
+  tonightSeen.add(event?.id);
+  ui.sync();
+  ui.showEvents?.();
+}
+
 /** Leave a galaxy or the view from a body, back to whatever you were looking at before. */
 function goBack() {
   if (away.stage === "returning" || away.stage === "unturning") return; // on the way back already
@@ -226,6 +245,10 @@ const ui = createUI({
   set,
   goLive,
   jumpToNow,
+  goTo,
+  events: () => upcomingEvents(new Date(clock.time), 90),
+  whenText: (d) => whenText(d, new Date(clock.time)),
+  clockTime: () => clock.time,
   goBack,
   backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
   travelling: () => away.stage === "returning" || away.stage === "unturning",
@@ -1259,6 +1282,22 @@ let tourIdle = performance.now(); // since when nothing has moved (or you last d
 let tourNext = Math.floor(Date.now() / TOUR_STAY) % 2 === 0 ? 0 : 2; // (not always the same place first)
 let tourNoted = null; // the place whose note has been shown
 for (const type of ["pointerdown", "keydown", "wheel"]) addEventListener(type, () => (tourIdle = performance.now()), { capture: true, passive: true });
+/**
+ * Something on in the sky tonight (by the clock's date): a note about it, once, when nothing else is being said. Looked
+ * for every half minute or so.
+ */
+const tonightSeen = new Set();
+let tonightNext = 0;
+function tonightFrame(now) {
+  if (now < tonightNext || away.stage || noteUntil) return;
+  tonightNext = now + 30000;
+  const e = tonight(new Date(clock.time));
+  if (!e || tonightSeen.has(e.id)) return;
+  tonightSeen.add(e.id);
+  ui.setCaption(`Tonight: ${e.title}`, [e.about, whenText(e.when, new Date(clock.time))]);
+  noteUntil = now + 20000;
+}
+
 function tourFrame(now) {
   if (!settings.tour) return;
   const moving = flight || tween || landing || held || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
@@ -1266,7 +1305,7 @@ function tourFrame(now) {
     tourIdle = now;
     return;
   }
-  if (tourNoted !== settings.view) {
+  if (tourNoted !== settings.view && !noteUntil) { // (not over a note that is up already: an event's, say)
     tourNoted = settings.view;
     const note = !away.stage && placeNote(settings.view, new Date(clock.time));
     if (note) {
@@ -1674,6 +1713,7 @@ function drawFrame(now) {
   noteFrame(now);
   dissolveFrame(now);
   tourFrame(now);
+  tonightFrame(now);
   ui.updateClock(clock.time, clock.synced && !settings.paused);
   if ((away.stage === "there" || away.stage === "returning") && galaxyFrame(now)) {
     updateHover(now);

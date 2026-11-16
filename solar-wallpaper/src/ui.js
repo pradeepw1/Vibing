@@ -6,7 +6,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id) => (id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, goLive, jumpToNow, goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
+export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -69,6 +69,40 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
   $("#pause").addEventListener("click", () => set("paused", !settings.paused));
   $("#reverse").addEventListener("click", () => set("reverse", !settings.reverse));
   $("#now").addEventListener("click", jumpToNow);
+  // The time machine: any date and time (local), and the clock carries on from there.
+  const gotoEl = $("#goto-date");
+  gotoEl.addEventListener("change", () => {
+    const t = new Date(gotoEl.value).getTime();
+    if (Number.isFinite(t)) goTo(t);
+  });
+  // What's on in the sky from the clock's date: click one to go there and look.
+  const eventsEl = $("#events");
+  function showEvents() {
+    const list = events().slice(0, 7);
+    eventsEl.replaceChildren(
+      ...(list.length
+        ? list.map((e) => {
+            const li = document.createElement("li");
+            const b = document.createElement("button");
+            b.type = "button";
+            b.title = e.about;
+            const when = document.createElement("span");
+            when.className = "when";
+            when.textContent = whenText(e.when);
+            const what = document.createElement("span");
+            what.className = "what";
+            what.textContent = e.title;
+            b.append(when, what);
+            b.addEventListener("click", () => goTo(e.when.getTime() - 3600000, e.view, e));
+            li.append(b);
+            return li;
+          })
+        : [Object.assign(document.createElement("li"), { className: "none", textContent: "Nothing much in the next three months." })]),
+    );
+    const d = new Date(clockTime());
+    const pad = (n) => String(n).padStart(2, "0");
+    gotoEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
   $("#mode-wallpaper").addEventListener("click", () => location.assign(pageAddress(WALLPAPER_PAGE, location.search))); // the Wallpaper: the planets with the camera going round, easy on the battery
   const strangeBtn = $("#strange-now");
   const strangeLabel = strangeBtn.textContent;
@@ -86,7 +120,10 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
   for (const [id, key] of Object.entries(toggles)) $(`#${id}`).addEventListener("change", (e) => set(key, e.target.checked));
 
   // The corner note about where you are would print over the open panel: let it fade while the panel is open.
-  new MutationObserver(() => document.body.classList.toggle("panel-open", !panel.hidden)).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
+  new MutationObserver(() => {
+    document.body.classList.toggle("panel-open", !panel.hidden);
+    if (!panel.hidden) showEvents(); // (worked out for whatever date the clock says now)
+  }).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
 
   menuBtn.addEventListener("click", () => {
     // (no justWoke check: the button is always in sight, so a click on it is meant)
@@ -504,5 +541,5 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], set, 
   }
 
   sync();
-  return { sync, updateClock, updateLabels, updateAwayLabels, setAway, setCaption, doneLoading, hover };
+  return { showEvents, sync, updateClock, updateLabels, updateAwayLabels, setAway, setCaption, doneLoading, hover };
 }
