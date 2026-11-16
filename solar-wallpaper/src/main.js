@@ -14,6 +14,7 @@ import { createRide, lightTimeText, LIGHT_KM_S, rideAt, ridePlan, rideToNext } f
 import { SUN } from "./bodies.js";
 import { createShip } from "./ship.js";
 import { createSound } from "./sound.js";
+import { createSpaceWeather } from "./spaceweather.js";
 import { fitSpan, spanTime } from "./span.js";
 import { takeSnapshot } from "./snapshot.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
@@ -200,6 +201,7 @@ function set(key, value, how = {}) {
   if (key === "constellations") sky.setConstellations(value);
   if (key === "visitors") visitors.group.visible = value;
   if (key === "sound") playSound();
+  if (key === "live") spaceWeather.setOn(value);
   if (key === "place" && pov.home) {
     const note = homeNote(new Date(clock.time), homePlace(value));
     showCaption(note.title, note.lines);
@@ -1420,6 +1422,18 @@ function rideFrame(now) {
       : "Out past Pluto, on towards the stars. The nearest, Proxima Centauri, is 4.2 light-years away: over four years more at light speed.";
 }
 
+// Live sunspots and aurora (see spaceweather.js), when switched on: the only part that uses the internet.
+const liveStatus = document.getElementById("live-status");
+const spaceWeather = createSpaceWeather({
+  sun: bodies.get("sun"),
+  earth: bodies.get("earth"),
+  onStatus: (text) => {
+    liveStatus.textContent = text;
+    liveStatus.hidden = !text;
+  },
+});
+spaceWeather.setOn(settings.live);
+
 // A quiet sound (see sound.js): Space Scope only, never the desktop wallpaper.
 const sound = createSound();
 function playSound() {
@@ -1933,6 +1947,7 @@ function drawFrame(now) {
 
   tickClock(dt);
   noteFrame(now);
+  spaceWeather.update(now, clock.time);
   if (sound.on) sound.setMood(away.stage && away.stage !== "returning" ? "away" : "home");
   dissolveFrame(now);
   if (ride) {

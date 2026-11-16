@@ -98,3 +98,7 @@ THE BSD 3-CLAUSE LICENCE (applies to the star and constellation data above)
   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
+
+Live space weather (only when "Live sunspots and aurora" is switched on): sunspot regions, the
+OVATION aurora forecast and the planetary K index from NOAA's Space Weather Prediction Center
+(https://www.swpc.noaa.gov/), fetched as published; data from a US government agency, free to use.

@@ -318,6 +318,9 @@ export const sun = {
   `,
   fragmentShader: /* glsl */ `
     uniform float time;
+    uniform vec4 spots[24];   // today's sunspots (live, see spaceweather.js): where on the Sun, and how big (radians)
+    uniform float spotCount;
+    uniform float spotFade;   // 0 with none, or with the clock days away from when they were seen
     varying vec3 vWorldPos;
     varying vec3 vNormal;
     varying vec3 vLocal;
@@ -332,6 +335,20 @@ export const sun = {
       // Hot white-yellow in the middle, deeper orange at the edge (limb darkening).
       vec3 col = mix(vec3(1.0, 0.42, 0.05), vec3(1.0, 0.93, 0.72), pow(mu, 0.55));
       col *= 0.82 + 0.28 * g;
+      if (spotFade > 0.0) {
+        // Each spot: a dark middle (umbra) in a paler, ragged edge (penumbra), and a brighter rim of faculae round it.
+        float dark = 0.0;
+        float bright = 0.0;
+        for (int i = 0; i < 24; i++) {
+          if (float(i) >= spotCount) break;
+          float r = spots[i].w;
+          float d = length(p - spots[i].xyz);
+          float rag = 1.0 + 0.18 * snoise(p * 260.0 + float(i));
+          dark = max(dark, 0.5 * (1.0 - smoothstep(0.62 * r, 1.0 * r * rag, d)) + 0.42 * (1.0 - smoothstep(0.3 * r, 0.5 * r, d)));
+          bright += 0.12 * smoothstep(1.0 * r, 1.6 * r, d) * (1.0 - smoothstep(1.6 * r, 3.0 * r, d));
+        }
+        col *= (1.0 - dark * spotFade) * (1.0 + min(bright, 0.15) * spotFade * (1.0 - mu));
+      }
       gl_FragColor = vec4(col, 1.0);
       ${outputChunks}
     }
@@ -849,6 +866,42 @@ export const markers = {
       float d = length(gl_PointCoord - 0.5) * 2.0;
       if (d > 1.0 || vAlpha < 0.01) discard;
       gl_FragColor = vec4(vTint, vAlpha * smoothstep(1.0, 0.3, d));
+      ${outputChunks}
+    }
+  `,
+};
+
+// --- The aurora (live, see spaceweather.js) --------------------------------------------
+// A thin shell round Earth, turning with it, lit where NOAA's forecast gives a chance of aurora, on the night side.
+export const aurora = {
+  vertexShader: /* glsl */ `
+    varying vec3 vLocal;
+    varying vec3 vNormalW;
+    varying vec3 vView;
+    void main() {
+      vLocal = normalize(position);
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vView = normalize(cameraPosition - wp.xyz);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D map;   // chance of aurora (0..1) by longitude (east, from Greenwich) and latitude
+    uniform vec3 sunDir;
+    uniform float strength;
+    varying vec3 vLocal;
+    varying vec3 vNormalW;
+    varying vec3 vView;
+    void main() {
+      float lon = atan(-vLocal.z, vLocal.x);
+      float lat = asin(clamp(vLocal.y, -1.0, 1.0));
+      float chance = texture2D(map, vec2(fract(lon / 6.2831853), (lat + 1.5707963) / 3.1415927)).r;
+      float night = smoothstep(0.12, -0.2, dot(vNormalW, normalize(sunDir)));
+      float edge = pow(1.0 - abs(dot(vNormalW, vView)), 2.0); // (seen edge-on, there is more of it to look through)
+      float glow = min(1.0, chance * 3.0) * night * (0.5 + 1.8 * edge) * strength;
+      vec3 col = mix(vec3(0.25, 1.0, 0.5), vec3(0.9, 0.3, 0.55), 0.25 * smoothstep(0.5, 1.0, chance * 3.0));
+      gl_FragColor = vec4(col * glow, glow);
       ${outputChunks}
     }
   `,

@@ -205,6 +205,8 @@ A view you reach by clicking isn't saved, so a stray click on your desktop won't
 
 **Ride a beam of light** (in the menu) is the solar system at its true size and true distance, nothing squashed: you leave the Sun's surface at the speed of light and go out past each planet in turn, to Neptune and Pluto, and on towards the stars. The readout says how far from the Sun you are and how long its light really takes to get that far (8 minutes 19 seconds to Earth, over 4 hours to Neptune). At light speed a planet would go by in a blink, so near each one the ride slows down to look, and says so; otherwise it keeps to light speed, or ×10, ×100 or ×1000 if you pick those. From far off a planet is a coloured dot, as it would be in real life (a bright star), and the Moon and the other big moons are out at their real distances too. **Look back** turns you round to see the Sun shrink. <kbd>Esc</kbd> or **Leave** brings you back. The way goes from planet to planet where they really are, so it can swing back nearer the Sun when the next planet is on the other side.
 
+**Live sunspots and aurora** (in the menu, off unless you turn it on: it's the only thing here that uses the internet) puts today's sunspots on the Sun, at their real places and sizes on it as NOAA's Space Weather Prediction Center lists them, turning with it, and the aurora round Earth's poles on the night side as NOAA forecasts it for the next half hour (brighter where it's more likely). A note in the menu gives the number of sunspot groups, the Kp index (how stirred up Earth's magnetic field is: *quiet* up to *an extreme storm (G5)*) and the best chance of aurora. They're for now: with the clock days away they fade out. It asks again every half hour (every three hours for the sunspots), and only while the page is showing. (`live=1` in the address.)
+
 **Fly it yourself** (in the menu) makes the view a ship you steer among the planets as they're drawn, with time going on as usual: <kbd>W</kbd> <kbd>S</kbd> forward and back, <kbd>A</kbd> <kbd>D</kbd> sideways, <kbd>R</kbd> <kbd>F</kbd> up and down, drag (or the arrow keys) to turn, <kbd>Q</kbd> <kbd>E</kbd> to roll, <kbd>Shift</kbd> to go faster and <kbd>Space</kbd> to stop. It goes slower the nearer it is to something, so you can come in close to a moon and still cross to Neptune in a few seconds, and it never goes inside anything. <kbd>Esc</kbd> or **Leave** takes you back to the view you started from.
 
 Time can run from 1600 to 2400. Outside that, the models for the moons and Pluto get shaky, so it stops.
@@ -264,6 +266,7 @@ The built files are in git, but the originals are not.
 | `src/oddities/` | The strange sightings: `stage.js` decides when and where one appears; `ufo.js`, `ships.js` and `phenomena.js` draw them |
 | `src/noise.js` | The noise functions the painted surfaces, the galaxies and the Gate are made from |
 | `src/gate.js`, `src/elsewhere.js` | The Gate (made up) and the endless hall beyond it, with its doorways and changing places |
+| `src/spaceweather.js` | Live sunspots, aurora and Kp from NOAA, when switched on |
 | `src/span.js`, `src/snapshot.js` | One picture across several screens (each draws its part), and pictures for saving drawn a piece at a time |
 | `src/facts.js` | The Mac menu's sky facts (the Moon, eclipses, what's coming up), built into `dist/facts.js` |
 | `mac/Facts.swift`, `mac/saver/` | The Mac app's side of the sky facts, and the screen saver |
@@ -284,6 +287,8 @@ The built files are in git, but the originals are not.
 ## Credits
 
 The comets' orbits come from [NASA JPL's Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html) and the spacecraft's places from [JPL's Horizons](https://ssd.jpl.nasa.gov/horizons/) (both public), by `tools/make-visitors.mjs` (`npm run visitors`). The meteor showers' dates, radiants and rates are from the International Meteor Organization's calendar.
+
+The live sunspots, aurora forecast and Kp index (only fetched when *Live sunspots and aurora* is on) come from NOAA's [Space Weather Prediction Center](https://www.swpc.noaa.gov/), as it publishes them for anyone to use.
 
 The time zones' cities (for *Your sky*) come from the tz database's `zone.tab` (public domain), by `tools/make-zones.mjs` (`npm run zones`).
 

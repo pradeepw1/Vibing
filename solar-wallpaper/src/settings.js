@@ -62,6 +62,7 @@ export const DEFAULTS = {
   constellations: false, // their lines and names, and the brightest stars' names
   visitors: true, // comets and spacecraft (see visitors.js)
   sound: false, // a quiet drone, wind and bells, made as it plays (see sound.js); never on the desktop wallpaper
+  live: false, // today's sunspots and aurora from NOAA (see spaceweather.js): uses the internet, so off unless asked
   place: null, // [latitude, longitude, name?] for "your sky" (null: from the computer's time zone)
   ui: true, // false hides the settings button completely (for wallpaper use)
   fps: 60,
@@ -70,7 +71,7 @@ export const DEFAULTS = {
 };
 
 const KEY = "solar-wallpaper:v1";
-const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "visitors", "sound", "place", "fps"];
+const SAVED = ["speed", "reverse", "view", "labels", "orbits", "belts", "clock", "drift", "strange", "photos", "tour", "constellations", "visitors", "sound", "live", "place", "fps"];
 
 function readSaved() {
   try {
@@ -115,6 +116,7 @@ export function parse(key, value) {
     case "constellations":
     case "visitors":
     case "sound":
+    case "live":
       return bool(value);
     default:
       return parseShared(key, value);

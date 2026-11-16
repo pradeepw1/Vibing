@@ -41,6 +41,7 @@ import {
 } from "./ephemeris.js";
 import { skyLayout, sunlight } from "./pov.js";
 import { CASTERS, moonShadow } from "./shadows.js";
+import { spotUniforms } from "./spaceweather.js";
 import * as shaders from "./shaders.js";
 import { ringStrip } from "./surfaces.js";
 
@@ -171,7 +172,7 @@ export function createSystem(scene, pixelRatio) {
   scene.add(root, orbitGroup);
 
   // --- Sun ---
-  const sunMat = new ShaderMaterial({ ...shaders.sun, uniforms: { time: { value: 0 } } });
+  const sunMat = new ShaderMaterial({ ...shaders.sun, uniforms: { time: { value: 0 }, ...spotUniforms() } });
   const sunMesh = new Mesh(sphere, sunMat);
   sunMesh.scale.setScalar(SCALE.sunRadius);
   const sunGroup = new Group();
