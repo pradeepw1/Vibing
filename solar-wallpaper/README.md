@@ -196,6 +196,8 @@ A view you reach by clicking isn't saved, so a stray click on your desktop won't
 
 **Ride a beam of light** (in the menu) is the solar system at its true size and true distance, nothing squashed: you leave the Sun's surface at the speed of light and go out past each planet in turn, to Neptune and Pluto, and on towards the stars. The readout says how far from the Sun you are and how long its light really takes to get that far (8 minutes 19 seconds to Earth, over 4 hours to Neptune). At light speed a planet would go by in a blink, so near each one the ride slows down to look, and says so; otherwise it keeps to light speed, or ×10, ×100 or ×1000 if you pick those. From far off a planet is a coloured dot, as it would be in real life (a bright star), and the Moon and the other big moons are out at their real distances too. **Look back** turns you round to see the Sun shrink. <kbd>Esc</kbd> or **Leave** brings you back. The way goes from planet to planet where they really are, so it can swing back nearer the Sun when the next planet is on the other side.
 
+**Fly it yourself** (in the menu) makes the view a ship you steer among the planets as they're drawn, with time going on as usual: <kbd>W</kbd> <kbd>S</kbd> forward and back, <kbd>A</kbd> <kbd>D</kbd> sideways, <kbd>R</kbd> <kbd>F</kbd> up and down, drag (or the arrow keys) to turn, <kbd>Q</kbd> <kbd>E</kbd> to roll, <kbd>Shift</kbd> to go faster and <kbd>Space</kbd> to stop. It goes slower the nearer it is to something, so you can come in close to a moon and still cross to Neptune in a few seconds, and it never goes inside anything. <kbd>Esc</kbd> or **Leave** takes you back to the view you started from.
+
 Time can run from 1600 to 2400. Outside that, the models for the moons and Pluto get shaky, so it stops.
 
 ## Changing it
@@ -253,6 +255,7 @@ The built files are in git, but the originals are not.
 | `src/oddities/` | The strange sightings: `stage.js` decides when and where one appears; `ufo.js`, `ships.js` and `phenomena.js` draw them |
 | `src/noise.js` | The noise functions the painted surfaces, the galaxies and the Gate are made from |
 | `src/gate.js`, `src/elsewhere.js` | The Gate (made up) and the endless hall beyond it, with its doorways and changing places |
+| `src/ship.js` | Fly it yourself: the keys, turning, how fast near things, and keeping out of them |
 | `src/ride.js` | Riding a beam of light: the way out past each planet, and its own scene at true size and distance |
 | `src/pov.js`, `src/povcam.js` | The sky as seen from a planet or moon, and the camera that hovers over its ground |
 | `src/main.js`, `src/ui.js`, `src/settings.js` | The clock, camera, settings panel and wallpaper-app hooks (Space Scope) |

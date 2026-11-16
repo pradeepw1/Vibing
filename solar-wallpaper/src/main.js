@@ -12,6 +12,7 @@ import { homeFacing, homeNote, homePlace, homeUp } from "./home.js";
 import { createMeteors, createVisitors } from "./visitors.js";
 import { createRide, lightTimeText, LIGHT_KM_S, rideAt, ridePlan, rideToNext } from "./ride.js";
 import { SUN } from "./bodies.js";
+import { createShip } from "./ship.js";
 import { galaxyOf, loadSettings, parse, save, SPEEDS, speedRate, viewpoint, VIEWS } from "./settings.js";
 import { createSky } from "./sky.js";
 import { EXOPLANET_SYSTEMS } from "./exoplanet-data.js";
@@ -173,6 +174,9 @@ function set(key, value, how = {}) {
   }
   settings[key] = value;
   if (key === "view") {
+    // (A new view while riding or flying: that ends first.)
+    if (ride) endRide();
+    if (ship) endShip();
     if (how.remember !== false) savedView = value;
     flyTo(value, how.instant ?? performance.now() < instantUntil);
   }
@@ -231,6 +235,7 @@ function goTo(ms, view, event) {
 /** Leave a galaxy or the view from a body, back to whatever you were looking at before. */
 function goBack() {
   if (ride) return endRide();
+  if (ship) return endShip();
   if (away.stage === "returning" || away.stage === "unturning") return; // on the way back already
   // Only saved if the view we're leaving was (not one reached by a click).
   const remember = savedView === settings.view;
@@ -259,6 +264,7 @@ const ui = createUI({
   skyNames: sky.names,
   things: visitors.things,
   ride: { start: startRide, end: endRide, speed: (x) => ride && (ride.speed = x), back: (on) => ride && (ride.back = on) },
+  ship: { start: () => startShip(), end: () => endShip(), on: () => Boolean(ship), key: (code, down) => shipCtl.key(code, down), reset: () => shipCtl.reset() },
   set,
   goLive,
   jumpToNow,
@@ -1398,6 +1404,69 @@ function rideFrame(now) {
 }
 
 /**
+ * Fly it yourself (see ship.js): the camera is the ship, among the planets as they're drawn. Leaving goes back (through
+ * a dissolve) to the view you started from, wherever its planet has got to meanwhile.
+ */
+const shipCtl = createShip(camera);
+let ship = null; // { position, quaternion, target, shownAt }
+const shipEls = { box: document.getElementById("ship"), near: document.getElementById("ship-near") };
+const shipBodies = [];
+let shipDrag = null;
+
+function startShip() {
+  if (ship || ride || away.stage || landing || takeoff || pov.id) return false;
+  settleMoves();
+  ship = { position: camera.position.clone(), quaternion: camera.quaternion.clone(), target: controls.target.clone(), shownAt: 0 };
+  shipCtl.reset();
+  controls.enabled = false;
+  shipEls.box.hidden = false;
+  showCaption(null);
+  reschedule();
+  return true;
+}
+
+function endShip() {
+  if (!ship) return;
+  render(); // (drawn again here, to be there to copy)
+  holdPicture();
+  // Back where it was: the next camera move carries it along with its planet, as if it had been there all along.
+  camera.position.copy(ship.position);
+  camera.quaternion.copy(ship.quaternion);
+  controls.target.copy(ship.target);
+  ship = null;
+  shipDrag = null;
+  shipCtl.reset();
+  controls.enabled = !flight;
+  shipEls.box.hidden = true;
+}
+
+function shipFrame(now, dt) {
+  shipBodies.length = 0;
+  for (const b of bodies.values()) {
+    if (!b.group.visible) continue;
+    shipBodies.push({ position: b.group.position, radius: b.radius * b.group.scale.x, name: b.def.name });
+  }
+  const info = shipCtl.step(dt, shipBodies);
+  if (now - ship.shownAt > 250) {
+    ship.shownAt = now;
+    shipEls.near.textContent = info.nearest ? `Nearest: ${info.nearest}` : "";
+  }
+}
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  if (!ship || !e.isPrimary) return;
+  shipDrag = { x: e.clientX, y: e.clientY };
+  renderer.domElement.setPointerCapture?.(e.pointerId);
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (!ship || !shipDrag || !e.isPrimary) return;
+  shipCtl.drag(e.clientX - shipDrag.x, e.clientY - shipDrag.y);
+  shipDrag = { x: e.clientX, y: e.clientY };
+});
+addEventListener("pointerup", () => (shipDrag = null));
+addEventListener("blur", () => shipCtl.reset());
+
+/**
  * Something on in the sky tonight (by the clock's date): a note about it, once, when nothing else is being said. Looked
  * for every half minute or so.
  */
@@ -1415,7 +1484,7 @@ function tonightFrame(now) {
 
 function tourFrame(now) {
   if (!settings.tour) return;
-  const moving = flight || tween || landing || held || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
+  const moving = flight || tween || landing || held || ship || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
   if (moving) {
     tourIdle = now;
     return;
@@ -1489,7 +1558,7 @@ renderer.domElement.addEventListener("pointerup", (e) => {
     else if (place.id !== away.galaxy) set("view", `galaxy-${place.id}`, { remember: false });
     return;
   }
-  if (tween || now < quietUntil) return; // mid-flight, clicks would land on things that are moving
+  if (tween || ship || now < quietUntil) return; // mid-flight, clicks would land on things that are moving (and flying, dragging turns)
   const hit = pick(e.clientX, e.clientY, e.pointerType === "touch" ? 22 : 9);
   if (!hit) return;
   quietUntil = now + 400;
@@ -1753,7 +1822,7 @@ function mustLayOut(now) {
 function still() {
   return (
     !(settings.drift && !reducedMotion) && (settings.paused || (settings.speed === "live" && !settings.reverse)) &&
-    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held && !landing && !ride
+    !tween && !flight && !settle && !away.stage && !stage.running && loadedShown && !system.fading && !held && !landing && !ride && !ship
   );
 }
 
@@ -1855,6 +1924,7 @@ function drawFrame(now) {
   for (const p of belts.parts) p.visible = settings.belts;
 
   if (pov.id) movePovCamera(now, dt);
+  else if (ship) shipFrame(now, dt);
   else {
     moveCamera(now);
     controls.autoRotate = settings.drift && !reducedMotion && !flight && !stage.running && !landing && !takeoff; // a sighting would drift out of view

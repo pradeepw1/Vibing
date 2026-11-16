@@ -79,11 +79,13 @@
   #panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
   #panel section + section { margin-top: 16px; }
   #ride { position: fixed; left: 50%; bottom: calc(22px + var(--safe-bottom)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; text-shadow: 0 1px 6px #000; z-index: 2; }
-  #ride[hidden] { display: none; }
-  #ride .ride-title { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  #ride[hidden], #ship[hidden] { display: none; }
+  #ship { position: fixed; left: 50%; bottom: calc(22px + var(--safe-bottom)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; text-shadow: 0 1px 6px #000; z-index: 2; width: max-content; max-width: calc(100vw - 32px); }
+  #ship kbd { font: inherit; font-size: 11px; padding: 0 4px; border: 1px solid var(--panel-line); border-radius: 4px; }
+  #ride .ride-title, #ship .ride-title { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
   #ride .ride-title span { letter-spacing: .04em; text-transform: none; margin-left: 6px; opacity: .8; }
-  #ride .ride-far { font-size: 15px; color: var(--text); }
-  #ride .ride-note { font-size: 12px; color: var(--muted); min-height: 1.4em; }
+  #ride .ride-far, #ship .ride-far { font-size: 15px; color: var(--text); }
+  #ride .ride-note, #ship .ride-note { font-size: 12px; color: var(--muted); min-height: 1.4em; }
   .goto { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
   .goto input { background: var(--chip); color: var(--text); border: 1px solid var(--panel-line); border-radius: 6px; padding: 3px 6px; font: inherit; color-scheme: dark; }
   .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -174,6 +176,7 @@
     <h2>View</h2>
     <select id="view" aria-label="View"></select>
     <button class="chip" id="ride-start" type="button" style="margin-top:8px">Ride a beam of light</button>
+    <button class="chip" id="ship-start" type="button" style="margin-top:8px">Fly it yourself</button>
     <label class="goto">Where you live <input type="text" id="place" inputmode="decimal" placeholder="latitude, longitude (else your time zone's city)" title="For Your sky. Like 41.85, -87.65 (Chicago). Empty: your time zone's city."></label>
   </section>
   <section>
@@ -212,6 +215,12 @@
     <button class="chip" type="button" id="ride-back" aria-pressed="false">Look back</button>
     <button class="chip" type="button" id="ride-leave">Leave</button>
   </div>
+</div>
+<div id="ship" hidden>
+  <div class="ride-title">Flying it yourself</div>
+  <div class="ride-note"><kbd>W</kbd> <kbd>S</kbd> forward, back · <kbd>A</kbd> <kbd>D</kbd> sideways · <kbd>R</kbd> <kbd>F</kbd> up, down<br>drag or arrow keys to turn · <kbd>Q</kbd> <kbd>E</kbd> roll · <kbd>Shift</kbd> faster · <kbd>Space</kbd> stop</div>
+  <div class="ride-far" id="ship-near"></div>
+  <div class="chips"><button class="chip" type="button" id="ship-leave">Leave</button></div>
 </div>
 <div id="pov" hidden>
   <span class="name"></span>

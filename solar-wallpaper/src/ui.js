@@ -6,7 +6,7 @@ import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id, view) => (view === "from-home" ? "Your sky" : id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
 
-export function createUI({ settings, bodies, galaxies = [], skyNames = [], things = [], ride = null, set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
+export function createUI({ settings, bodies, galaxies = [], skyNames = [], things = [], ride = null, ship = null, set, goLive, jumpToNow, goTo = () => {}, events = () => [], whenText = (d) => d.toString(), clockTime = () => Date.now(), goBack, backLabel, travelling = () => false, showStrange = () => {} }) {
   const clockEl = $("#clock");
   const dateEl = $("#clock .date");
   const timeEl = $("#clock .time");
@@ -209,6 +209,11 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
       wake(); // show the buttons you're stepping through
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // Flying: the ship's keys steer it (everything else, Esc to leave say, works as usual).
+    if (ship?.on() && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) && ship.key(e.code, true)) {
+      e.preventDefault();
+      return;
+    }
     // Leave keys alone that a focused control needs: the dropdown uses most
     // keys, and buttons and tick boxes reached with Tab are pressed with
     // Space and Enter. One just clicked with the mouse keeps focus too, but
@@ -258,6 +263,21 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
     }
     e.preventDefault();
   });
+
+  if (ship) {
+    addEventListener("keyup", (e) => ship.on() && ship.key(e.code, false));
+    $("#ship-start").addEventListener("click", () => {
+      if (ship.start() === false) {
+        $("#ship-start").textContent = "Only from the solar system";
+        setTimeout(() => ($("#ship-start").textContent = "Fly it yourself"), 2500);
+        return;
+      }
+      panel.hidden = true;
+      menuBtn.setAttribute("aria-expanded", "false");
+      $("#ship-start").blur();
+    });
+    $("#ship-leave").addEventListener("click", () => ship.end());
+  }
 
   // --- Clock ---
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
