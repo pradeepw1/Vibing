@@ -67,3 +67,15 @@ test("a picture for saving: sizes kept sensible, and the pieces cover it exactly
   }
   assert.ok(covered.every((n) => n === 1));
 });
+
+test("a view kept from Space Scope: the camera's place from what it looks at, as close as a black hole needs", () => {
+  // In the solar system, a few units off; by Cygnus X-1, a hundredth of a unit or less; round a galaxy, thousands.
+  assert.deepEqual(parse("cam", "6,3,8"), [6, 3, 8]);
+  assert.deepEqual(parse("cam", "0.0041,0.0087,-0.0059"), [0.0041, 0.0087, -0.0059]);
+  assert.deepEqual(parse("cam", "1.23e-05,4e-06,-2e-06"), [1.23e-5, 4e-6, -2e-6], "as the Mac app may write a tiny number");
+  assert.deepEqual(parse("cam", "-6500,2100,7000"), [-6500, 2100, 7000]);
+  for (const bad of ["0,0,0", "1,2", "a,b,c", "1e6,0,0"]) assert.equal(parse("cam", bad), undefined, bad);
+  // Round another star, the planet it was following.
+  assert.equal(parse("follow", "p0"), "p0");
+  assert.equal(parse("follow", "<script>"), undefined);
+});

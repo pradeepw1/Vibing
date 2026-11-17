@@ -198,10 +198,16 @@ final class Settings {
         set { store.set(newValue, forKey: "look") }
     }
 
+    /// Round another star: the planet the camera was following in Space Scope (nil: the star itself).
+    var follow: String? {
+        get { store.string(forKey: "follow") }
+        set { store.set(newValue, forKey: "follow") }
+    }
+
     /// Back to how the wallpaper started: the picture, the view and the camera, the speed, the zoom and the switches.
     /// (Not the app's own choices: the battery, every screen or not, opening at login.)
     func reset() {
-        for key in ["style", "view", "camera", "look", "speed", "zoom"] { store.removeObject(forKey: key) }
+        for key in ["style", "view", "camera", "look", "follow", "speed", "zoom"] { store.removeObject(forKey: key) }
         for choice in switchChoices + scopeSwitches { store.removeObject(forKey: "switch.\(choice.key)") }
     }
 
@@ -447,6 +453,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             items.append("view=\(settings.view)")
             if let camera = settings.camera { items.append("cam=\(camera)") }
             if let look = settings.look { items.append("look=\(look)") }
+            if let follow = settings.follow { items.append("follow=\(follow)") }
         } else {
             items.append("zoom=\(number(settings.zoom))")
         }
@@ -908,8 +915,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             if let on = setUp[choice.key] as? Bool { settings.pick(choice.key, on) }
         }
         let numbers = { (key: String) in (setUp[key] as? [NSNumber])?.map { "\($0.doubleValue)" }.joined(separator: ",") }
-        settings.camera = numbers("cam")
+        settings.camera = numbers("cam") // (by a black hole, as small as a thousandth: kept in full)
         settings.look = numbers("look")
+        settings.follow = setUp["follow"] as? String
         settings.style = .scope
         Journal.note("the wallpaper now shows what Space Scope was left showing: \(settings.view)")
         if show { startAgain() }
@@ -946,6 +954,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         settings.view = id
         settings.camera = nil // (a view picked from the menu has its own framing)
         settings.look = nil
+        settings.follow = nil
         send("view", id)
         rebuildMenu()
     }

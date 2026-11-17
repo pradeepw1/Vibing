@@ -254,6 +254,17 @@ export function createExoSystem(canvas, pixelRatio) {
   }
 
   const aim = new Vector3();
+  /** Puts the planets where they are `t` seconds in (on the page's own clock, performance.now). */
+  function placeBodies(t) {
+    for (const b of current.bodies) {
+      const a = b.phase + b.omega * t;
+      b.mesh.position.set(Math.cos(a) * b.r, 0, Math.sin(a) * b.r);
+      b.mesh.rotation.y = b.spin * t;
+      b.mat.uniforms.sunDir.value.copy(b.mesh.position).negate().normalize();
+      b.mat.uniforms.time.value = t;
+    }
+  }
+
   /** Moves the planets round and the camera along. dt: seconds since the last frame. */
   function update(dt, now, drift) {
     if (!current) return;
@@ -262,13 +273,7 @@ export function createExoSystem(canvas, pixelRatio) {
     sky.group.position.copy(camera.position);
     for (const g of current.glows) g.quaternion.copy(camera.quaternion);
     if (current.beams) current.beams.rotation.y = t * 5.2;
-    for (const b of current.bodies) {
-      const a = b.phase + b.omega * t;
-      b.mesh.position.set(Math.cos(a) * b.r, 0, Math.sin(a) * b.r);
-      b.mesh.rotation.y = b.spin * t;
-      b.mat.uniforms.sunDir.value.copy(b.mesh.position).negate().normalize();
-      b.mat.uniforms.time.value = t;
-    }
+    placeBodies(t);
     // Heading for a planet: the camera's centre slides to it over a moment, then stays exactly with it; the distance eases in.
     const goal = following ? following.mesh.position : aim.set(0, 0, 0);
     const k = 1 - Math.exp(-dt * 3.2);
@@ -348,6 +353,25 @@ export function createExoSystem(canvas, pixelRatio) {
     },
     get following() {
       return following?.place.id ?? null;
+    },
+    /**
+     * Puts the camera `offset` from the star, or from planet `followId` and staying with it, at once: a view set up in
+     * Space Scope and kept as the wallpaper. (A planet it can't find: the star.)
+     */
+    setView(offset, followId = null) {
+      if (!current) return;
+      placeBodies(performance.now() / 1000); // (where they are now: this can come before the first frame has placed them)
+      const body = followId ? current.bodies.find((b) => b.place.id === followId) : null;
+      following = body ?? null;
+      followSince = performance.now() - 1400; // (there already: no gliding over)
+      offsetGoal = null;
+      wantDistance = 0;
+      controls.minDistance = body ? body.radius * 1.8 : current.starR * 1.6;
+      const centre = body ? body.mesh.position : aim.set(0, 0, 0);
+      fromTarget.copy(centre);
+      controls.target.copy(centre);
+      camera.position.copy(centre).add(offset);
+      controls.update();
     },
     setMilkyWay: (texture) => sky.setMilkyWay(texture),
     resize() {

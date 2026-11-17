@@ -99,6 +99,8 @@ jobs:
           grep 'home from a galaxy' run.log | tail -1 | while read -r line; do echo "::notice::$line"; done
           # What the Space Scope window is left showing becomes the wallpaper; Reset puts it back.
           check 'after setting up Saturn in the Space Scope window, the wallpaper shows: {"view":"saturn","drift":false,"cam":\[6,3,8\],"camNow":\[6,3,8\]}'
+          # And out by a black hole, close in: the angle it was left at, not the black hole's own framing.
+          check 'after setting up Cygnus X-1 in the Space Scope window, the wallpaper shows: {"view":"galaxy-cygx1","stage":"there","cam":\[0.0041,0.0087,-0.0059\],"camNow":\[0.0041,0.0087,-0.0059\]}'
           check 'after Reset, the wallpaper shows: {"view":"middle","drift":[a-z]*,"cam":null'
           # Other apps opening and Mission Control: the same page carries on, its graphics kept, nothing reloaded by the app.
           awk '/watching the wallpaper/{f=1} /after other apps and Mission Control/{print; f=0} f' run.log > apps.log

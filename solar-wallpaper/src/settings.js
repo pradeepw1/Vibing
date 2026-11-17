@@ -98,9 +98,13 @@ export function parse(key, value) {
       return VIEWS.some((v) => v.id === value) || viewpoint(value) || MOONS.some((m) => m.id === value) ? value : undefined;
     case "cam": {
       // Where the camera was left, from what it looks at: "x,y,z" (a view set up in Space Scope and kept as the wallpaper).
+      // Out among the galaxies that can be thousands of units, and by a black hole a thousandth of one.
       const n = String(value).split(",").map(Number);
-      return n.length === 3 && n.every((x) => Number.isFinite(x) && Math.abs(x) < 5000) && Math.hypot(...n) > 1e-6 ? n : undefined;
+      return n.length === 3 && n.every((x) => Number.isFinite(x) && Math.abs(x) < 1e5) && Math.hypot(...n) > 1e-9 ? n : undefined;
     }
+    case "follow":
+      // Round another star: the planet the camera was following when the view was kept (see exosystem.js).
+      return typeof value === "string" && /^[\w.+-]{1,64}$/.test(value) ? value : undefined;
     case "look": {
       // Standing on a body: "height,turn,tilt" (height in the body's radii, the other two in degrees).
       const [height, turn, tilt] = String(value).split(",").map(Number);

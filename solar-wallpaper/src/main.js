@@ -2120,14 +2120,21 @@ function setUp() {
   const s = { view: settings.view, speed: settings.speed };
   for (const key of ["labels", "orbits", "belts", "clock", "drift", "photos", "strange"]) s[key] = settings[key];
   if (pov.id) s.look = [povCam.state.altitude, povCam.state.yaw, povCam.state.pitch].map((n) => +n.toFixed(3));
-  else if (!away.stage && focus) s.cam = camera.position.clone().sub(controls.target).toArray().map((n) => +n.toFixed(4));
+  else if (away.stage === "there") {
+    // Out among the galaxies (a black hole, say) or round another star: where that scene's camera is, from what it looks
+    // at, and round a star, the planet it is following. To six figures, not to so many places: by a black hole the camera
+    // can be a thousandth of a unit from it.
+    const scope = away.scene === "system" ? ex : away.scene === "galaxies" ? lg : null;
+    if (scope) s.cam = scope.camera.position.clone().sub(scope.controls.target).toArray().map((n) => +n.toPrecision(6));
+    if (away.scene === "system" && ex.following) s.follow = ex.following;
+  } else if (!away.stage && focus) s.cam = camera.position.clone().sub(controls.target).toArray().map((n) => +n.toFixed(4));
   return s;
 }
 const sceneOut = window.webkit?.messageHandlers?.scene;
 if (sceneOut) {
   let sent = "";
   setInterval(() => {
-    if (tween || flight || settle || (away.stage && away.stage !== "there")) return; // (on the way somewhere: wait till there)
+    if (tween || flight || settle || (away.stage && (away.stage !== "there" || lg.flying))) return; // (on the way somewhere: wait till there)
     const now = JSON.stringify(setUp());
     if (now === sent) return;
     sent = now;
@@ -2171,7 +2178,7 @@ function goToMoment(ms) {
   goTo(ms, event?.view, event);
 }
 
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail, snapshot, goToMoment, showStrange };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail, snapshot, goToMoment, showStrange, setUp };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
@@ -2180,6 +2187,15 @@ flyTo(settings.view, true);
 if (settle) settleSky(performance.now(), new Date(clock.time), 0);
 // A view set up in Space Scope and kept as the wallpaper: the camera where it was left (see `setUp` below).
 if (settings.cam && !pov.id && !away.stage && focus) camera.position.copy(controls.target).add(new Vector3().fromArray(settings.cam));
+// The same out among the galaxies (a black hole, say), or round another star (and the planet it was following there).
+else if (settings.cam && away.stage === "there") {
+  const at = new Vector3().fromArray(settings.cam);
+  if (away.scene === "system") ex.setView(at, settings.follow);
+  else if (away.scene === "galaxies") {
+    lg.camera.position.copy(lg.controls.target).add(at);
+    lg.controls.update();
+  }
+}
 if (settings.look && pov.id) [povCam.state.altitude, povCam.state.yaw, povCam.state.pitch] = settings.look;
 startPaint(focus.body.id, focus.body.kind === "moon" ? focus.body.parent.id : null);
 if (saver) schedule();

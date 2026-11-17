@@ -252,6 +252,26 @@ enum LaunchCheck {
             say("launch check: closed the Space Scope window")
         }))
         steps.append((15, { ask(hooks, wallpaperNow, "after setting up Saturn in the Space Scope window, the wallpaper shows:") }))
+        // The same out by a black hole, close in (a hundredth of a unit from it): the angle it is left at is the wallpaper's
+        // too. (It used to go back to the black hole's own framing: only the solar system's camera was kept.)
+        let blackHoleNow = "(function(){var s=window.solarSystem;if(!s)return 'not Space Scope';"
+            + "var o=s.lg.camera.position.clone().sub(s.lg.controls.target);return JSON.stringify({view:s.settings.view,stage:s.away.stage,"
+            + "cam:s.settings.cam||null,camNow:o.toArray().map(function(n){return Math.round(n*10000)/10000;})});})()"
+        steps.append((1, { hooks.openScope() }))
+        steps.append((6, {
+            hooks.scopeWeb()?.evaluateJavaScript("window.solarSystem.set('view','galaxy-cygx1',{instant:true});'ok'", completionHandler: nil)
+            say("launch check: in the Space Scope window: out by Cygnus X-1")
+        }))
+        steps.append((3, {
+            hooks.scopeWeb()?.evaluateJavaScript("var s=window.solarSystem;s.lg.camera.position.copy(s.lg.controls.target)"
+                + ".add({x:0.0041,y:0.0087,z:-0.0059});s.lg.controls.update();'ok'", completionHandler: nil)
+            say("launch check: in the Space Scope window: camera put at 0.0041, 0.0087, -0.0059 from Cygnus X-1")
+        }))
+        steps.append((3, {
+            hooks.closeScope()
+            say("launch check: closed the Space Scope window")
+        }))
+        steps.append((15, { ask(hooks, blackHoleNow, "after setting up Cygnus X-1 in the Space Scope window, the wallpaper shows:") }))
         steps.append((1, { hooks.reset() }))
         steps.append((15, { ask(hooks, wallpaperNow, "after Reset, the wallpaper shows:") }))
         // Other apps opening, and Mission Control, with the wallpaper showing round them: the picture has to carry on as
