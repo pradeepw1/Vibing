@@ -62,112 +62,79 @@ function spring(w = 1.6, z = 0.55) {
 // into the star sphere (900 out) however far from the Sun the camera is.
 const MAX_REACH = 380;
 
-const IDENTITY = new Quaternion();
 const Z_AXIS = new Vector3(0, 0, 1);
 const origin = new Vector3(); // the middle of a sighting's holder, which is where it rests
 
 /**
- * The camera, and where a sighting sits in relation to it, all in the
- * sighting's own units (one unit is about the size of the thing), which the
- * stage's scale doesn't touch.
+ * The camera, and where a sighting sits in relation to it, all in the sighting's own units (one unit is about the size
+ * of the thing), which the stage's scale doesn't touch.
  *
- * A sighting is far off, like a star: its holder is carried along with the
- * camera's movement, so it doesn't slide past the stars when the camera moves.
- * The wallpaper's camera is always turning, slowly, and a minute is long enough
- * for that to carry a sighting off the side of the screen, so the sighting keeps
- * a `frame`, a view of its own, which goes along with the camera's turning
- * (all of it when the sighting asks, follow(1), and none of it, follow(0)).
- * hold() notes where a point sits in that frame and release() puts it back.
- * gate() says how much to follow if nothing special is going on: all of it
- * while the camera drifts slowly, none while someone is swinging it round by hand.
+ * A sighting is a thing at a place in space, like a planet or a moon: when the camera turns, zooms or moves, it stays
+ * where it is, so it slides across the screen, and grows or shrinks, as anything out there would. (The stage carries it
+ * along with the planet the camera rides with, as the camera is carried.) Its path is laid out once, from where the
+ * camera was when it began, `origin`, and the way the view faced then, `frame`: hold() notes where a point sits in that
+ * frame and release() gives it back. Only what it does to look at you uses where the camera is now, `pos`.
  */
 function createEye(group, holder) {
   const inverse = new Matrix4();
   const axes = new Matrix4();
   const world = new Vector3();
-  const start = new Vector3(); // the camera when the sighting began, in the group's space
   const home = new Vector3();
-  const seen = new Quaternion(); // the camera's turn now, and the last time
-  const lastSeen = new Quaternion();
-  const turned = new Quaternion(); // how far it has turned since
-  const share = new Quaternion();
   const frameInverse = new Quaternion();
   const eye = {
+    // Where the camera is now, and which way its right, up and back are, in the sighting's units.
     pos: new Vector3(),
     right: new Vector3(),
     up: new Vector3(),
     back: new Vector3(),
+    // Where it was when the sighting began, and the view's axes then.
+    origin: new Vector3(),
     frame: new Quaternion(),
-    // The same axes for the frame: where the sighting's right, up and back are.
     fRight: new Vector3(1, 0, 0),
     fUp: new Vector3(0, 1, 0),
     fBack: new Vector3(0, 0, 1),
-    rate: 0, // how fast the camera is turning, degrees a second, smoothed
     /**
-     * Sizes the holder so that a thing one unit across looks `angle` degrees wide
-     * from the camera, whatever scale the stage chose, and pulls everything in
-     * towards the camera if it would reach further than `reach` camera-distances.
-     * Returns how far the camera is, in units.
+     * Sizes the holder so that a thing one unit across looks `angle` degrees wide from the camera, whatever scale the
+     * stage chose, and brings everything in towards the camera if it would reach further than `reach`
+     * camera-distances. Returns how far the camera is, in units.
      */
     fit(ctx, angle, reach) {
       ctx.camera.getWorldPosition(world);
       const dist = world.distanceTo(ctx.anchor);
       const k = Math.min(1, MAX_REACH / (reach * dist));
       group.updateWorldMatrix(true, false);
-      start.copy(group.worldToLocal(world));
-      home.copy(start).multiplyScalar(1 - k);
+      home.copy(group.worldToLocal(world)).multiplyScalar(1 - k);
       holder.position.copy(home);
       holder.scale.setScalar((k * 2 * dist * Math.tan((angle * DEG) / 2)) / ctx.scale);
       return 0.5 / Math.tan((angle * DEG) / 2);
     },
-    /** Once a frame, with the seconds since the last one. */
-    update(camera, dt) {
+    /** Once a frame: where the camera is now. (The sighting itself stays put.) */
+    update(camera) {
       camera.updateMatrixWorld();
       const e = camera.matrixWorld.elements;
-      group.updateWorldMatrix(true, false);
-      holder.position.copy(home).add(group.worldToLocal(world.set(e[12], e[13], e[14]))).sub(start);
+      holder.position.copy(home);
       holder.updateWorldMatrix(true, false);
       inverse.copy(holder.matrixWorld).invert();
       eye.pos.set(e[12], e[13], e[14]).applyMatrix4(inverse);
       eye.right.set(e[0], e[1], e[2]).transformDirection(inverse);
       eye.up.set(e[4], e[5], e[6]).transformDirection(inverse);
       eye.back.set(e[8], e[9], e[10]).transformDirection(inverse);
-      seen.setFromRotationMatrix(axes.makeBasis(eye.right, eye.up, eye.back));
-      if (dt > 0) {
-        turned.copy(seen).multiply(lastSeen.invert());
-        const angle = 2 * Math.acos(Math.min(1, Math.abs(turned.w)));
-        eye.rate += (angle / DEG / dt - eye.rate) * Math.min(1, dt / 0.4);
-      } else {
-        turned.identity();
-      }
-      lastSeen.copy(seen);
-      eye.follow(0);
     },
-    /** Starts the frame off as the camera's view, as it is now. */
+    /** The sighting begins: where the camera is and how it faces become what its path is laid out from. */
     reset() {
-      eye.frame.copy(seen);
-      eye.rate = 0;
-      eye.follow(0);
-    },
-    /** How much of the camera's turning to go along with just now: all of it while it drifts, none while it is swung round. */
-    gate() {
-      return 1 - ease(ramp(eye.rate, 2.5, 7));
-    },
-    /** Turns the frame with the camera by this much of what it turned since the last frame, 0 to 1. */
-    follow(amount) {
-      share.copy(IDENTITY).slerp(turned, amount);
-      eye.frame.premultiply(share).normalize();
+      eye.origin.copy(eye.pos);
+      eye.frame.setFromRotationMatrix(axes.makeBasis(eye.right, eye.up, eye.back));
       eye.fRight.set(1, 0, 0).applyQuaternion(eye.frame);
       eye.fUp.set(0, 1, 0).applyQuaternion(eye.frame);
       eye.fBack.set(0, 0, 1).applyQuaternion(eye.frame);
     },
     /** Where a point sits in the frame. */
     hold(p, out = new Vector3()) {
-      return out.copy(p).sub(eye.pos).applyQuaternion(frameInverse.copy(eye.frame).invert());
+      return out.copy(p).sub(eye.origin).applyQuaternion(frameInverse.copy(eye.frame).invert());
     },
-    /** The point that sits there now. */
+    /** The point that sits there. */
     release(h, out = new Vector3()) {
-      return out.copy(h).applyQuaternion(eye.frame).add(eye.pos);
+      return out.copy(h).applyQuaternion(eye.frame).add(eye.origin);
     },
     /** A direction in the frame's terms, and back again. */
     holdDirection(d, out = new Vector3()) {
@@ -414,7 +381,7 @@ export function createCount() {
     start(ctx) {
       const rand = ctx.random;
       eye.fit(ctx, fitAngle(ctx.camera, ANGLE), REACH);
-      eye.update(ctx.camera, 0);
+      eye.update(ctx.camera);
       eye.reset();
       eye.hold(origin, spot);
       const side = rand() < 0.5 ? -1 : 1;
@@ -438,12 +405,10 @@ export function createCount() {
     update(dt, ctx) {
       if (!started) return false;
       t += Math.min(dt, 0.25);
-      eye.update(ctx.camera, dt);
-      // It goes along with the camera while that drifts, so it can't wander off the screen.
-      // From the moment it turns it goes along with every movement.
-      eye.follow(Math.max(eye.gate(), ease(ramp(t, T.turn - 2, T.turn + 2))));
+      eye.update(ctx.camera);
+      // Where it comes to rest, and its way in, are fixed in space, laid out from where the camera was at the start.
       eye.release(spot, place);
-      away.copy(place).sub(eye.pos).normalize(); // from the camera to the ring
+      away.copy(place).sub(eye.origin).normalize(); // from there to the ring
       right.copy(eye.fRight).addScaledVector(away, -eye.fRight.dot(away)).normalize();
       up.crossVectors(right, away);
 
@@ -459,9 +424,9 @@ export function createCount() {
 
       // And it turns to look straight at us, settling a little too far and coming back.
       const g = aim.step(ease(ramp(t, T.turn, T.turned)), dt);
-      toEye.copy(eye.pos).sub(pos).normalize();
+      toEye.copy(eye.pos).sub(pos).normalize(); // (wherever the camera is now)
       normal.copy(slantTo).multiplyScalar(1 - g).addScaledVector(toEye, g).normalize();
-      faceTo(craft.quaternion, normal, eye.up);
+      faceTo(craft.quaternion, normal, eye.fUp);
       craft.position.copy(pos);
 
       // The seams, then the dark.
@@ -653,7 +618,7 @@ export function createAssembly() {
     start(ctx) {
       const rand = ctx.random;
       eye.fit(ctx, fitAngle(ctx.camera, ANGLE, 0.56), REACH);
-      eye.update(ctx.camera, 0);
+      eye.update(ctx.camera);
       eye.reset();
       eye.hold(origin, resting);
       side = rand() < 0.5 ? -1 : 1;
@@ -668,12 +633,10 @@ export function createAssembly() {
     update(dt, ctx) {
       if (!started) return false;
       t += Math.min(dt, 0.25);
-      eye.update(ctx.camera, dt);
-      // It goes along with the camera while that drifts, so it can't wander off the screen.
-      // From the moment they stop, it goes along with every movement, whatever the camera does.
-      eye.follow(Math.max(eye.gate(), ease(ramp(t, T.stop - 1, T.stop + 1))));
+      eye.update(ctx.camera);
+      // Where they stop, and the way they come, are fixed in space, laid out from where the camera was at the start.
       eye.release(resting, place);
-      away.copy(place).sub(eye.pos).normalize(); // from the camera to the lattice
+      away.copy(place).sub(eye.origin).normalize(); // from there to the lattice
       right.copy(eye.fRight).addScaledVector(away, -eye.fRight.dot(away)).normalize();
       up.crossVectors(right, away);
       travel.copy(right).multiplyScalar(-side); // the way they go
@@ -707,16 +670,16 @@ export function createAssembly() {
         const jz = Math.sin(clock * (0.3 + 0.6 * wobble[w + 2]) + 6.283 * wobble[w + 5]) * wobbleSize;
         const rx = (x + jx) * cy + (z + jz) * sy;
         const rz = -(x + jx) * sy + (z + jz) * cy;
-        // The depth goes along each lamp's own line of sight, so that the three layers still add up
-        // to one exact grid when the lattice is off to one side, instead of coming apart in pairs.
-        p.copy(centre).addScaledVector(right, rx).addScaledVector(up, y + jy).sub(eye.pos);
-        p.multiplyScalar(1 + rz / p.length()).add(eye.pos);
+        // The depth goes along each lamp's line of sight from where the camera was, so that the three layers add up to
+        // one exact grid from there when the lattice is off to one side, instead of coming apart in pairs.
+        p.copy(centre).addScaledVector(right, rx).addScaledVector(up, y + jy).sub(eye.origin);
+        p.multiplyScalar(1 + rz / p.length()).add(eye.origin);
         spot.setXYZ(i, p.x, p.y, p.z);
 
         // Side-on to us, face forward in the way they are going; then square on to us.
         const tipTo = (12 + 6 * (s[0] / 0.5)) * DEG;
         idle.copy(travel).multiplyScalar(Math.cos(tipTo)).addScaledVector(away, -Math.sin(tipTo));
-        toEye.copy(eye.pos).sub(p).normalize();
+        toEye.copy(eye.pos).sub(p).normalize(); // (they look at wherever the camera is now)
         n.copy(idle).multiplyScalar(1 - turned).addScaledVector(toEye, turned).normalize();
         // The last one slowly gets bigger, as if it were coming closer.
         const nearer = i === middle ? 1 + 0.9 * ease(ramp(t, T.cut, T.last)) : 1;
@@ -998,7 +961,7 @@ export function createNeedle() {
     start(ctx) {
       const rand = ctx.random;
       eye.fit(ctx, ANGLE, REACH);
-      eye.update(ctx.camera, 0);
+      eye.update(ctx.camera);
       eye.reset();
       away.copy(eye.pos).negate().normalize();
       const flip = rand() < 0.5 ? -1 : 1;
@@ -1016,19 +979,20 @@ export function createNeedle() {
     update(dt, ctx) {
       if (!started) return false;
       t += Math.min(dt, 0.25);
-      eye.update(ctx.camera, dt);
+      eye.update(ctx.camera);
 
       // How far round it is: 90 degrees is side-on, 0 is pointing at us. It starts so slowly you can't tell.
       const after = Math.max(0, t - T.aligned);
       const landing = 0.45 * Math.exp(-1.1 * after) * Math.sin(2 * Math.PI * 0.7 * after); // lands a little off, then corrects
       const psi = swing.step((SIDE_ON * (1 - ease(ramp(t, 0, T.aligned))) + landing) * DEG, dt);
 
-      // It goes along with the camera while that drifts, so it can't wander off the screen,
-      // and with every movement once it is nearly pointing at us.
-      eye.follow(Math.max(eye.gate(), 1 - ease(ramp(Math.abs(psi) / DEG, 3, 24))));
+      // It swings about a point fixed in space, round to point at wherever the camera is now.
       eye.release(pivotAt, pivot);
       away.copy(pivot).sub(eye.pos).normalize();
       eye.releaseDirection(sideAt, side);
+      side.addScaledVector(away, -side.dot(away)); // (square to the way to the camera, however that has moved)
+      if (side.lengthSq() < 1e-6) side.copy(eye.fUp).addScaledVector(away, -eye.fUp.dot(away));
+      side.normalize();
       dir.copy(away).multiplyScalar(Math.cos(psi)).addScaledVector(side, Math.sin(psi)).normalize();
       near.copy(pivot).addScaledVector(dir, -ARM);
 

@@ -48,6 +48,7 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random,
   let last = null; // the one that just ended, for the note
   let wanted = null; // "show me one now" waiting for a good moment: { id (true, or the id asked for), until }
   let onEnd = null;
+  let onMissed = null;
   const ahead = new Vector3();
   const anchor = new Vector3();
   const eye = new Vector3();
@@ -177,6 +178,17 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random,
     set onEnd(fn) {
       onEnd = fn;
     },
+    /** Called when one asked for by hand found no room in time, so the page can say why nothing came. */
+    set onMissed(fn) {
+      onMissed = fn;
+    },
+    /**
+     * Moves the one showing along by `delta` (scene units). The page says how far the planet the camera rides with has
+     * gone, so a sighting stays put in the view of that planet, as the camera does, instead of being left behind.
+     */
+    carry(delta) {
+      if (current) current.sighting.group.position.add(delta);
+    },
     /**
      * Starts the next one (or the one with this id) as soon as there's a good place for it,
      * if that comes within a few seconds. True if one is, or is about to be, showing.
@@ -216,7 +228,11 @@ export function createStage({ scene, builders, pixelRatio, random = Math.random,
         if (!alive) finish(true);
         return;
       }
-      if (wanted && now() > wanted.until) wanted = null; // no room came, or we were away
+      if (wanted && now() > wanted.until) {
+        // No room came, or we were away.
+        wanted = null;
+        onMissed?.();
+      }
       if (!view.allowed) return;
       if (wanted) {
         // Asked for: go on the first frame there is room for it.

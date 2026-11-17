@@ -92,6 +92,26 @@ let scopeSwitches: [(key: String, label: String)] = [
     ("live", "Live sunspots and aurora (from NOAA, uses the internet)"),
 ]
 
+// Space Scope's strange sightings, to show one by hand (the same list as src/oddities/catalog.js: a test checks).
+let strangeChoices: [(id: String, name: String)] = [
+    ("count", "The Count"),
+    ("assembly", "The Assembly"),
+    ("needle", "The Needle"),
+    ("generation", "Generation ship"),
+    ("lane", "Shuttle lane"),
+    ("derelict", "Derelict"),
+    ("voyager1", "Voyager 1"),
+    ("voyager2", "Voyager 2"),
+    ("seam", "The Seam"),
+    ("echo", "The Echo"),
+    ("primes", "The Primes"),
+    ("curtains", "The Curtains"),
+    ("dimming", "The Dimming"),
+    ("wanderer", "The Wanderer"),
+    ("lens", "The Lens"),
+    ("lighthouse", "The Lighthouse"),
+]
+
 // MARK: - Saving the battery
 
 /// Frames a second the page should draw, or nil for none at all. The camera moves slowly, so fewer frames still look
@@ -791,6 +811,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         speedItem.submenu = speedMenu
         menu.addItem(speedItem)
 
+        if settings.style == .scope {
+            let strangeMenu = NSMenu()
+            let any = item("Any one", #selector(showStrange(_:)))
+            any.representedObject = ""
+            strangeMenu.addItem(any)
+            strangeMenu.addItem(.separator())
+            for choice in strangeChoices {
+                let it = item(choice.name, #selector(showStrange(_:)))
+                it.representedObject = choice.id
+                strangeMenu.addItem(it)
+            }
+            let strangeItem = NSMenuItem(title: "Show a strange sighting", action: nil, keyEquivalent: "")
+            strangeItem.submenu = strangeMenu
+            menu.addItem(strangeItem)
+        }
+
         menu.addItem(.separator())
         for choice in switchChoices + (settings.style == .scope ? scopeSwitches : []) {
             let it = item(choice.label, #selector(flip(_:)), on: settings.isOn(choice.key))
@@ -962,6 +998,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     /// Paused means the pages are gone altogether, so nothing is drawn and the memory is given back.
+    /// A strange sighting now, on the wallpaper on the main screen (the one picked, or any one). It shows whether or not
+    /// they come by themselves.
+    @objc private func showStrange(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        guard let web = wallpapers.first?.web else {
+            tell("There's no wallpaper showing", "Turn the wallpaper on again (it's paused, or off on the battery), then ask for one.")
+            return
+        }
+        Journal.note("strange sighting asked for: \(id.isEmpty ? "any one" : id)")
+        web.evaluateJavaScript("window.solarSystem && window.solarSystem.showStrange(\"\(id)\")", completionHandler: nil)
+    }
+
     /// One picture across all the screens, or one each: the pages start again either way.
     @objc private func toggleSpan() {
         settings.span.toggle()

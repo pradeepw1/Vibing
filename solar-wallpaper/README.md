@@ -116,7 +116,7 @@ None of it is real; the picture is drawn by the computer from a few formulas (`s
 
 ## Strange sightings
 
-Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`), or press **Show me one now** in the panel. If your system asks for reduced motion, none come by themselves, but the button still works.
+Every few minutes, something drifts through the view: a ship, a craft, a thing in the sky that shouldn't be there. They take a minute or two, never rush, and leave without a trace. Turn them off with **Strange sightings** in the settings (or `?strange=0`). To see one when you like, pick it under **See one** in the panel (or leave it on *Any one*) and press **Show it now**, or press <kbd>S</kbd>; in the Mac app, *Show a strange sighting* in the menu does the same on the wallpaper. If your system asks for reduced motion, none come by themselves, but asking still works. If there's no open space in front of the camera to put one (a planet filling the view), a note says so.
 
 **All of them are made up, apart from the two real Voyager probes.** When one ends, a note in the corner says what it was and that it was invented. Each one is drawn from scratch in code (no models or pictures), in `src/oddities/`.
 
@@ -124,7 +124,7 @@ Every few minutes, something drifts through the view: a ship, a craft, a thing i
 - **Ships** (`ships.js`): a generation ship turning its drums for a crew asleep for centuries, a line of shuttles flying in perfect order, a torn-open wreck with one beacon still calling, and the real *Voyager 1* and *Voyager 2*, shown as small models (not at their true place in the sky).
 - **Odd sky** (`phenomena.js`): *The Seam*, a crack in the sky with a wrong sky behind it. *The Echo*, a ring of light spreading from a place with no star (a nod to real light echoes, like V838 Monocerotis). *The Primes*, rings of light in groups of 2, 3, 5, 7, 11. *The Curtains*, aurora with no planet under it. *The Dimming*, dark pieces crossing a star and fitting together over it (a nod to Tabby's Star). *The Wanderer*, a planet with no star, seen only by the stars it hides. *The Lens*, something unseen bending a star's light into a ring (as real gravitational lensing does). *The Lighthouse*, a pulsar-like point flashing as its beams sweep round, slowing until it suddenly jumps faster.
 
-They show up in the Sun-and-planets views and from the ground. They're placed a little off the middle of the view, never behind a planet, and never switch on while the camera is moving between views.
+They show up in the Sun-and-planets views and from the ground. They're placed a little off the middle of the view, never behind a planet, and never switch on while the camera is moving between views. Once there, each stays where it is in space, like anything else out there: turn the camera and it slides across the screen, zoom in and it moves and grows as a thing at that distance would. (It goes along with the planet you're looking at, as the camera does, so with time sped up it isn't left behind.) The camera's own slow drift and the tour wait while one is showing.
 
 ## Use it as your wallpaper
 

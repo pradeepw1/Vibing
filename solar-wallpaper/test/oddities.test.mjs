@@ -315,3 +315,102 @@ test("sightings can be built ahead of time, one at a time", () => {
   stage.update(0.1, camera, open());
   assert.deepEqual(made, ["a", "b", "c"]);
 });
+
+test("the list to pick from names every sighting, and the Mac app's menu offers the same ones", async () => {
+  const { CATALOG } = await import("../src/oddities/catalog.js");
+  const built = ALL.map((make) => make(1));
+  assert.deepEqual(CATALOG.map((c) => [c.id, c.name]), built.map((s) => [s.id, s.name]));
+  for (const s of built) s.dispose();
+  const swift = (await import("node:fs")).readFileSync(new URL("../mac/main.swift", import.meta.url), "utf8");
+  const list = /let strangeChoices[^=]*= \[([\s\S]*?)\n\]/.exec(swift)?.[1] ?? "";
+  const ids = [...list.matchAll(/\("([a-z0-9]+)", "([^"]+)"\)/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(ids, CATALOG.map((c) => [c.id, c.name]), "mac/main.swift's strangeChoices");
+});
+
+/** The middle of what a sighting draws, in world space (its lamps' places, for the ones drawn as lamps). */
+function middleOf(group) {
+  group.updateWorldMatrix(true, true);
+  const sum = new Vector3();
+  let n = 0;
+  group.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    const spots = o.geometry.attributes.spot;
+    if (spots) {
+      for (let i = 0; i < spots.count; i++, n++) sum.add(new Vector3().fromBufferAttribute(spots, i).applyMatrix4(o.matrixWorld));
+      return;
+    }
+    o.geometry.computeBoundingSphere();
+    sum.add(o.geometry.boundingSphere.center.clone().applyMatrix4(o.matrixWorld));
+    n++;
+  });
+  return sum.divideScalar(n);
+}
+
+/** Plays a sighting for `seconds`, doing `move(camera, t)` to the camera as it goes. */
+function play(make, seconds, move = () => {}) {
+  const camera = cameraAt(0, 20, 60);
+  camera.updateProjectionMatrix();
+  const s = make(1);
+  const anchor = new Vector3(0, 10, 0);
+  const scale = 2 * 100 * Math.tan((s.angle * Math.PI) / 360);
+  s.group.position.copy(anchor);
+  s.group.scale.setScalar(scale);
+  s.group.updateMatrixWorld(true);
+  const ctx = { camera, random: seeded(5), anchor: s.group.position, scale };
+  s.start(ctx);
+  for (let t = 0; t < seconds; t += 0.1) {
+    move(camera, t);
+    camera.updateMatrixWorld();
+    s.update(0.1, ctx);
+  }
+  return { s, camera };
+}
+
+test("the craft stay where they are in space when the camera turns, slowly or not, or moves", () => {
+  for (const make of UFOS) {
+    const id = make(1).id;
+    for (const seconds of [12, 30, 50]) {
+      const still = play(make, seconds);
+      // Turned slowly (2 degrees a second, as a drift or a careful drag) from a few seconds in.
+      const turned = play(make, seconds, (c, t) => t > 4 && c.rotateY((2 * Math.PI) / 180 / 10));
+      const a = middleOf(still.s.group);
+      const b = middleOf(turned.s.group);
+      assert.ok(a.distanceTo(b) < 1e-3, `${id} at ${seconds}s: moved ${a.distanceTo(b).toFixed(3)} as the camera turned`);
+      // Seen through the turned camera, it is somewhere else on the screen.
+      const onStill = a.clone().project(still.camera);
+      const onTurned = b.clone().project(turned.camera);
+      assert.ok(Math.abs(onStill.x - onTurned.x) > 0.1, `${id} at ${seconds}s: stayed on the same spot of the screen`);
+    }
+    if (id !== "needle") {
+      // Moved sideways (the Needle turns to point at wherever the camera is, so only its pivot would stay).
+      const still = play(make, 30);
+      const slid = play(make, 30, (c, t) => t > 4 && c.translateX(0.4));
+      assert.ok(middleOf(still.s.group).distanceTo(middleOf(slid.s.group)) < 1e-3, `${id} went along with the camera`);
+    }
+  }
+});
+
+test("a sighting is carried along with the planet the camera rides with, and a missed request says so", () => {
+  const scene = fakeScene();
+  const sighting = fakeSighting("a");
+  let clock = 0;
+  const stage = createStage({ scene, builders: [() => sighting], pixelRatio: 1, random: seeded(), now: () => clock });
+  const camera = cameraAt(0, 0, 50);
+  stage.showOne();
+  stage.update(0.1, camera, open());
+  const was = sighting.group.position.clone();
+  stage.carry(new Vector3(1, 2, 3));
+  assert.ok(sighting.group.position.clone().sub(was).distanceTo(new Vector3(1, 2, 3)) < 1e-9);
+  // Asked for where there's no room (inside a planet's keep-clear zone): a word after a few seconds.
+  const other = createStage({ scene, builders: [() => fakeSighting("b")], pixelRatio: 1, random: seeded(), now: () => clock });
+  let missed = 0;
+  other.onMissed = () => missed++;
+  other.showOne();
+  const blocked = open([{ center: new Vector3(0, 0, 40), radius: 9 }]); // (the camera is 10 from its middle: too near)
+  for (let i = 0; i < 60; i++) {
+    clock += 100;
+    other.update(0.1, camera, blocked);
+  }
+  assert.equal(other.running, false);
+  assert.equal(missed, 1);
+});

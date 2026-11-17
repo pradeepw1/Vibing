@@ -2,6 +2,7 @@
 import { Ray, Vector3 } from "three";
 import { pageAddress, WALLPAPER_PAGE } from "./modes.js";
 import { galaxyOf, SPEEDS, viewpoint, VIEWS } from "./settings.js";
+import { CATALOG } from "./oddities/catalog.js";
 
 const $ = (sel) => document.querySelector(sel);
 const fromName = (id, view) => (view === "from-home" ? "Your sky" : id === "moon" ? "From the Moon" : `From ${id[0].toUpperCase()}${id.slice(1)}`);
@@ -132,10 +133,18 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
     gotoEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   $("#mode-wallpaper").addEventListener("click", () => location.assign(pageAddress(WALLPAPER_PAGE, location.search))); // the Wallpaper: the planets with the camera going round, easy on the battery
+  // Strange sightings: any one, or one picked by name (S shows one too).
+  const strangePick = $("#strange-pick");
+  for (const group of [...new Set(CATALOG.map((c) => c.group))]) {
+    const box = document.createElement("optgroup");
+    box.label = group;
+    for (const c of CATALOG.filter((x) => x.group === group)) box.append(new Option(c.name, c.id));
+    strangePick.append(box);
+  }
   const strangeBtn = $("#strange-now");
   const strangeLabel = strangeBtn.textContent;
   strangeBtn.addEventListener("click", () => {
-    if (showStrange() === false) {
+    if (showStrange(strangePick.value) === false) {
       // Not possible from here (out among the galaxies): say so, and leave the panel open.
       strangeBtn.textContent = "Only near the planets";
       setTimeout(() => (strangeBtn.textContent = strangeLabel), 2500);
@@ -249,6 +258,7 @@ export function createUI({ settings, bodies, galaxies = [], skyNames = [], thing
       case "l": set("labels", !settings.labels); break;
       case "o": set("orbits", !settings.orbits); break;
       case "c": set("constellations", !settings.constellations); break;
+      case "s": showStrange(); break;
       case "h": hiddenAll = !hiddenAll; sync(); break;
       case "Escape": if (!panel.hidden) { panel.hidden = true; menuBtn.setAttribute("aria-expanded", "false"); } else goBack(); break;
       case "Backspace":

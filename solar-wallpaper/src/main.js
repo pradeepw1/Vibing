@@ -295,7 +295,7 @@ const ui = createUI({
   backLabel: () => labelOf(galaxyOf(settings.view) ? away.home : lastLookView),
   travelling: () => away.stage === "returning" || away.stage === "unturning",
   // Out among the galaxies there is no room for one: say so, rather than closing the panel on nothing.
-  showStrange: () => (away.stage ? false : stage.showOne()),
+  showStrange: (id) => showStrange(id),
 });
 
 // --- Camera: views, smooth flights and following a planet ---
@@ -1333,6 +1333,17 @@ stage.onEnd = (s) => {
   ui.setCaption(s.real ? s.name : `Made up: ${s.name}`, lines);
   noteUntil = performance.now() + 10000;
 };
+// Asked for one, but there was nowhere in front of the camera to put it (a planet filling the view, say): say so.
+stage.onMissed = () => {
+  ui.setCaption("No room for a sighting just here", ["They appear in open space in front of the camera. Turn away from the planet in the way, or zoom out a little, and ask again."]);
+  noteUntil = performance.now() + 8000;
+};
+
+/** A sighting now: the one with this id, or any one. False out among the galaxies, where there are none. */
+function showStrange(id) {
+  if (away.stage || ride) return false;
+  return stage.showOne(id || undefined);
+}
 
 /** Takes down the note about the sighting that just ended, after a while (whichever scene we're in). */
 /**
@@ -1523,7 +1534,7 @@ function tonightFrame(now) {
 
 function tourFrame(now) {
   if (!settings.tour) return;
-  const moving = flight || tween || landing || held || ship || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
+  const moving = flight || tween || landing || held || ship || stage.running || (away.stage && (away.stage !== "there" || lg.flying || away.dive !== null));
   if (moving) {
     tourIdle = now;
     return;
@@ -1551,7 +1562,15 @@ function noteFrame(now) {
 }
 
 let nextPrepare = 0;
+// A sighting stays put in the view of whatever the camera rides along with (the planet it follows round the Sun, or the
+// one it stands on), moving with that as the camera does; otherwise, with time sped up, it would be left behind.
+const strangeRide = { body: null, at: new Vector3(), moved: new Vector3() };
+
 function strangeFrame(dt, now) {
+  const rider = (pov.id && bodies.get(pov.id)) || focus?.body;
+  if (rider && rider === strangeRide.body) stage.carry(strangeRide.moved.subVectors(rider.group.position, strangeRide.at));
+  strangeRide.body = rider;
+  if (rider) strangeRide.at.copy(rider.group.position);
   strangeView.allowed = !away.stage && !tween && !flight && !settle;
   strangeView.up = pov.id ? camera.up : null;
   for (const s of strangeSpheres) {
@@ -2152,7 +2171,7 @@ function goToMoment(ms) {
   goTo(ms, event?.view, event);
 }
 
-window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail, snapshot, goToMoment };
+window.solarSystem = { camera, controls, bodies, settings, clock, set, pov, povCam, system, sky, lg, ex, beyond, away, ui, stage, strangeView, photos, renderer, detail, snapshot, goToMoment, showStrange };
 
 // Put everything in place for the first frame, then go.
 system.update(new Date(clock.time), 0, rate(), camera, innerHeight * pixelRatio, settings.orbits, 0);
