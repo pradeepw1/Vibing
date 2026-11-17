@@ -30,7 +30,30 @@ jobs:
           test -f "$app/Contents/Resources/web/index.html"
           test -f "$app/Contents/Resources/web/scope.html"
           test -f "$app/Contents/Resources/AppIcon.icns"
+          test -f "$app/Contents/Resources/web/facts.js" # (the menu's sky facts)
           du -sh "$app" solar-wallpaper/mac/build/SolarSystemLive.dmg solar-wallpaper/mac/build/SolarSystemLive.zip
+
+      - name: Check the screen saver loads
+        run: |
+          saver="solar-wallpaper/mac/build/Solar System Live.saver"
+          lipo -info "$saver/Contents/MacOS/SolarSaver"
+          file "$saver/Contents/MacOS/SolarSaver" | grep -q "bundle" || { echo "::error::the screen saver isn't a loadable bundle"; exit 1; }
+          codesign --verify --deep --strict "$saver"
+          test -f "$saver/Contents/Resources/web/scope.html"
+          # Loaded the way macOS loads a screen saver: the bundle, then the view it names.
+          cat > loadsaver.swift <<'EOF'
+          import Foundation
+          import ScreenSaver
+          guard let bundle = Bundle(path: CommandLine.arguments[1]), bundle.load(),
+                let view = bundle.principalClass as? ScreenSaverView.Type else {
+              print("::error::the screen saver didn't load")
+              exit(1)
+          }
+          print("::notice::the screen saver loads: \(view)")
+          EOF
+          swiftc -o loadsaver loadsaver.swift
+          ./loadsaver "$saver"
+          du -sh "$saver" solar-wallpaper/mac/build/SolarSystemLive-ScreenSaver.zip
 
       - name: Start it and check it draws, takes the menu's choices, saves power
         run: |
@@ -121,6 +144,7 @@ jobs:
           path: |
             solar-wallpaper/mac/build/SolarSystemLive.dmg
             solar-wallpaper/mac/build/SolarSystemLive.zip
+            solar-wallpaper/mac/build/SolarSystemLive-ScreenSaver.zip
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
