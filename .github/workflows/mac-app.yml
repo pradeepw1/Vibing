@@ -82,8 +82,9 @@ jobs:
           failed=0
           # Space Scope is what the wallpaper shows when the app starts, as a wallpaper: the savings are on, no settings button.
           check 'page state (scope): .*"page":true.*"which":"scope".*"saver":true.*"settingsButton":false'
-          check 'launch check: menu: .*Look at (now Out to Jupiter)'
-          check 'launch check: menu: Solar System Live 1.0 ([0-9a-f]\{7,\}, 20[0-9-]* [0-9:]*)'
+          # The menu: tonight's Moon and the next eclipse, the few things done often, and the rest in Settings.
+          check 'launch check: menu: .*% | Next eclipse .* | - | Open Space Scope… | Look at \[Out to Jupiter\] | Pause | - | Settings | Quit   \['
+          check 'launch check: settings menu: Picture \[Space Scope\] | Time speed \[Live\] | Show \[Names\] | - | Camera goes round | .* | Solar System Live 1.0 ([0-9a-f]\{7,\}, 20[0-9-]* [0-9:]*)   \['
           check 'after picking the Inner planets view the page says: inner'
           # Switching to the lean picture and zooming it from the menu.
           check 'style now: lean'

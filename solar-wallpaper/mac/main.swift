@@ -28,15 +28,16 @@ enum BatteryMode: String {
     case pause // nothing drawn
 }
 
-let styleChoices: [(style: Style, label: String)] = [
-    (.scope, "Space Scope (the full picture, easy on the battery)"),
-    (.lean, "Lean Wallpaper (just the planets, lightest)"),
+// (The menu shows short names; what each does in more words is its tooltip.)
+let styleChoices: [(style: Style, label: String, tip: String)] = [
+    (.scope, "Space Scope", "The full picture: planets, moons, galaxies and more, set up to go easy on the battery"),
+    (.lean, "Lean", "Just the planets going round: the lightest on the battery"),
 ]
 
-let batteryChoices: [(mode: BatteryMode, label: String)] = [
-    (.save, "Save power (fewer frames a second)"),
-    (.full, "Full speed"),
-    (.pause, "Pause"),
+let batteryChoices: [(mode: BatteryMode, label: String, tip: String)] = [
+    (.save, "Save power", "Fewer frames a second while on the battery"),
+    (.full, "Full speed", "The same as when plugged in"),
+    (.pause, "Pause", "Nothing drawn while on the battery"),
 ]
 
 // Space Scope's views (what the camera looks at).
@@ -77,19 +78,19 @@ let speedChoices: [(id: String, label: String)] = [
 ]
 
 // The page's names for these, and what to call them in the menu.
-let switchChoices: [(key: String, label: String)] = [
-    ("drift", "Camera goes round"),
-    ("labels", "Names"),
-    ("orbits", "Orbit lines"),
-    ("belts", "Asteroids"),
-    ("clock", "Date and time"),
-    ("photos", "Real planet maps"),
+let switchChoices: [(key: String, label: String, tip: String)] = [
+    ("drift", "Camera goes round", "The camera drifts slowly round"),
+    ("labels", "Names", "The names of the planets, moons and more"),
+    ("orbits", "Orbit lines", "The planets' paths round the Sun"),
+    ("belts", "Asteroids", "The asteroid belt and the Kuiper belt"),
+    ("clock", "Date and time", "The clock in the corner"),
+    ("photos", "Real planet maps", "Maps made from spacecraft pictures, instead of painted ones"),
 ]
-let scopeSwitches: [(key: String, label: String)] = [
-    ("strange", "Strange sightings (all made up)"),
-    ("tour", "Take a tour (flies off somewhere every minute or so)"),
-    ("constellations", "Constellations"),
-    ("live", "Live sunspots and aurora (from NOAA, uses the internet)"),
+let scopeSwitches: [(key: String, label: String, tip: String)] = [
+    ("strange", "Strange sightings", "Made-up ships and odd things drifting by now and then"),
+    ("tour", "Tour", "Flies off somewhere by itself every minute or so"),
+    ("constellations", "Constellations", "Their lines and names, and the brightest stars' names"),
+    ("live", "Live sunspots and aurora", "Today's sunspots and aurora, from NOAA (uses the internet)"),
 ]
 
 // Space Scope's strange sightings, to show one by hand (the same list as src/oddities/catalog.js: a test checks).
@@ -747,10 +748,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     // MARK: The menu
 
-    private func item(_ title: String, _ action: Selector?, key: String = "", on: Bool = false) -> NSMenuItem {
+    private func item(_ title: String, _ action: Selector?, key: String = "", on: Bool = false, tip: String? = nil) -> NSMenuItem {
         let it = NSMenuItem(title: title, action: action, keyEquivalent: key)
         it.target = self
         it.state = on ? .on : .off
+        it.toolTip = tip
+        return it
+    }
+
+    /// An item that opens a menu of `items`.
+    private func submenu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {
+        let menu = NSMenu()
+        for it in items { menu.addItem(it) }
+        let it = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        it.submenu = menu
         return it
     }
 
@@ -761,131 +772,104 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         return false
     }
 
+    /// The menu: tonight's sky, the few things done often, and everything else in Settings.
     private func rebuildMenu() {
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(item("Solar System Live \(buildName)", nil))
         skyItems = makeSkyItems()
         for it in skyItems { menu.addItem(it) }
         if !fellBack.isEmpty || !gaveUp.isEmpty {
-            menu.addItem(item("Space Scope kept stopping on a screen, so it shows the lean picture there", nil))
+            menu.addItem(item("A screen shows the lean picture", nil, tip: "Space Scope kept stopping there. Picking a picture in Settings tries it again."))
+            menu.addItem(.separator())
         }
-        menu.addItem(.separator())
-
-        let styleMenu = NSMenu()
-        for choice in styleChoices {
-            let it = item(choice.label, #selector(pickStyle(_:)), on: settings.style == choice.style)
-            it.representedObject = choice.style.rawValue
-            styleMenu.addItem(it)
-        }
-        let styleItem = NSMenuItem(title: "Picture", action: nil, keyEquivalent: "")
-        styleItem.submenu = styleMenu
-        menu.addItem(styleItem)
-
+        menu.addItem(item("Open Space Scope…", #selector(openScope), tip: "Fly about, and what you leave it showing becomes the wallpaper"))
         if settings.style == .scope {
-            let viewMenu = NSMenu()
-            for choice in viewChoices {
+            menu.addItem(submenu("Look at", viewChoices.map { choice in
                 let it = item(choice.label, #selector(pickView(_:)), on: settings.view == choice.id)
                 it.representedObject = choice.id
-                viewMenu.addItem(it)
-            }
-            let current = viewChoices.first(where: { $0.id == settings.view })?.label ?? settings.view
-            let viewItem = NSMenuItem(title: "Look at (now \(current))", action: nil, keyEquivalent: "")
-            viewItem.submenu = viewMenu
-            menu.addItem(viewItem)
+                return it
+            }))
         } else {
-            let zoomMenu = NSMenu()
-            for choice in zoomChoices {
+            let zoom = zoomChoices.map { choice -> NSMenuItem in
                 let it = item("\(number(choice.zoom))×   \(choice.label)", #selector(pickZoom(_:)), on: abs(settings.zoom - choice.zoom) < 0.05)
                 it.representedObject = choice.zoom
-                zoomMenu.addItem(it)
+                return it
             }
-            zoomMenu.addItem(.separator())
-            zoomMenu.addItem(item("Zoom in", #selector(zoomIn), key: "+"))
-            zoomMenu.addItem(item("Zoom out", #selector(zoomOut), key: "-"))
-            let zoomItem = NSMenuItem(title: "Zoom (now \(number(settings.zoom))×)", action: nil, keyEquivalent: "")
-            zoomItem.submenu = zoomMenu
-            menu.addItem(zoomItem)
+            menu.addItem(submenu("Zoom", zoom + [.separator(), item("Zoom in", #selector(zoomIn), key: "+"), item("Zoom out", #selector(zoomOut), key: "-")]))
         }
+        menu.addItem(item(paused ? "Resume" : "Pause", #selector(togglePause)))
+        menu.addItem(.separator())
+        menu.addItem(submenu("Settings", settingsItems()))
+        menu.addItem(item("Quit", #selector(quit), key: "q"))
+        statusItem.menu = menu
+    }
 
-        let speedMenu = NSMenu()
-        for choice in speedChoices {
+    /// Everything else, out of the way: the picture and time, what shows, the screens and the battery, and the rest.
+    private func settingsItems() -> [NSMenuItem] {
+        var items: [NSMenuItem] = []
+        items.append(submenu("Picture", styleChoices.map { choice in
+            let it = item(choice.label, #selector(pickStyle(_:)), on: settings.style == choice.style, tip: choice.tip)
+            it.representedObject = choice.style.rawValue
+            return it
+        }))
+        items.append(submenu("Time speed", speedChoices.map { choice in
             let it = item(choice.label, #selector(pickSpeed(_:)), on: settings.speed == choice.id)
             it.representedObject = choice.id
-            speedMenu.addItem(it)
+            return it
+        }))
+        // What shows, in a menu of its own; how it moves, here.
+        let switches = (switchChoices + (settings.style == .scope ? scopeSwitches : [])).map { choice -> (key: String, item: NSMenuItem) in
+            let it = item(choice.label, #selector(flip(_:)), on: settings.isOn(choice.key), tip: choice.tip)
+            it.representedObject = choice.key
+            return (choice.key, it)
         }
-        let speedItem = NSMenuItem(title: "Time speed", action: nil, keyEquivalent: "")
-        speedItem.submenu = speedMenu
-        menu.addItem(speedItem)
-
+        let moving: Set<String> = ["drift", "tour", "strange", "live"]
+        items.append(submenu("Show", switches.filter { !moving.contains($0.key) }.map { $0.item }))
+        items.append(.separator())
+        items += switches.filter { moving.contains($0.key) }.map { $0.item }
+        items.append(.separator())
         if settings.style == .scope {
-            let strangeMenu = NSMenu()
             let any = item("Any one", #selector(showStrange(_:)))
             any.representedObject = ""
-            strangeMenu.addItem(any)
-            strangeMenu.addItem(.separator())
-            for choice in strangeChoices {
+            items.append(submenu("Show a strange sighting", [any, .separator()] + strangeChoices.map { choice in
                 let it = item(choice.name, #selector(showStrange(_:)))
                 it.representedObject = choice.id
-                strangeMenu.addItem(it)
-            }
-            let strangeItem = NSMenuItem(title: "Show a strange sighting", action: nil, keyEquivalent: "")
-            strangeItem.submenu = strangeMenu
-            menu.addItem(strangeItem)
+                return it
+            }))
         }
-
-        menu.addItem(.separator())
-        for choice in switchChoices + (settings.style == .scope ? scopeSwitches : []) {
-            let it = item(choice.label, #selector(flip(_:)), on: settings.isOn(choice.key))
-            it.representedObject = choice.key
-            menu.addItem(it)
-        }
-
-        menu.addItem(.separator())
-        let batteryMenu = NSMenu()
-        batteryMenu.addItem(item(powerNote(), nil))
-        batteryMenu.addItem(.separator())
-        for choice in batteryChoices {
-            let it = item(choice.label, #selector(pickBattery(_:)), on: settings.batteryMode == choice.mode)
-            it.representedObject = choice.mode.rawValue
-            batteryMenu.addItem(it)
-        }
-        let batteryItem = NSMenuItem(title: "When on the battery", action: nil, keyEquivalent: "")
-        batteryItem.submenu = batteryMenu
-        menu.addItem(batteryItem)
-        menu.addItem(item("Show on every screen", #selector(toggleAllScreens), on: settings.allScreens))
-        if NSScreen.screens.count > 1 {
-            menu.addItem(item("One picture across all the screens", settings.allScreens ? #selector(toggleSpan) : nil,
-                              on: settings.span && settings.allScreens))
-        }
-        menu.addItem(item("The Moon's phase in the menu bar", #selector(toggleMoonIcon), on: settings.moonIcon))
-        menu.addItem(item("Pause the wallpaper", #selector(togglePause), on: paused))
-        if #available(macOS 13.0, *) {
-            menu.addItem(item("Open at login", #selector(toggleLogin), on: launchesAtLogin))
-        }
-        menu.addItem(.separator())
-        let pictureMenu = NSMenu()
         let main = NSScreen.screens.first
         let sharp = main.map { [Int($0.frame.width * $0.backingScaleFactor), Int($0.frame.height * $0.backingScaleFactor)] } ?? [2880, 1800]
-        for (label, size) in [("4K (3840 × 2160)", [3840, 2160]), ("5K (5120 × 2880)", [5120, 2880]), ("8K (7680 × 4320)", [7680, 4320]),
-                              ("This screen's shape, sharp (\(sharp[0]) × \(sharp[1]))", sharp)] {
-            let it = item(label, #selector(savePicture(_:)))
+        let sizes: [(String, [Int])] = [("4K", [3840, 2160]), ("5K", [5120, 2880]), ("8K", [7680, 4320]), ("This screen, \(sharp[0]) × \(sharp[1])", sharp)]
+        items.append(submenu("Save a picture", sizes.map { label, size in
+            let it = item(label, #selector(savePicture(_:)), tip: "\(size[0]) × \(size[1]), saved in Pictures, in a folder called Solar System Live")
             it.representedObject = size
-            pictureMenu.addItem(it)
+            return it
+        }))
+        items.append(.separator())
+        items.append(item("Every screen", #selector(toggleAllScreens), on: settings.allScreens, tip: "The wallpaper on every screen, not only the main one"))
+        if NSScreen.screens.count > 1 {
+            items.append(item("One picture across screens", settings.allScreens ? #selector(toggleSpan) : nil, on: settings.span && settings.allScreens,
+                              tip: "The screens make one big picture, laid out as macOS has them"))
         }
-        pictureMenu.addItem(.separator())
-        pictureMenu.addItem(item("Saved in Pictures, in a folder called Solar System Live", nil))
-        let pictureItem = NSMenuItem(title: "Save a picture of the wallpaper", action: nil, keyEquivalent: "")
-        pictureItem.submenu = pictureMenu
-        menu.addItem(pictureItem)
-        menu.addItem(item("Set up the wallpaper in Space Scope…", #selector(openScope)))
-        menu.addItem(item("Reset the wallpaper…", #selector(askToReset)))
-        menu.addItem(item("Credits", #selector(openCredits)))
-        menu.addItem(item("Show the log (for when something goes wrong)", #selector(openLog)))
-        menu.addItem(item("Copy the log (to paste when asking for help)", #selector(copyLog)))
-        menu.addItem(.separator())
-        menu.addItem(item("Quit Solar System Live", #selector(quit), key: "q"))
-        statusItem.menu = menu
+        items.append(submenu("On battery", [item(powerNote(), nil), .separator()] + batteryChoices.map { choice in
+            let it = item(choice.label, #selector(pickBattery(_:)), on: settings.batteryMode == choice.mode, tip: choice.tip)
+            it.representedObject = choice.mode.rawValue
+            return it
+        }))
+        items.append(item("Moon in the menu bar", #selector(toggleMoonIcon), on: settings.moonIcon, tip: "Tonight's Moon, in its real phase, as this menu's icon"))
+        if #available(macOS 13.0, *) {
+            items.append(item("Open at login", #selector(toggleLogin), on: launchesAtLogin))
+        }
+        items.append(.separator())
+        items.append(item("Reset…", #selector(askToReset), tip: "The wallpaper back to how it started"))
+        items.append(submenu("Help", [
+            item("Credits", #selector(openCredits)),
+            item("Show the log", #selector(openLog), tip: "What the app did, for when something goes wrong"),
+            item("Copy the log", #selector(copyLog), tip: "To paste when asking for help"),
+        ]))
+        items.append(.separator())
+        items.append(item("Solar System Live \(buildName)", nil))
+        return items
     }
 
     // MARK: What the menu does
@@ -1050,45 +1034,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         }
     }
 
-    /// The sky facts at the top of the menu: tonight's Moon, the next eclipses, and a list of what else is coming up.
-    /// Clicking one opens Space Scope at that moment, looking at it.
+    /// The sky at the top of the menu: tonight's Moon, and the next eclipse with what else is coming up under it.
+    /// Clicking one of those opens Space Scope at that moment, looking at it. (Ends with a separator; none at all if the
+    /// facts can't be had.)
     private func makeSkyItems() -> [NSMenuItem] {
         guard let sky = facts.read() else { return [] }
-        var items: [NSMenuItem] = [.separator()]
-        let moon = item("\(sky.moonName), \(Int((sky.lit * 100).rounded()))% lit · full \(soonText(sky.nextFull)), \(dayText(sky.nextFull))",
-                        #selector(openSkyMoment(_:)))
-        moon.representedObject = sky.nextFull
+        let percent = Int((sky.lit * 100).rounded())
+        let moon = item("\(sky.moonName) · \(percent)%", nil, tip: "\(percent)% lit tonight. Full \(soonText(sky.nextFull)), \(dayText(sky.nextFull)).")
         if let image = NSImage(systemSymbolName: sky.moonSymbol, accessibilityDescription: sky.moonName) {
             image.isTemplate = true
             moon.image = image
         }
-        items.append(moon)
-        for (i, eclipse) in sky.eclipses.enumerated() {
-            let it = item("\(i == 0 ? "Next eclipse" : "Then"): \(eclipse.title), \(dayText(eclipse.when)) (\(soonText(eclipse.when)))",
-                          #selector(openSkyMoment(_:)))
-            it.representedObject = eclipse.when
-            items.append(it)
-        }
-        if !sky.coming.isEmpty {
-            let coming = NSMenu()
-            for event in sky.coming {
-                let it = item("\(event.title): \(dayText(event.when)) (\(soonText(event.when)))", #selector(openSkyMoment(_:)))
+        var items = [moon]
+        if let next = sky.eclipses.first {
+            let moment = { (event: SkyEvent) -> NSMenuItem in
+                let it = self.item("\(event.title) · \(dayText(event.when))", #selector(self.openSkyMoment(_:)), tip: "Opens Space Scope then, looking at it")
                 it.representedObject = event.when
-                coming.addItem(it)
+                return it
             }
-            let comingItem = NSMenuItem(title: "Coming up in the sky", action: nil, keyEquivalent: "")
-            comingItem.submenu = coming
-            items.append(comingItem)
+            let coming = sky.coming.isEmpty ? [] : [NSMenuItem.separator()] + sky.coming.map(moment)
+            items.append(submenu("Next eclipse \(soonText(next.when))", sky.eclipses.map(moment) + coming))
         }
-        return items
+        return items + [.separator()]
     }
 
-    /// Just before the menu opens: the sky facts as they are now (the menu itself is only made again when a choice changes).
+    /// Just before the menu opens: the sky as it is now (the rest of the menu is only made again when a choice changes).
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === statusItem.menu else { return }
         for it in skyItems where it.menu === menu { menu.removeItem(it) }
         skyItems = makeSkyItems()
-        for (i, it) in skyItems.enumerated() { menu.insertItem(it, at: 1 + i) }
+        for (i, it) in skyItems.enumerated() { menu.insertItem(it, at: i) }
         updateIcon()
     }
 

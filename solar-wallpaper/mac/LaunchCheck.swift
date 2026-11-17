@@ -93,7 +93,16 @@ enum LaunchCheck {
         // The Space Scope picture, as the app starts.
         steps.append((15, {
             ask(hooks, stateJS, "page state (scope):")
-            say("launch check: menu: " + (hooks.menu()?.items.map { $0.isSeparatorItem ? "-" : $0.title }.joined(separator: " | ") ?? "none"))
+            // The menu as it reads, a submenu's ticked choice in brackets: the top, and Settings.
+            let describe = { (menu: NSMenu?) -> String in
+                (menu?.items ?? []).map { item -> String in
+                    if item.isSeparatorItem { return "-" }
+                    if let on = item.submenu?.items.first(where: { $0.state == .on }) { return "\(item.title) [\(on.title)]" }
+                    return item.title
+                }.joined(separator: " | ")
+            }
+            say("launch check: menu: " + describe(hooks.menu()))
+            say("launch check: settings menu: " + describe(hooks.menu()?.items.first(where: { $0.title == "Settings" })?.submenu))
             hooks.web()?.takeSnapshot(with: nil) { image, error in
                 guard let image = image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else {
                     say("launch check: no snapshot: \(error?.localizedDescription ?? "unknown")")
