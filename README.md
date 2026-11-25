@@ -30,11 +30,11 @@ You need two things:
 Open the **Terminal** app and run these one at a time:
 
 ```bash
-git clone https://github.com/pradeepw1/Vibing.git
+git clone -b claude/wonderful-tesla-irl54a https://github.com/pradeepw1/Vibing.git Buddy
 ```
 
 ```bash
-cd Vibing
+cd Buddy
 ```
 
 ```bash
@@ -43,7 +43,15 @@ cd Vibing
 
 The first run takes a few minutes. When it's done, Buddy is in your Applications folder and opens by itself. Paste your API key and start chatting.
 
-To update later, run `git pull` and then `./install.sh` again. Your chats and settings stay where they are.
+To update later, run `git pull` and then `./install.sh` again from the same folder. Your chats and settings stay where they are.
+
+### Or download the ready-made app (no Node.js needed)
+
+GitHub builds and tests Buddy on a Mac every time the code changes.
+
+1. Open the [Buddy Mac app builds](https://github.com/pradeepw1/Vibing/actions/workflows/buddy-mac.yml) page and click the newest run with a green check.
+2. Under **Artifacts**, download **Buddy-for-Apple-chip-Macs** (or **Buddy-for-Intel-Macs** for an older Intel Mac). Unzip it until you see **Buddy**, and drag it into your Applications folder.
+3. The first time you open it, macOS will say it can't check the app. That's because it isn't registered with Apple (that needs a paid developer account). Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
 
 ## Handy shortcuts
 

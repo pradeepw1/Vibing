@@ -145,10 +145,12 @@ class Store {
 
   async setApiKey(key) {
     let record;
-    if (this.safeStorage.isEncryptionAvailable()) {
+    // Automated tests skip the Keychain (a Keychain prompt would hang a test machine).
+    const skipKeychain = process.env.BUDDY_PLAIN_KEY_STORAGE === '1';
+    if (!skipKeychain && this.safeStorage.isEncryptionAvailable()) {
       record = { encrypted: true, apiKey: this.safeStorage.encryptString(key).toString('base64') };
     } else {
-      // Only happens on systems without a keychain (like a Linux test box).
+      // Tests, or systems without a keychain (like a Linux test box).
       record = { encrypted: false, apiKey: key };
     }
     await writeFileAtomic(this.secretsFile, JSON.stringify(record), 0o600);

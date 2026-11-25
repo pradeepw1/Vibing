@@ -30,6 +30,7 @@ async function launch() {
       BUDDY_USER_DATA: userData,
       BUDDY_API_BASE_URL: mockUrl,
       BUDDY_TEST_AUTOCONFIRM: '1',
+      BUDDY_PLAIN_KEY_STORAGE: '1',
     },
   });
   win = await app.firstWindow();

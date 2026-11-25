@@ -1,0 +1,97 @@
+name: Buddy Mac app
+
+# On one of GitHub's Macs: runs Buddy's end-to-end test, builds Buddy.app for
+# Apple-chip and Intel Macs, and checks both are signed and that the app starts.
+# The zipped apps (and the test's screenshots) are kept with each run, under "Artifacts".
+on:
+  push:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "build/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/buddy-mac.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Run the end-to-end test
+        env:
+          BUDDY_SHOTS: ${{ runner.temp }}/shots
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npm test
+
+      - name: Keep the test's screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+
+      - name: Build Buddy.app
+        run: npx electron-builder --mac --dir --arm64 --x64
+
+      - name: Check both apps
+        run: |
+          for app in dist/mac-arm64/Buddy.app dist/mac/Buddy.app; do
+            echo "== $app"
+            lipo -archs "$app/Contents/MacOS/Buddy"
+            codesign --verify --deep --strict "$app"
+            codesign -dv "$app" 2>&1 | grep -E "Identifier|Signature"
+            test -f "$app/Contents/Resources/app.asar"
+            test -f "$app/Contents/Resources/icon.icns"
+            du -sh "$app"
+          done
+
+      - name: Start the app and check it keeps running
+        run: |
+          data="$RUNNER_TEMP/buddy-data"
+          BUDDY_USER_DATA="$data" dist/mac-arm64/Buddy.app/Contents/MacOS/Buddy > run.log 2>&1 &
+          pid=$!
+          sleep 20
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "::notice::Buddy.app started and was still running 20 seconds later"
+            kill "$pid"
+          else
+            echo "::error::Buddy.app quit by itself"
+            cat run.log
+            exit 1
+          fi
+          test -d "$data/conversations" || { echo "::error::Buddy didn't set up its data folder"; exit 1; }
+
+      - name: Zip the apps
+        run: |
+          ditto -c -k --keepParent dist/mac-arm64/Buddy.app Buddy-Apple-chip.zip
+          ditto -c -k --keepParent dist/mac/Buddy.app Buddy-Intel.zip
+          ls -lh ./*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Buddy-for-Apple-chip-Macs
+          path: Buddy-Apple-chip.zip
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Buddy-for-Intel-Macs
+          path: Buddy-Intel.zip
+          compression-level: 0
