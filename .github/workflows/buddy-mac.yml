@@ -39,14 +39,6 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright
           npm test
 
-      - name: Keep the test's screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-screenshots
-          path: ${{ runner.temp }}/shots
-          if-no-files-found: ignore
-
       - name: Build Buddy.app
         run: npx electron-builder --mac --dir --arm64 --x64
 
@@ -65,9 +57,15 @@ jobs:
       - name: Start the app and check it keeps running
         run: |
           data="$RUNNER_TEMP/buddy-data"
+          mkdir -p "$data"
+          # A stand-in key (never sent anywhere: nothing is typed) so it opens to the chat screen.
+          echo '{"encrypted":false,"apiKey":"sk-ant-placeholder-for-the-screenshot"}' > "$data/secrets.json"
+          echo '{"name":"Sam"}' > "$data/settings.json"
           BUDDY_USER_DATA="$data" dist/mac-arm64/Buddy.app/Contents/MacOS/Buddy > run.log 2>&1 &
           pid=$!
           sleep 20
+          mkdir -p "$RUNNER_TEMP/shots"
+          screencapture -x "$RUNNER_TEMP/shots/real-mac-window.png" || true
           if kill -0 "$pid" 2>/dev/null; then
             echo "::notice::Buddy.app started and was still running 20 seconds later"
             kill "$pid"
@@ -77,6 +75,14 @@ jobs:
             exit 1
           fi
           test -d "$data/conversations" || { echo "::error::Buddy didn't set up its data folder"; exit 1; }
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
 
       - name: Zip the apps
         run: |
