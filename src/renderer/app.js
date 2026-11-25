@@ -1,0 +1,1876 @@
+// Buddy - the chat window.
+
+import { renderMarkdown, escapeHtml } from './markdown.js';
+import { icon, logo } from './icons.js';
+
+const api = window.buddy;
+
+const EFFORT_LABELS = { low: 'Quick', medium: 'Balanced', high: 'Deep' };
+const EFFORT_HINTS = {
+  low: 'Short thinking, fastest replies',
+  medium: 'A good balance for most things',
+  high: 'Thinks longer on hard problems',
+};
+const MAX_ATTACHMENTS = 20;
+const SUGGESTIONS = [
+  { icon: 'pen', label: 'Help me write', prompt: 'Help me write ' },
+  { icon: 'bulb', label: 'Explain something', prompt: 'Explain this to me like I’m new to it: ' },
+  { icon: 'calendar', label: 'Plan my week', prompt: 'Help me plan my week. Here’s what I have going on: ' },
+  { icon: 'code', label: 'Code with me', prompt: 'Help me with some code. ' },
+];
+
+const state = {
+  info: null,
+  settings: {},
+  models: [],
+  hasKey: false,
+  keyHint: '',
+  chats: [],
+  search: '',
+  current: null, // { id, title, isNew, messages: [] }
+  composer: { model: 'claude-opus-5-5', effort: 'medium', webSearch: true },
+  drafts: [], // { tempId, pending, meta?, previewUrl?, name }
+  editingId: null,
+  renamingId: null,
+  shortcutOk: true,
+};
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const uuid = () => crypto.randomUUID();
+
+function h(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function formatSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function modelLabel(id) {
+  return state.models.find((m) => m.id === id)?.label || 'Claude';
+}
+
+function assistantName() {
+  return (state.settings.assistantName || '').trim() || 'Buddy';
+}
+
+function toast(text, kind = '') {
+  const root = $('.toasts');
+  if (!root) return;
+  const el = h(`<div class="toast ${kind}"></div>`);
+  el.textContent = text;
+  root.appendChild(el);
+  setTimeout(() => el.remove(), kind === 'error' ? 5000 : 2200);
+}
+
+async function copyText(text, note = 'Copied') {
+  await api.copy(text);
+  toast(note);
+}
+
+function errorText(err) {
+  const msg = String(err?.message || err || 'Something went wrong');
+  // Errors thrown in the main process arrive as "Error invoking remote method '...': Error: <text>"
+  return msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Boot
+
+async function boot() {
+  const info = await api.init();
+  state.info = info;
+  state.settings = info.settings;
+  state.models = info.models;
+  state.hasKey = info.hasKey;
+  state.keyHint = info.keyHint || '';
+  state.shortcutOk = info.shortcutOk;
+  document.body.classList.toggle('mac', info.platform === 'darwin');
+  applyTheme();
+  applyFont();
+  resetComposerOptions();
+
+  api.onEvent(onEvent);
+  api.onMenu(onMenu);
+  wireGlobalKeys();
+  wireDragAndDrop();
+
+  if (!state.hasKey) renderOnboarding();
+  else startApp();
+}
+
+function applyFont() {
+  document.body.classList.toggle('font-serif', state.settings.font === 'serif');
+}
+
+// "system" follows the Mac's light/dark setting; "light" and "dark" force one.
+function applyTheme() {
+  document.documentElement.dataset.theme = state.settings.theme || 'system';
+}
+
+function resetComposerOptions() {
+  state.composer = {
+    model: state.settings.model,
+    effort: state.settings.effort,
+    webSearch: state.settings.webSearch,
+  };
+}
+
+function startApp() {
+  renderShell();
+  newChat();
+  loadChats();
+}
+
+// ---------------------------------------------------------------------------------------------
+// First run
+
+function renderOnboarding() {
+  const root = $('#root');
+  root.innerHTML = '';
+  const el = h(`
+    <div class="onboard drag">
+      <div class="onboard-card">
+        ${logo(52)}
+        <h1>Welcome to Buddy</h1>
+        <p class="lead">Your own Claude, right on your Mac. Let’s get you set up in a minute.</p>
+        <ol class="steps">
+          <li>
+            <div class="step-head">Get an API key from Anthropic</div>
+            <button class="btn" data-act="console">${icon('external', 15)} Open the Anthropic Console</button>
+          </li>
+          <li>
+            <div class="step-head">Paste your key here</div>
+            <input class="input" type="password" id="ob-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          </li>
+          <li>
+            <div class="step-head">What should Buddy call you? <span class="kbd">(optional)</span></div>
+            <input class="input" type="text" id="ob-name" placeholder="Your first name" autocomplete="off" />
+          </li>
+        </ol>
+        <div class="row between">
+          <div class="form-msg" id="ob-msg"></div>
+          <button class="btn primary" id="ob-go">Get started</button>
+        </div>
+        <div class="fine-print">${icon('shield', 15)}<div>Your key is locked in your Mac’s Keychain and is only used to talk to Anthropic. Chats are saved on this Mac. You pay Anthropic directly for what you use.</div></div>
+      </div>
+    </div>`);
+  root.appendChild(el);
+  root.appendChild(h('<div class="toasts"></div>'));
+  const keyInput = $('#ob-key', el);
+  const nameInput = $('#ob-name', el);
+  nameInput.value = state.settings.name || '';
+  const go = $('#ob-go', el);
+  const msg = $('#ob-msg', el);
+  $('[data-act="console"]', el).addEventListener('click', () => api.openExternal('https://platform.claude.com/settings/keys'));
+
+  async function submit() {
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    const key = keyInput.value.trim();
+    if (!key) {
+      msg.textContent = 'Paste your API key first.';
+      msg.classList.add('error');
+      keyInput.focus();
+      return;
+    }
+    go.disabled = true;
+    go.textContent = 'Checking…';
+    const result = await api.setApiKey(key).catch((err) => ({ ok: false, error: errorText(err) }));
+    go.disabled = false;
+    go.textContent = 'Get started';
+    if (!result.ok) {
+      msg.textContent = result.error;
+      msg.classList.add('error');
+      return;
+    }
+    const name = nameInput.value.trim();
+    if (name !== (state.settings.name || '')) {
+      const saved = await api.saveSettings({ name });
+      state.settings = saved.settings;
+    }
+    state.hasKey = true;
+    state.keyHint = result.keyHint || '';
+    startApp();
+    if (result.warning) toast(result.warning);
+  }
+  go.addEventListener('click', submit);
+  keyInput.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  nameInput.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  setTimeout(() => keyInput.focus(), 50);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Main layout
+
+function renderShell() {
+  const root = $('#root');
+  root.innerHTML = '';
+  const app = h(`
+    <div class="app ${state.settings.sidebarCollapsed ? 'sidebar-collapsed' : ''}">
+      <aside class="sidebar">
+        <div class="sidebar-head drag">
+          <button class="icon-btn" data-act="toggle-sidebar" title="Hide sidebar (⌘\\)">${icon('sidebar')}</button>
+        </div>
+        <div class="brand">${logo(24)}<span class="brand-name"></span></div>
+        <button class="new-chat" data-act="new-chat">${icon('newChat', 17)}<span>New chat</span><span class="kbd">⌘N</span></button>
+        <div class="search-box">${icon('search', 15)}<input type="text" placeholder="Search chats" spellcheck="false" /></div>
+        <nav class="chat-list"></nav>
+        <div class="sidebar-foot">
+          <button class="profile" data-act="settings" title="Settings">
+            <span class="avatar"></span><span class="name"></span>
+          </button>
+          <button class="icon-btn" data-act="settings" title="Settings (⌘,)">${icon('settings')}</button>
+        </div>
+      </aside>
+      <main class="main empty">
+        <header class="topbar drag">
+          <button class="icon-btn when-collapsed" data-act="toggle-sidebar" title="Show sidebar (⌘\\)">${icon('sidebar')}</button>
+          <button class="icon-btn when-collapsed" data-act="new-chat" title="New chat (⌘N)">${icon('newChat', 17)}</button>
+          <div class="topbar-title"></div>
+        </header>
+        <div class="scroller">
+          <div class="welcome">
+            ${logo(46)}
+            <h1 class="greeting"></h1>
+            <div class="greeting-sub">How can I help you today?</div>
+          </div>
+          <div class="thread"></div>
+        </div>
+        <button class="to-bottom" title="Scroll to bottom">${icon('arrowDown', 17)}</button>
+        <div class="composer-area">
+          <div class="composer">
+            <div class="drafts"></div>
+            <textarea rows="1" spellcheck="true"></textarea>
+            <div class="toolbar">
+              <button class="tool-btn" data-act="attach" title="Add photos and files">${icon('paperclip', 17)}</button>
+              <button class="tool-btn web-btn" data-act="web" title="Let Claude search the web">${icon('globe', 17)}<span>Search</span></button>
+              <div class="spacer"></div>
+              <button class="tool-btn model-btn" data-act="model"><span class="model-name"></span>${icon('chevronDown', 14)}</button>
+              <button class="send-btn" data-act="send" title="Send (Enter)">${icon('arrowUp', 18)}</button>
+            </div>
+            <input type="file" class="file-input" multiple hidden />
+          </div>
+          <div class="suggestions"></div>
+          <div class="footnote"></div>
+        </div>
+      </main>
+      <div class="drop-overlay">Drop files to add them to your message</div>
+      <div class="toasts"></div>
+    </div>`);
+  root.appendChild(app);
+
+  app.addEventListener('click', onClick);
+
+  const search = $('.search-box input', app);
+  const runSearch = debounce(() => {
+    state.search = search.value;
+    loadChats();
+  }, 180);
+  search.addEventListener('input', runSearch);
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      search.value = '';
+      state.search = '';
+      loadChats();
+      focusComposer();
+    }
+  });
+
+  const suggestions = $('.suggestions', app);
+  for (const s of SUGGESTIONS) {
+    const b = h(`<button class="suggestion">${icon(s.icon, 15)}<span></span></button>`);
+    b.querySelector('span').textContent = s.label;
+    b.addEventListener('click', () => {
+      const ta = composerInput();
+      ta.value = s.prompt;
+      autosize();
+      updateComposer();
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+    suggestions.appendChild(b);
+  }
+
+  wireComposer();
+  wireScroller();
+  renderProfile();
+  updateComposer();
+}
+
+function renderProfile() {
+  const name = (state.settings.name || '').trim();
+  $('.profile .avatar').textContent = (name[0] || '?').toUpperCase();
+  $('.profile .name').textContent = name || 'You';
+  $('.brand-name').textContent = assistantName();
+  $('.composer textarea').placeholder = `Message ${assistantName()}…`;
+  $('.footnote').textContent = `${assistantName()} runs on Claude and can make mistakes. Double-check anything important.`;
+  updateGreeting();
+}
+
+function updateGreeting() {
+  const el = $('.greeting');
+  if (!el) return;
+  const hour = new Date().getHours();
+  const part = hour < 5 ? 'Up late' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Up late';
+  const name = (state.settings.name || '').trim();
+  el.textContent = name ? `${part}, ${name}` : part;
+}
+
+function onClick(e) {
+  const target = e.target.closest('[data-act]');
+  if (!target) return;
+  const act = target.dataset.act;
+  switch (act) {
+    case 'toggle-sidebar':
+      toggleSidebar();
+      break;
+    case 'new-chat':
+      newChat();
+      break;
+    case 'settings':
+      openSettings();
+      break;
+    case 'attach':
+      $('.file-input').click();
+      break;
+    case 'web':
+      setComposerOption({ webSearch: !state.composer.webSearch }, true);
+      toast(state.composer.webSearch ? 'Web search is on' : 'Web search is off');
+      break;
+    case 'model':
+      openModelMenu(target);
+      break;
+    case 'send':
+      if (isBusy()) stopReply();
+      else sendMessage();
+      break;
+    default:
+      break;
+  }
+}
+
+function onMenu(action) {
+  if (!state.hasKey) return;
+  switch (action) {
+    case 'new-chat':
+      newChat();
+      break;
+    case 'settings':
+      openSettings();
+      break;
+    case 'toggle-sidebar':
+      toggleSidebar();
+      break;
+    case 'search': {
+      if (state.settings.sidebarCollapsed) toggleSidebar();
+      const input = $('.search-box input');
+      input?.focus();
+      input?.select();
+      break;
+    }
+    case 'focus-composer':
+      if (!document.querySelector('.overlay')) focusComposer();
+      break;
+    default:
+      break;
+  }
+}
+
+async function toggleSidebar() {
+  const collapsed = !state.settings.sidebarCollapsed;
+  state.settings.sidebarCollapsed = collapsed;
+  $('.app')?.classList.toggle('sidebar-collapsed', collapsed);
+  const saved = await api.saveSettings({ sidebarCollapsed: collapsed });
+  state.settings = saved.settings;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sidebar
+
+async function loadChats() {
+  try {
+    state.chats = await api.listChats(state.search);
+  } catch {
+    state.chats = [];
+  }
+  renderChatList();
+}
+
+const reloadChats = debounce(loadChats, 120);
+
+function groupLabel(ts) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = 86400000;
+  if (ts >= startOfToday) return 'Today';
+  if (ts >= startOfToday - day) return 'Yesterday';
+  if (ts >= startOfToday - 7 * day) return 'Previous 7 days';
+  if (ts >= startOfToday - 30 * day) return 'Previous 30 days';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function renderChatList() {
+  const list = $('.chat-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!state.chats.length) {
+    const empty = h('<div class="chat-empty"></div>');
+    empty.textContent = state.search ? 'No chats match your search.' : 'Your chats will show up here.';
+    list.appendChild(empty);
+    return;
+  }
+  let lastGroup = '';
+  for (const chat of state.chats) {
+    const group = groupLabel(chat.updatedAt || chat.createdAt || 0);
+    if (group !== lastGroup) {
+      const g = h('<div class="chat-group"></div>');
+      g.textContent = group;
+      list.appendChild(g);
+      lastGroup = group;
+    }
+    list.appendChild(chatItem(chat));
+  }
+}
+
+function chatItem(chat) {
+  const active = state.current?.id === chat.id;
+  const item = h(`<div class="chat-item ${active ? 'active' : ''}" data-id="${escapeHtml(chat.id)}" title=""></div>`);
+  if (state.renamingId === chat.id) {
+    const input = h('<input type="text" maxlength="120" />');
+    input.value = chat.title;
+    item.appendChild(input);
+    const finish = async (save) => {
+      if (state.renamingId !== chat.id) return;
+      state.renamingId = null;
+      const title = input.value.trim();
+      if (save && title && title !== chat.title) {
+        await api.renameChat(chat.id, title);
+        if (state.current?.id === chat.id) {
+          state.current.title = title;
+          renderTitle();
+        }
+      }
+      loadChats();
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') finish(true);
+      if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+    return item;
+  }
+  const title = h('<span class="title"></span>');
+  title.textContent = chat.title || 'New chat';
+  item.title = chat.title || '';
+  item.appendChild(title);
+  if (chat.busy) item.appendChild(h('<span class="busy-dot" title="Replying…"></span>'));
+  const more = h(`<button class="icon-btn small more" title="More">${icon('more', 16)}</button>`);
+  item.appendChild(more);
+  more.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openChatMenu(more, chat);
+  });
+  item.addEventListener('click', () => openChat(chat.id));
+  item.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openChatMenu(more, chat);
+  });
+  item.addEventListener('dblclick', () => startRename(chat.id));
+  return item;
+}
+
+function startRename(id) {
+  state.renamingId = id;
+  renderChatList();
+}
+
+function openChatMenu(anchor, chat) {
+  const menu = h(`
+    <div class="popover">
+      <button class="menu-item" data-a="rename">${icon('pencil', 16)}<span class="mi-main">Rename</span></button>
+      <button class="menu-item danger" data-a="delete">${icon('trash', 16)}<span class="mi-main">Delete</span></button>
+    </div>`);
+  anchor.classList.add('open');
+  openPopover(anchor, menu, {
+    placement: 'below-start',
+    onClose: () => anchor.classList.remove('open'),
+  });
+  menu.addEventListener('click', async (e) => {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (!a) return;
+    closePopover();
+    if (a === 'rename') startRename(chat.id);
+    if (a === 'delete') {
+      const deleted = await api.deleteChat(chat.id);
+      if (deleted && state.current?.id === chat.id) newChat();
+      loadChats();
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Popovers
+
+let activePopover = null;
+
+function openPopover(anchor, el, { placement = 'above-end', onClose } = {}) {
+  closePopover();
+  document.body.appendChild(el);
+  const r = anchor.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const hgt = el.offsetHeight;
+  const margin = 8;
+  let top;
+  let left;
+  const spaceAbove = r.top;
+  const wantAbove = placement.startsWith('above') ? spaceAbove > hgt + margin : false;
+  if (wantAbove || (placement.startsWith('below') && window.innerHeight - r.bottom < hgt + margin && spaceAbove > hgt)) {
+    top = r.top - hgt - 6;
+  } else {
+    top = r.bottom + 6;
+  }
+  left = placement.endsWith('end') ? r.right - w : r.left;
+  left = Math.max(margin, Math.min(left, window.innerWidth - w - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - hgt - margin));
+  el.style.top = `${top}px`;
+  el.style.left = `${left}px`;
+
+  const onDown = (e) => {
+    if (!el.contains(e.target) && !anchor.contains(e.target)) closePopover();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closePopover();
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', onDown), 0);
+  document.addEventListener('keydown', onKey, true);
+  window.addEventListener('blur', closePopover, { once: true });
+  activePopover = {
+    el,
+    close: () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey, true);
+      el.remove();
+      onClose?.();
+    },
+  };
+}
+
+function closePopover() {
+  if (!activePopover) return;
+  const p = activePopover;
+  activePopover = null;
+  p.close();
+}
+
+function openModelMenu(anchor) {
+  const menu = h('<div class="popover" style="width: 300px"></div>');
+  const render = () => {
+    menu.innerHTML = '<div class="menu-section">Model</div>';
+    for (const m of state.models) {
+      const item = h(`
+        <button class="menu-item ${m.id === state.composer.model ? 'checked' : ''}" data-model="${escapeHtml(m.id)}">
+          <span class="mi-main"><div class="mi-title"></div><div class="mi-sub"></div></span>
+          <span class="check">${icon('check', 16)}</span>
+        </button>`);
+      item.querySelector('.mi-title').textContent = m.label;
+      item.querySelector('.mi-sub').textContent = m.blurb;
+      menu.appendChild(item);
+    }
+    menu.appendChild(h('<div class="menu-sep"></div>'));
+    menu.appendChild(h('<div class="menu-section">Thinking</div>'));
+    const seg = h('<div class="segmented"></div>');
+    for (const effort of ['low', 'medium', 'high']) {
+      const b = h(`<button data-effort="${effort}" class="${state.composer.effort === effort ? 'on' : ''}"></button>`);
+      b.textContent = EFFORT_LABELS[effort];
+      seg.appendChild(b);
+    }
+    menu.appendChild(seg);
+    const hint = h('<div class="menu-hint"></div>');
+    hint.textContent = EFFORT_HINTS[state.composer.effort] || '';
+    menu.appendChild(hint);
+  };
+  render();
+  menu.addEventListener('click', (e) => {
+    const modelBtn = e.target.closest('[data-model]');
+    const effortBtn = e.target.closest('[data-effort]');
+    if (modelBtn) {
+      setComposerOption({ model: modelBtn.dataset.model }, true);
+      closePopover();
+    } else if (effortBtn) {
+      setComposerOption({ effort: effortBtn.dataset.effort }, true);
+      render();
+    }
+  });
+  openPopover(anchor, menu, { placement: 'above-end' });
+}
+
+async function setComposerOption(patch, persist) {
+  Object.assign(state.composer, patch);
+  updateComposer();
+  if (persist) {
+    try {
+      const saved = await api.saveSettings(patch);
+      state.settings = saved.settings;
+    } catch {
+      // keep going; it's only a default
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Opening chats
+
+function newChat() {
+  if (!$('.app')) return;
+  state.current = { id: uuid(), title: 'New chat', isNew: true, messages: [] };
+  state.editingId = null;
+  resetComposerOptions();
+  renderConversation();
+  renderChatList();
+  focusComposer();
+}
+
+async function openChat(id) {
+  if (state.current?.id === id && !state.current.isNew) {
+    focusComposer();
+    return;
+  }
+  const conv = await api.getChat(id);
+  if (!conv) {
+    toast('That chat could not be opened.', 'error');
+    loadChats();
+    return;
+  }
+  state.current = { ...conv, isNew: false };
+  state.editingId = null;
+  if (state.models.some((m) => m.id === conv.model)) state.composer.model = conv.model;
+  renderConversation();
+  renderChatList();
+  scrollToBottom(true);
+  focusComposer();
+}
+
+function isBusy() {
+  return Boolean(state.current?.messages.some((m) => m.role === 'assistant' && m.status === 'streaming'));
+}
+
+function renderTitle() {
+  const title = state.current?.isNew ? 'New chat' : state.current?.title || 'New chat';
+  const el = $('.topbar-title');
+  if (el) el.textContent = title;
+  document.title = state.current && !state.current.isNew ? `${title} – ${assistantName()}` : assistantName();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rendering messages
+
+const messageNodes = new Map(); // message id -> element
+
+function renderConversation() {
+  const main = $('.main');
+  const thread = $('.thread');
+  if (!main || !thread) return;
+  const conv = state.current;
+  const empty = !conv || conv.messages.length === 0;
+  main.classList.toggle('empty', empty);
+  updateGreeting();
+  renderTitle();
+  thread.innerHTML = '';
+  messageNodes.clear();
+  if (!conv) return;
+  conv.messages.forEach((m) => {
+    const node = buildMessage(m);
+    messageNodes.set(m.id, node);
+    thread.appendChild(node);
+  });
+  markLast();
+  updateComposer();
+}
+
+function appendMessageNode(m) {
+  const thread = $('.thread');
+  const node = buildMessage(m);
+  messageNodes.set(m.id, node);
+  thread.appendChild(node);
+  $('.main').classList.remove('empty');
+  markLast();
+}
+
+function replaceMessageNode(m) {
+  const old = messageNodes.get(m.id);
+  const node = buildMessage(m);
+  messageNodes.set(m.id, node);
+  if (old && old.parentNode) old.replaceWith(node);
+  else $('.thread')?.appendChild(node);
+  markLast();
+}
+
+function markLast() {
+  const msgs = state.current?.messages || [];
+  const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant');
+  for (const [id, node] of messageNodes) node.classList.toggle('last', lastAssistant?.id === id && msgs[msgs.length - 1]?.id === id);
+}
+
+function buildMessage(m) {
+  return m.role === 'user' ? buildUser(m) : buildAssistant(m);
+}
+
+function attachmentNode(att, { thumbClass = 'thumb' } = {}) {
+  if (att.kind === 'image') {
+    const img = h(`<img class="${thumbClass}" alt="" draggable="false" />`);
+    img.src = `/att/${encodeURIComponent(att.id)}`;
+    img.alt = att.name;
+    img.title = att.name;
+    img.addEventListener('click', () => openLightbox(img.src));
+    return img;
+  }
+  const chip = h(`
+    <div class="file-chip">
+      <div class="file-icon ${att.kind === 'pdf' ? 'pdf' : ''}">${icon(att.kind === 'pdf' ? 'file' : 'fileText', 16)}</div>
+      <div class="meta"><div class="fname"></div><div class="fsub"></div></div>
+    </div>`);
+  chip.querySelector('.fname').textContent = att.name;
+  chip.querySelector('.fsub').textContent = `${att.kind === 'pdf' ? 'PDF' : 'Text'} · ${formatSize(att.size)}`;
+  chip.title = att.name;
+  return chip;
+}
+
+function openLightbox(src) {
+  const box = h('<div class="lightbox"><img alt="" /></div>');
+  box.querySelector('img').src = src;
+  const close = () => {
+    box.remove();
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+    }
+  };
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', onKey, true);
+  document.body.appendChild(box);
+}
+
+function buildUser(m) {
+  const node = h(`<div class="msg user" data-id="${escapeHtml(m.id)}"></div>`);
+  if (m.attachments?.length) {
+    const atts = h('<div class="user-atts"></div>');
+    for (const att of m.attachments) atts.appendChild(attachmentNode(att));
+    node.appendChild(atts);
+  }
+  if (state.editingId === m.id) {
+    const box = h(`
+      <div class="edit-box">
+        <textarea rows="1"></textarea>
+        <div class="row">
+          <button class="btn ghost" data-a="cancel">Cancel</button>
+          <button class="btn primary" data-a="save">Send</button>
+        </div>
+      </div>`);
+    const ta = box.querySelector('textarea');
+    ta.value = m.text;
+    const grow = () => {
+      ta.style.height = 'auto';
+      ta.style.height = `${Math.min(ta.scrollHeight, 320)}px`;
+      ta.style.overflowY = ta.scrollHeight > 320 ? 'auto' : 'hidden';
+    };
+    ta.addEventListener('input', grow);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        submitEdit(m, ta.value);
+      }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        cancelEdit(m);
+      }
+    });
+    box.querySelector('[data-a="cancel"]').addEventListener('click', () => cancelEdit(m));
+    box.querySelector('[data-a="save"]').addEventListener('click', () => submitEdit(m, ta.value));
+    node.appendChild(box);
+    setTimeout(() => {
+      grow();
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }, 0);
+    return node;
+  }
+  if (m.text) {
+    const bubble = h('<div class="bubble"></div>');
+    bubble.textContent = m.text;
+    node.appendChild(bubble);
+  }
+  const actions = h(`
+    <div class="msg-actions">
+      <button class="icon-btn small" data-a="copy" title="Copy">${icon('copy', 15)}</button>
+      <button class="icon-btn small" data-a="edit" title="Edit">${icon('pencil', 15)}</button>
+    </div>`);
+  actions.querySelector('[data-a="copy"]').addEventListener('click', () => copyText(m.text));
+  actions.querySelector('[data-a="edit"]').addEventListener('click', () => {
+    if (isBusy()) {
+      toast('Wait for the reply to finish first.');
+      return;
+    }
+    state.editingId = m.id;
+    replaceMessageNode(m);
+  });
+  if (!m.text) actions.querySelector('[data-a="copy"]').remove();
+  node.appendChild(actions);
+  return node;
+}
+
+function cancelEdit(m) {
+  state.editingId = null;
+  replaceMessageNode(m);
+}
+
+// Group raw blocks into what you see: thinking/tool steps, text, and model switches.
+function segmentize(blocks) {
+  const segs = [];
+  let text = null;
+  blocks.forEach((b, i) => {
+    if (!b) return;
+    if (b.type === 'text') {
+      if (!text) {
+        text = { type: 'text', key: `t${i}`, parts: [] };
+        segs.push(text);
+      }
+      text.parts.push(b);
+      return;
+    }
+    if (b.type === 'thinking' || b.type === 'tool' || b.type === 'tool_result') {
+      // Whitespace-only text between steps shouldn't split them.
+      const last = segs[segs.length - 1];
+      if (text && last === text && text.parts.every((p) => !p.text.trim())) segs.pop();
+      text = null;
+      const prev = segs[segs.length - 1];
+      if (prev && prev.type === 'process') prev.items.push(b);
+      else segs.push({ type: 'process', key: `p${i}`, items: [b] });
+      return;
+    }
+    text = null;
+    if (b.type === 'fallback') segs.push({ type: 'fallback', key: `f${i}`, block: b });
+  });
+  return segs;
+}
+
+function seconds(ms) {
+  const s = Math.max(1, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function processLabel(seg, active) {
+  const items = seg.items;
+  const resultsById = new Map(items.filter((b) => b.type === 'tool_result').map((b) => [b.toolUseId, b]));
+  if (active) {
+    const last = items[items.length - 1];
+    if (last.type === 'tool' && !resultsById.has(last.id)) {
+      if (last.name === 'web_search') return last.query ? `Searching “${last.query}”` : 'Searching the web';
+      if (last.name === 'web_fetch') return last.url ? `Reading ${hostOf(last.url) || 'a page'}` : 'Reading a page';
+      return 'Working';
+    }
+    if (last.type === 'tool_result') return 'Thinking';
+    return 'Thinking';
+  }
+  const thinking = items.filter((b) => b.type === 'thinking');
+  const ms = thinking.reduce((sum, b) => sum + (b.start && b.end ? b.end - b.start : 0), 0);
+  const searches = items.filter((b) => b.type === 'tool' && b.name === 'web_search').length;
+  const reads = items.filter((b) => b.type === 'tool' && b.name === 'web_fetch').length;
+  const bits = [];
+  if (thinking.length) bits.push(ms >= 1000 ? `Thought for ${seconds(ms)}` : 'Thought it over');
+  if (searches) bits.push(searches === 1 ? 'searched the web' : `searched ${searches} times`);
+  if (reads) bits.push(reads === 1 ? 'read a page' : `read ${reads} pages`);
+  if (!bits.length) return 'Worked on it';
+  const label = bits.join(', ');
+  return label[0].toUpperCase() + label.slice(1);
+}
+
+const openProcesses = new Set(); // `${messageId}:${segKey}` the user expanded
+
+function buildProcess(m, seg, active) {
+  const id = `${m.id}:${seg.key}`;
+  const node = h(`
+    <div class="process ${openProcesses.has(id) ? 'open' : ''} ${active ? 'active' : ''}">
+      <button class="process-head">${icon(active ? 'sparkle' : 'sparkle', 16)}<span class="label"></span>${icon('chevronRight', 14, 'chev')}</button>
+      <div class="process-body"></div>
+    </div>`);
+  node.querySelector('.label').textContent = processLabel(seg, active);
+  node.querySelector('.process-head').addEventListener('click', () => {
+    if (openProcesses.has(id)) openProcesses.delete(id);
+    else openProcesses.add(id);
+    node.classList.toggle('open');
+  });
+  const body = node.querySelector('.process-body');
+  const results = new Map(seg.items.filter((b) => b.type === 'tool_result').map((b) => [b.toolUseId, b]));
+  for (const b of seg.items) {
+    if (b.type === 'thinking') {
+      const step = h('<div class="step"><div class="step-thinking"></div></div>');
+      const t = step.querySelector('.step-thinking');
+      if (b.text.trim()) t.textContent = b.text.trim();
+      else {
+        if (b.redacted) t.textContent = 'Some of this thinking is hidden for safety reasons.';
+        else t.textContent = m.status === 'streaming' && !b.end ? 'Thinking…' : 'No notes for this step.';
+        t.classList.add('empty');
+      }
+      body.appendChild(step);
+    } else if (b.type === 'tool') {
+      const res = results.get(b.id);
+      const step = h(`<div class="step"><div class="step-title"></div></div>`);
+      const title = step.querySelector('.step-title');
+      if (b.name === 'web_search') {
+        title.innerHTML = `${icon('search', 14)}<span></span>`;
+        title.querySelector('span').textContent = b.query ? `Searched “${b.query}”` : 'Searched the web';
+      } else if (b.name === 'web_fetch') {
+        title.innerHTML = `${icon('read', 14)}<span></span>`;
+        title.querySelector('span').textContent = b.url ? `Read ${hostOf(b.url) || b.url}` : 'Read a page';
+      } else {
+        title.innerHTML = `${icon('code', 14)}<span>Ran a quick check</span>`;
+      }
+      if (res?.error) {
+        const err = h('<div class="step-error"></div>');
+        err.textContent = res.error === 'max_uses_exceeded' ? 'Reached the search limit for this reply.' : `That didn’t work (${res.error}).`;
+        step.appendChild(err);
+      } else if (res?.results?.length) {
+        const list = h('<div class="results"></div>');
+        for (const r of res.results.slice(0, 10)) {
+          const a = h('<a class="result" href="#"><span class="rtitle"></span><span class="rhost"></span></a>');
+          a.querySelector('.rtitle').textContent = r.title || r.url;
+          a.querySelector('.rhost').textContent = hostOf(r.url);
+          a.title = r.url;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            api.openExternal(r.url);
+          });
+          list.appendChild(a);
+        }
+        step.appendChild(list);
+      }
+      body.appendChild(step);
+    }
+  }
+  return node;
+}
+
+function citationSources(seg) {
+  // Number each distinct source once per message segment.
+  const sources = [];
+  const byUrl = new Map();
+  let md = '';
+  for (const part of seg.parts) {
+    md += part.text;
+    const ids = [];
+    for (const c of part.citations || []) {
+      const key = c.url || c.title;
+      if (!key) continue;
+      if (!byUrl.has(key)) {
+        byUrl.set(key, sources.length);
+        sources.push({ ...c, texts: [] });
+      }
+      const idx = byUrl.get(key);
+      if (c.text) sources[idx].texts.push(c.text);
+      if (!ids.includes(idx)) ids.push(idx);
+    }
+    if (ids.length) md += ids.map((i) => `⟦c${i}⟧`).join('');
+  }
+  return { md, sources };
+}
+
+function insertCitations(root, sources) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const hits = [];
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.includes('⟦c')) hits.push(walker.currentNode);
+  }
+  for (const node of hits) {
+    const inCode = node.parentElement?.closest('code, pre');
+    const parts = node.nodeValue.split(/(⟦c\d+⟧)/);
+    const frag = document.createDocumentFragment();
+    for (const p of parts) {
+      const m = /^⟦c(\d+)⟧$/.exec(p);
+      if (!m) {
+        if (p) frag.appendChild(document.createTextNode(p));
+        continue;
+      }
+      const src = sources[Number(m[1])];
+      if (!src || inCode) continue;
+      const chip = document.createElement('button');
+      chip.className = 'cite';
+      chip.type = 'button';
+      chip.textContent = src.url ? hostOf(src.url) || 'source' : src.title || 'source';
+      const quote = src.texts[0] ? `\n“${src.texts[0].slice(0, 220)}${src.texts[0].length > 220 ? '…' : ''}”` : '';
+      chip.title = `${src.title || src.url}${quote}`;
+      if (src.url) chip.addEventListener('click', () => api.openExternal(src.url));
+      frag.appendChild(chip);
+    }
+    node.replaceWith(frag);
+  }
+}
+
+function buildText(seg) {
+  const { md, sources } = citationSources(seg);
+  const node = h('<div class="md"></div>');
+  node.innerHTML = renderMarkdown(md);
+  if (sources.length) insertCitations(node, sources);
+  return node;
+}
+
+function noticeNode(kind, title, detail, actions = []) {
+  const node = h(`
+    <div class="notice ${kind}">
+      ${icon(kind === 'error' ? 'alert' : kind === 'warn' ? 'shield' : 'alert', 18)}
+      <div><div class="ntitle"></div><div class="ndetail"></div><div class="nactions"></div></div>
+    </div>`);
+  node.querySelector('.ntitle').textContent = title;
+  const d = node.querySelector('.ndetail');
+  if (detail) d.textContent = detail;
+  else d.remove();
+  const acts = node.querySelector('.nactions');
+  for (const a of actions) {
+    const b = h(`<button class="btn"></button>`);
+    b.textContent = a.label;
+    b.addEventListener('click', a.run);
+    acts.appendChild(b);
+  }
+  if (!actions.length) acts.remove();
+  return node;
+}
+
+function assistantText(m) {
+  return (m.blocks || [])
+    .filter((b) => b && b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim();
+}
+
+function isLastMessage(m) {
+  const msgs = state.current?.messages || [];
+  return msgs[msgs.length - 1]?.id === m.id;
+}
+
+function buildAssistant(m) {
+  const node = h(`<div class="msg assistant" data-id="${escapeHtml(m.id)}"></div>`);
+  fillAssistant(node, m);
+  return node;
+}
+
+function fillAssistant(node, m) {
+  node.innerHTML = '';
+  const streaming = m.status === 'streaming';
+  const head = h(`<div class="assistant-head ${streaming ? 'streaming' : ''}">${logo(22)}</div>`);
+  node.appendChild(head);
+  const reply = h('<div class="reply"></div>');
+  node.appendChild(reply);
+
+  const refused = m.status === 'refused';
+  const segs = segmentize(m.blocks || []);
+  const lastIdx = segs.length - 1;
+  segs.forEach((seg, i) => {
+    if (seg.type === 'process') {
+      reply.appendChild(buildProcess(m, seg, streaming && i === lastIdx));
+    } else if (seg.type === 'text') {
+      if (refused) return; // a declined reply's partial text isn't shown
+      reply.appendChild(buildText(seg));
+    } else if (seg.type === 'fallback') {
+      const n = h(`<div class="switch-note">${icon('swap', 14)}<span></span></div>`);
+      n.querySelector('span').textContent = `${seg.block.to} took over to finish this reply`;
+      reply.appendChild(n);
+    }
+  });
+
+  if (streaming && (!segs.length || segs[lastIdx].type !== 'process')) {
+    reply.appendChild(h('<div class="typing"><span></span><span></span><span></span></div>'));
+  }
+
+  if (m.status === 'error' && m.error) {
+    const actions = [];
+    if (m.error.action === 'settings') actions.push({ label: 'Open Settings', run: () => openSettings() });
+    if (isLastMessage(m)) actions.push({ label: 'Try again', run: () => regenerate() });
+    reply.appendChild(noticeNode('error', m.error.title, m.error.detail, actions));
+  }
+  if (refused) {
+    const cat = m.refusal?.category;
+    const detail =
+      'Claude’s safety checks flagged this request, so it stopped here.' +
+      (cat ? ` (Reason: ${cat.replace(/_/g, ' ')})` : '') +
+      ' You can rephrase your message or try a different model.';
+    const actions = isLastMessage(m) ? [{ label: 'Try again', run: () => regenerate() }] : [];
+    reply.appendChild(noticeNode('warn', 'Claude can’t help with this one', detail, actions));
+  }
+  if (m.status === 'stopped') reply.appendChild(h('<div class="muted-note">You stopped this reply.</div>'));
+  if (m.notice) {
+    const note = h('<div class="muted-note"></div>');
+    note.textContent = m.notice;
+    reply.appendChild(note);
+  }
+  if (m.status === 'done' && m.stopReason === 'max_tokens') {
+    reply.appendChild(h('<div class="muted-note">This reply hit the length limit and was cut off.</div>'));
+  }
+  if (m.status === 'done' && m.stopReason === 'model_context_window_exceeded') {
+    reply.appendChild(h('<div class="muted-note">This chat got too long. Start a new chat to keep going.</div>'));
+  }
+
+  if (!streaming) {
+    const actions = h('<div class="msg-actions"></div>');
+    const text = assistantText(m);
+    if (text && !refused) {
+      const copy = h(`<button class="icon-btn small" title="Copy">${icon('copy', 15)}</button>`);
+      copy.addEventListener('click', () => copyText(text));
+      actions.appendChild(copy);
+    }
+    if (isLastMessage(m)) {
+      const retry = h(`<button class="icon-btn small" title="Retry">${icon('retry', 15)}</button>`);
+      retry.addEventListener('click', () => regenerate());
+      actions.appendChild(retry);
+    }
+    if (m.model) {
+      const tag = h('<span class="model-tag"></span>');
+      tag.textContent = m.model;
+      const u = m.usage;
+      if (u && (u.input || u.output)) {
+        const n = (x) => Number(x || 0).toLocaleString();
+        const searches = u.searches ? ` · ${u.searches} web search${u.searches === 1 ? '' : 'es'}` : '';
+        tag.title = `Tokens: ${n(u.input + u.cacheRead + u.cacheWrite)} in (${n(u.cacheRead)} from cache) · ${n(u.output)} out${searches}`;
+      }
+      actions.appendChild(tag);
+    }
+    node.appendChild(actions);
+  }
+  node.addEventListener('click', onCodeCopy);
+}
+
+function onCodeCopy(e) {
+  const btn = e.target.closest('[data-action="copy-code"]');
+  if (!btn) return;
+  const code = btn.closest('.codeblock')?.querySelector('code');
+  if (!code) return;
+  api.copy(code.textContent);
+  btn.textContent = 'Copied';
+  setTimeout(() => {
+    btn.textContent = 'Copy';
+  }, 1400);
+}
+
+// Repaint a streaming reply at most once per frame.
+const pendingPaint = new Set();
+let paintScheduled = false;
+
+function schedulePaint(messageId) {
+  pendingPaint.add(messageId);
+  if (paintScheduled) return;
+  paintScheduled = true;
+  requestAnimationFrame(() => {
+    paintScheduled = false;
+    const stick = isNearBottom();
+    for (const id of pendingPaint) {
+      const m = state.current?.messages.find((x) => x.id === id);
+      const node = messageNodes.get(id);
+      if (m && node) fillAssistant(node, m);
+    }
+    pendingPaint.clear();
+    if (stick) scrollToBottom();
+    updateToBottom();
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Events from the main process
+
+function findMessage(convId, messageId) {
+  if (!state.current || state.current.id !== convId) return null;
+  return state.current.messages.find((m) => m.id === messageId) || null;
+}
+
+function onEvent(ev) {
+  switch (ev.type) {
+    case 'start':
+    case 'meta': {
+      const m = findMessage(ev.convId, ev.messageId);
+      if (m && ev.model) {
+        m.model = ev.model;
+      }
+      break;
+    }
+    case 'block': {
+      const m = findMessage(ev.convId, ev.messageId);
+      if (!m || m.status !== 'streaming') break;
+      m.blocks[ev.index] = ev.block;
+      schedulePaint(m.id);
+      break;
+    }
+    case 'done': {
+      const listed = state.chats.find((c) => c.id === ev.convId);
+      if (listed?.busy) {
+        listed.busy = false;
+        renderChatList();
+      }
+      const m = findMessage(ev.convId, ev.messageId);
+      if (m) {
+        Object.assign(m, ev.message);
+        const stick = isNearBottom();
+        replaceMessageNode(m);
+        renderOtherAssistantActions();
+        if (stick) scrollToBottom();
+        updateComposer();
+      }
+      reloadChats();
+      break;
+    }
+    case 'title':
+      if (state.current?.id === ev.convId) {
+        state.current.title = ev.title;
+        renderTitle();
+      }
+      reloadChats();
+      break;
+    case 'list-changed':
+      reloadChats();
+      break;
+    default:
+      break;
+  }
+}
+
+// When a newer reply arrives, older replies lose their Retry button.
+function renderOtherAssistantActions() {
+  const msgs = state.current?.messages || [];
+  for (const m of msgs) {
+    if (m.role !== 'assistant' || m.status === 'streaming') continue;
+    const node = messageNodes.get(m.id);
+    if (node) fillAssistant(node, m);
+  }
+  markLast();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sending
+
+function composerInput() {
+  return $('.composer textarea');
+}
+
+function focusComposer() {
+  const ta = composerInput();
+  if (ta && !document.querySelector('.overlay')) ta.focus();
+}
+
+function autosize() {
+  const ta = composerInput();
+  if (!ta) return;
+  const max = window.innerHeight * 0.4;
+  ta.style.height = 'auto';
+  ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+  // Only show a scrollbar once the text is taller than the box can grow.
+  ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
+}
+
+function updateComposer() {
+  if (!$('.composer')) return;
+  const busy = isBusy();
+  const send = $('.send-btn');
+  const text = composerInput().value.trim();
+  const pending = state.drafts.some((d) => d.pending);
+  const ready = state.drafts.some((d) => d.meta);
+  send.classList.toggle('stop', busy);
+  send.innerHTML = busy ? icon('stop', 18) : icon('arrowUp', 18);
+  send.title = busy ? 'Stop (Esc)' : 'Send (Enter)';
+  send.disabled = !busy && (pending || (!text && !ready));
+  $('.web-btn').classList.toggle('on', state.composer.webSearch);
+  $('.web-btn').title = state.composer.webSearch ? 'Web search is on' : 'Web search is off';
+  const effort = EFFORT_LABELS[state.composer.effort];
+  $('.model-name').textContent = `${modelLabel(state.composer.model)}${state.composer.effort !== 'medium' ? ` · ${effort}` : ''}`;
+}
+
+function wireComposer() {
+  const ta = composerInput();
+  requestAnimationFrame(autosize);
+  window.addEventListener('resize', debounce(autosize, 100));
+  ta.addEventListener('input', () => {
+    autosize();
+    updateComposer();
+  });
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      if (!isBusy()) sendMessage();
+    }
+  });
+  ta.addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (files.length) {
+      e.preventDefault();
+      addFiles(files);
+    }
+  });
+  const fileInput = $('.file-input');
+  fileInput.addEventListener('change', () => {
+    addFiles([...fileInput.files]);
+    fileInput.value = '';
+  });
+}
+
+async function addFiles(files) {
+  if (!files.length) return;
+  const room = MAX_ATTACHMENTS - state.drafts.length;
+  if (room <= 0) {
+    toast(`You can add up to ${MAX_ATTACHMENTS} files to one message.`, 'error');
+    return;
+  }
+  for (const file of files.slice(0, room)) {
+    if (file.size > 32 * 1024 * 1024) {
+      toast(`${file.name} is too big. Files need to be under 30 MB.`, 'error');
+      continue;
+    }
+    const draft = { tempId: uuid(), pending: true, name: file.name, kind: file.type.startsWith('image/') ? 'image' : 'file' };
+    if (draft.kind === 'image') draft.previewUrl = URL.createObjectURL(file);
+    state.drafts.push(draft);
+    renderDrafts();
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const result = await api.addAttachment({ name: file.name, mediaType: file.type, data });
+      if (!state.drafts.includes(draft)) {
+        if (result.ok) api.removeAttachment(result.attachment.id);
+        continue;
+      }
+      if (!result.ok) {
+        removeDraft(draft, false);
+        toast(result.error, 'error');
+        continue;
+      }
+      draft.pending = false;
+      draft.meta = result.attachment;
+    } catch (err) {
+      removeDraft(draft, false);
+      toast(errorText(err), 'error');
+    }
+    renderDrafts();
+  }
+  if (files.length > room) toast(`Only the first ${room} files were added.`);
+}
+
+function removeDraft(draft, tellMain = true) {
+  state.drafts = state.drafts.filter((d) => d !== draft);
+  if (draft.previewUrl) URL.revokeObjectURL(draft.previewUrl);
+  if (tellMain && draft.meta) api.removeAttachment(draft.meta.id);
+  renderDrafts();
+}
+
+function renderDrafts() {
+  const box = $('.drafts');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const d of state.drafts) {
+    const wrap = h(`<div class="draft ${d.pending ? 'pending' : ''}"></div>`);
+    if (d.kind === 'image' && d.previewUrl) {
+      const img = h('<img class="thumb" alt="" />');
+      img.src = d.previewUrl;
+      img.title = d.name;
+      wrap.appendChild(img);
+    } else {
+      const meta = d.meta || { name: d.name, kind: /\.pdf$/i.test(d.name) ? 'pdf' : 'text', size: 0 };
+      const chip = attachmentNode(meta);
+      if (d.pending) chip.querySelector('.fsub').textContent = 'Adding…';
+      wrap.appendChild(chip);
+    }
+    const rm = h(`<button class="remove" title="Remove">${icon('x', 12)}</button>`);
+    rm.addEventListener('click', () => removeDraft(d));
+    wrap.appendChild(rm);
+    box.appendChild(wrap);
+  }
+  updateComposer();
+}
+
+async function sendMessage() {
+  const ta = composerInput();
+  const text = ta.value.trim();
+  const drafts = state.drafts.filter((d) => d.meta);
+  if (state.drafts.some((d) => d.pending)) return;
+  if (!text && !drafts.length) return;
+  if (isBusy()) return;
+
+  const conv = state.current;
+  const userMsg = {
+    id: uuid(),
+    role: 'user',
+    text,
+    attachments: drafts.map((d) => d.meta),
+    createdAt: Date.now(),
+  };
+  const reply = newReplyPlaceholder();
+  const wasNew = conv.isNew;
+
+  conv.messages.push(userMsg, reply);
+  for (const d of state.drafts) if (d.previewUrl) URL.revokeObjectURL(d.previewUrl);
+  state.drafts = [];
+  ta.value = '';
+  autosize();
+  renderDrafts();
+  if (wasNew) {
+    renderConversation();
+  } else {
+    appendMessageNode(userMsg);
+    appendMessageNode(reply);
+    renderOtherAssistantActions();
+  }
+  scrollToBottom(true);
+  updateComposer();
+
+  try {
+    const res = await api.send({
+      convId: conv.id,
+      messageId: userMsg.id,
+      assistantId: reply.id,
+      text,
+      attachmentIds: userMsg.attachments.map((a) => a.id),
+      ...state.composer,
+    });
+    if (state.current === conv) {
+      conv.isNew = false;
+      if (wasNew) conv.title = res.title;
+      renderTitle();
+    }
+    loadChats();
+  } catch (err) {
+    failReply(conv, reply, err);
+  }
+}
+
+function newReplyPlaceholder() {
+  return {
+    id: uuid(),
+    role: 'assistant',
+    status: 'streaming',
+    model: modelLabel(state.composer.model),
+    blocks: [],
+    createdAt: Date.now(),
+  };
+}
+
+function failReply(conv, reply, err) {
+  reply.status = 'error';
+  reply.error = { title: 'Message not sent', detail: errorText(err), action: '' };
+  if (state.current === conv) {
+    replaceMessageNode(reply);
+    updateComposer();
+  }
+}
+
+async function regenerate() {
+  const conv = state.current;
+  if (!conv || conv.isNew || isBusy()) return;
+  while (conv.messages.length && conv.messages[conv.messages.length - 1].role === 'assistant') {
+    const m = conv.messages.pop();
+    messageNodes.get(m.id)?.remove();
+    messageNodes.delete(m.id);
+  }
+  const reply = newReplyPlaceholder();
+  conv.messages.push(reply);
+  appendMessageNode(reply);
+  scrollToBottom(true);
+  updateComposer();
+  try {
+    await api.regenerate({ convId: conv.id, assistantId: reply.id, ...state.composer });
+  } catch (err) {
+    failReply(conv, reply, err);
+  }
+}
+
+async function submitEdit(m, value) {
+  const text = value.trim();
+  const conv = state.current;
+  if (!conv || isBusy()) return;
+  if (!text && !m.attachments?.length) return;
+  state.editingId = null;
+  const index = conv.messages.findIndex((x) => x.id === m.id);
+  conv.messages.splice(index + 1);
+  m.text = text;
+  const reply = newReplyPlaceholder();
+  conv.messages.push(reply);
+  renderConversation();
+  scrollToBottom(true);
+  try {
+    await api.edit({ convId: conv.id, messageId: m.id, text, assistantId: reply.id, ...state.composer });
+  } catch (err) {
+    failReply(conv, reply, err);
+  }
+}
+
+function stopReply() {
+  if (state.current) api.stop(state.current.id);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scrolling
+
+function scroller() {
+  return $('.scroller');
+}
+
+function isNearBottom() {
+  const s = scroller();
+  if (!s) return true;
+  return s.scrollHeight - s.scrollTop - s.clientHeight < 60;
+}
+
+function scrollToBottom(force = false) {
+  const s = scroller();
+  if (!s) return;
+  if (force || isNearBottom()) s.scrollTop = s.scrollHeight;
+  if (force) requestAnimationFrame(() => (s.scrollTop = s.scrollHeight));
+}
+
+function updateToBottom() {
+  const btn = $('.to-bottom');
+  if (!btn) return;
+  const empty = $('.main')?.classList.contains('empty');
+  btn.classList.toggle('show', !empty && !isNearBottom());
+}
+
+function wireScroller() {
+  const s = scroller();
+  s.addEventListener('scroll', updateToBottom, { passive: true });
+  $('.to-bottom').addEventListener('click', () => {
+    s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Keyboard + drag and drop
+
+function wireGlobalKeys() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (activePopover) return;
+      const overlay = document.querySelector('.overlay');
+      if (overlay) {
+        overlay.dispatchEvent(new CustomEvent('close'));
+        return;
+      }
+      if (isBusy()) stopReply();
+    }
+  });
+  window.addEventListener('focus', updateGreeting);
+}
+
+function wireDragAndDrop() {
+  let depth = 0;
+  const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  window.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e) || !state.hasKey) return;
+    e.preventDefault();
+    depth++;
+    $('.drop-overlay')?.classList.add('show');
+  });
+  window.addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!hasFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) $('.drop-overlay')?.classList.remove('show');
+  });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    $('.drop-overlay')?.classList.remove('show');
+    if (state.hasKey && $('.composer')) addFiles([...e.dataTransfer.files]);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Settings
+
+function openSettings() {
+  if (!$('.app') || document.querySelector('.overlay')) return;
+  closePopover();
+  const s = state.settings;
+  const overlay = h(`
+    <div class="overlay">
+      <div class="modal" role="dialog" aria-label="Settings">
+        <div class="modal-head"><h2>Settings</h2><button class="icon-btn" data-a="close" title="Close">${icon('x')}</button></div>
+        <div class="modal-body">
+          <div class="section">
+            <h3>About you</h3>
+            <p class="hint">This helps your assistant give you more personal answers. Changes apply to new chats.</p>
+            <div class="row" style="gap:14px">
+              <div class="field" style="flex:1"><label for="s-name">Your name</label><input class="input" id="s-name" maxlength="80" /></div>
+              <div class="field" style="flex:1"><label for="s-aname">Assistant’s name</label><input class="input" id="s-aname" maxlength="40" placeholder="Buddy" /></div>
+            </div>
+            <div class="field">
+              <label for="s-about">What should it know about you?</label>
+              <textarea class="textarea" id="s-about" placeholder="For example: I’m a nurse in Seattle, I’m learning Python, and I like short, practical answers."></textarea>
+            </div>
+            <div class="field">
+              <label for="s-style">How should it reply?</label>
+              <textarea class="textarea" id="s-style" placeholder="For example: Talk like a friend. Keep it simple. Skip the fluff."></textarea>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>API key</h3>
+            <p class="hint">Buddy uses your own Anthropic API key. It’s stored in your Mac’s Keychain.</p>
+            <div class="row between wrap">
+              <div class="key-status"><span class="dot"></span><span class="key-text"></span></div>
+              <div class="row"><button class="btn" data-a="change-key">Change key</button><button class="btn ghost danger" data-a="remove-key">Remove</button></div>
+            </div>
+            <div class="key-edit" hidden style="margin-top:12px">
+              <div class="row"><input class="input" id="s-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" /><button class="btn primary" data-a="save-key">Save</button></div>
+              <div class="form-msg" id="s-key-msg"></div>
+            </div>
+            <div class="sub" style="font-size:12.5px;color:var(--text-3);margin:10px 0 8px">Get or manage keys at <a href="#" data-a="console">platform.claude.com</a>.</div>
+          </div>
+
+          <div class="section">
+            <h3>Defaults for new chats</h3>
+            <div class="row" style="gap:14px">
+              <div class="field" style="flex:1"><label for="s-model">Model</label><select class="select" id="s-model"></select></div>
+              <div class="field" style="flex:1"><label for="s-effort">Thinking</label>
+                <select class="select" id="s-effort">
+                  <option value="low">Quick</option><option value="medium">Balanced</option><option value="high">Deep</option>
+                </select>
+              </div>
+            </div>
+            <div class="row between field">
+              <div><label style="margin:0">Search the web</label><div class="sub" style="margin-top:2px">Lets Claude look things up. Searches cost about a cent each.</div></div>
+              <button class="toggle" id="s-web" role="switch"></button>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Appearance</h3>
+            <div class="field"><label>Theme</label>
+              <div class="segmented" id="s-theme" style="margin:0;max-width:330px">
+                <button data-v="system">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+              </div>
+            </div>
+            <div class="field"><label>Reply font</label>
+              <div class="segmented" id="s-font" style="margin:0;max-width:220px">
+                <button data-v="sans">Sans</button><button data-v="serif">Serif</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Quick open</h3>
+            <p class="hint">Press this from any app to show or hide Buddy.</p>
+            <div class="field" style="max-width:330px">
+              <select class="select" id="s-shortcut"></select>
+              <div class="form-msg warn" id="s-shortcut-msg"></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Your data</h3>
+            <p class="hint">Chats and files are saved only on this Mac. Messages are sent to Anthropic to get replies.</p>
+            <div class="row wrap"><button class="btn" data-a="reveal">Show data folder</button><button class="btn danger" data-a="delete-all">Delete all chats</button></div>
+            <div class="sub" style="font-size:12.5px;color:var(--text-3);margin:14px 0 4px" id="s-version"></div>
+          </div>
+        </div>
+      </div>
+    </div>`);
+  document.body.appendChild(overlay);
+
+  const close = () => {
+    overlay.remove();
+    renderProfile();
+    updateComposer();
+    focusComposer();
+  };
+  overlay.addEventListener('close', close);
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  const save = async (patch) => {
+    try {
+      const res = await api.saveSettings(patch);
+      state.settings = res.settings;
+      state.shortcutOk = res.shortcutOk;
+      return res;
+    } catch (err) {
+      toast(errorText(err), 'error');
+      return null;
+    }
+  };
+
+  // text fields
+  const bindText = (sel, key) => {
+    const el = $(sel, overlay);
+    el.value = s[key] || '';
+    const commit = debounce(() => save({ [key]: el.value.trim() }).then(() => renderProfile()), 400);
+    el.addEventListener('input', commit);
+  };
+  bindText('#s-name', 'name');
+  bindText('#s-aname', 'assistantName');
+  bindText('#s-about', 'about');
+  bindText('#s-style', 'style');
+
+  // API key
+  const keyText = $('.key-text', overlay);
+  const dot = $('.key-status .dot', overlay);
+  const renderKey = () => {
+    dot.classList.toggle('off', !state.hasKey);
+    keyText.textContent = state.hasKey ? `Connected${state.keyHint ? ` · key ending in ${state.keyHint}` : ''}` : 'No key saved';
+  };
+  renderKey();
+  const keyEdit = $('.key-edit', overlay);
+  const keyMsg = $('#s-key-msg', overlay);
+  overlay.addEventListener('click', async (e) => {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (!a) return;
+    if (a === 'close') close();
+    if (a === 'console') {
+      e.preventDefault();
+      api.openExternal('https://platform.claude.com/settings/keys');
+    }
+    if (a === 'change-key') {
+      keyEdit.hidden = false;
+      $('#s-key', overlay).focus();
+    }
+    if (a === 'save-key') {
+      const input = $('#s-key', overlay);
+      keyMsg.className = 'form-msg';
+      keyMsg.textContent = 'Checking…';
+      const res = await api.setApiKey(input.value).catch((err) => ({ ok: false, error: errorText(err) }));
+      if (!res.ok) {
+        keyMsg.classList.add('error');
+        keyMsg.textContent = res.error;
+        return;
+      }
+      state.hasKey = true;
+      state.keyHint = res.keyHint || '';
+      input.value = '';
+      keyEdit.hidden = true;
+      keyMsg.textContent = '';
+      renderKey();
+      toast(res.warning || 'API key saved');
+    }
+    if (a === 'remove-key') {
+      const res = await api.clearApiKey();
+      state.hasKey = res.hasKey;
+      state.keyHint = res.keyHint || '';
+      overlay.remove();
+      if (!state.hasKey) renderOnboarding();
+    }
+    if (a === 'reveal') api.revealData();
+    if (a === 'delete-all') {
+      const done = await api.deleteAllChats();
+      if (done) {
+        toast('All chats deleted');
+        newChat();
+        loadChats();
+      }
+    }
+  });
+  $('#s-key', overlay).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') overlay.querySelector('[data-a="save-key"]').click();
+  });
+
+  // defaults
+  const modelSel = $('#s-model', overlay);
+  for (const m of state.models) {
+    const o = document.createElement('option');
+    o.value = m.id;
+    o.textContent = m.label;
+    modelSel.appendChild(o);
+  }
+  modelSel.value = s.model;
+  modelSel.addEventListener('change', () => save({ model: modelSel.value }));
+  const effortSel = $('#s-effort', overlay);
+  effortSel.value = s.effort;
+  effortSel.addEventListener('change', () => save({ effort: effortSel.value }));
+  const web = $('#s-web', overlay);
+  web.classList.toggle('on', s.webSearch);
+  web.setAttribute('aria-checked', String(s.webSearch));
+  web.addEventListener('click', async () => {
+    const res = await save({ webSearch: !state.settings.webSearch });
+    if (res) {
+      web.classList.toggle('on', res.settings.webSearch);
+      web.setAttribute('aria-checked', String(res.settings.webSearch));
+    }
+  });
+
+  // appearance
+  const bindSegmented = (sel, key, after) => {
+    const seg = $(sel, overlay);
+    const paint = () => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.settings[key]));
+    paint();
+    seg.addEventListener('click', async (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      await save({ [key]: b.dataset.v });
+      paint();
+      after?.();
+    });
+  };
+  bindSegmented('#s-theme', 'theme', applyTheme);
+  bindSegmented('#s-font', 'font', applyFont);
+
+  // shortcut
+  const shortcutSel = $('#s-shortcut', overlay);
+  const shortcutMsg = $('#s-shortcut-msg', overlay);
+  const pretty = (acc) =>
+    acc
+      ? acc
+          .replace('CommandOrControl', '⌘')
+          .replace('Control', '⌃')
+          .replace('Alt', '⌥')
+          .replace('Shift', '⇧')
+          .replace(/\+/g, ' ')
+          .replace('Space', 'Space')
+      : 'Off';
+  for (const acc of state.info.shortcuts) {
+    const o = document.createElement('option');
+    o.value = acc;
+    o.textContent = pretty(acc);
+    shortcutSel.appendChild(o);
+  }
+  shortcutSel.value = s.shortcut;
+  const paintShortcut = () => {
+    shortcutMsg.textContent = state.shortcutOk || !state.settings.shortcut ? '' : 'Another app is already using this shortcut. Pick a different one.';
+  };
+  paintShortcut();
+  shortcutSel.addEventListener('change', async () => {
+    await save({ shortcut: shortcutSel.value });
+    paintShortcut();
+  });
+
+  $('#s-version', overlay).textContent = `Buddy ${state.info.version}`;
+}
+
+boot().catch((err) => {
+  document.body.textContent = `Buddy could not start: ${errorText(err)}`;
+});

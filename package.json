@@ -1,0 +1,51 @@
+{
+  "name": "buddy",
+  "productName": "Buddy",
+  "version": "1.0.0",
+  "description": "Your own personal Claude chat app for the Mac.",
+  "main": "src/main/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --dir",
+    "dist": "electron-builder --mac",
+    "test": "node test/e2e.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@highlightjs/cdn-assets": "^11.12.0",
+    "dompurify": "^3.5.0",
+    "marked": "^18.3.0"
+  },
+  "devDependencies": {
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.personal.buddy",
+    "productName": "Buddy",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "target": [
+        "dmg"
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "notarize": false
+    },
+    "dmg": {
+      "title": "Buddy"
+    }
+  }
+}
