@@ -158,8 +158,9 @@ const RESULT_TYPES = new Set([
 ]);
 
 // Clean one finished API response before sending it back as history.
-function replayable(blocks) {
-  const resultIds = new Set(blocks.filter((b) => b && RESULT_TYPES.has(b.type)).map((b) => b.tool_use_id));
+// `resultIds` covers the whole reply: after a paused turn, a tool call and its result
+// can sit in two different responses.
+function replayable(blocks, resultIds) {
   // After a mid-reply switch to a fallback model, model-internal blocks from before the switch are left out.
   let lastFallback = -1;
   blocks.forEach((b, i) => {
@@ -203,7 +204,13 @@ function assistantTurns(message, plain) {
     const text = textOnly(parts.flat());
     return text.length ? [text] : [];
   }
-  return parts.map(replayable).filter((p) => p.length);
+  const resultIds = new Set(
+    parts
+      .flat()
+      .filter((b) => b && RESULT_TYPES.has(b.type))
+      .map((b) => b.tool_use_id),
+  );
+  return parts.map((p) => replayable(p, resultIds)).filter((p) => p.length);
 }
 
 async function userContent(store, message) {

@@ -89,6 +89,7 @@ Tip: set a monthly spend limit in the Console so there are no surprises.
 - **"Your API key didn't work"**: create a new key at platform.claude.com and paste it in Settings → API key.
 - **"Your credit balance is too low" or "over your usage limit"**: add credits or raise your limit in the Console.
 - **The installer says Node.js is missing**: install it from nodejs.org, then close and reopen Terminal.
+- **Terminal asks to install "command line developer tools"** when you run `git`: click **Install**, wait for it to finish, then run the command again.
 
 ## Try it without installing
 

@@ -285,6 +285,17 @@ async function lastAssistantText() {
     assert.match(await lastAssistantText(), /Picked up right where I paused/);
   });
 
+  await step('a paused reply is replayed with its search call and result together', async () => {
+    const reqs = streamRequests(await send('what next?'));
+    const msgs = reqs[0].body.messages;
+    // The paused reply comes back as two assistant messages, exactly as they were sent.
+    const [first, second] = msgs.slice(-3, -1);
+    assert.equal(first.role, 'assistant');
+    assert.equal(second.role, 'assistant');
+    assert.ok(first.content.some((c) => c.type === 'server_tool_use' && c.id === 'srvtoolu_pause'), 'search call kept');
+    assert.ok(second.content.some((c) => c.type === 'web_search_tool_result' && c.tool_use_id === 'srvtoolu_pause'), 'result kept');
+  });
+
   await step('if the API rejects the beta extras, Buddy retries without them and keeps web search', async () => {
     const reqs = streamRequests(await send('badbeta check'));
     assert.equal(reqs.length, 2);
