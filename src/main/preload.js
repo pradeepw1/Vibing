@@ -33,7 +33,12 @@ contextBridge.exposeInMainWorld('buddy', {
   edit: (payload) => invoke('chat:edit', payload),
   stop: (convId) => invoke('chat:stop', convId),
 
+  exportChat: (convId) => invoke('chat:export', convId),
+  createPreview: (html) => invoke('preview:create', html),
+  openPreviewInBrowser: (html, title) => invoke('preview:openInBrowser', html, title),
+
   openExternal: (url) => invoke('shell:open', url),
+  reveal: (filePath) => invoke('shell:reveal', filePath),
   copy: (text) => invoke('clipboard:write', text),
   revealData: () => invoke('data:reveal'),
 

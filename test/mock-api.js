@@ -98,7 +98,9 @@ function createServer() {
           ? 'Python greeting function'
           : prompt.includes('email')
             ? 'Friendly reminder email'
-            : 'Mock chat title';
+            : prompt.includes('calculator')
+              ? 'Tip calculator'
+              : 'Mock chat title';
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -229,6 +231,98 @@ function createServer() {
       send('content_block_stop', { index: i });
       await thinking('Continuing after the switch.');
       await textBlock('And here is the rest, finished by the fallback model.');
+      finish('end_turn');
+      return;
+    }
+
+    if (text.includes('math')) {
+      await thinking('A quick math example.');
+      await textBlock(
+        'The famous one is $E = mc^2$, and the area under $x^2$ from 0 to 1 is:\n\n' +
+          '$$\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\n$$\n\nCoffee costs $5 and lunch costs $10.',
+      );
+      finish('end_turn');
+      return;
+    }
+
+    if (text.includes('calculator')) {
+      // A realistic reply, used for the README's preview screenshot.
+      await thinking('A small, friendly tip calculator in one HTML file.');
+      const page = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tip calculator</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f3ff; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+  .card { background: #fff; padding: 28px; border-radius: 20px; box-shadow: 0 10px 30px rgba(60, 60, 140, .15); width: 280px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  label { display: block; font-size: 13px; color: #666; margin: 14px 0 6px; }
+  input { width: 100%; box-sizing: border-box; font-size: 18px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; }
+  .tips { display: flex; gap: 8px; }
+  .tips button { flex: 1; padding: 10px 0; border: 0; border-radius: 10px; background: #ecebfd; color: #4f52d6; font-weight: 600; font-size: 15px; cursor: pointer; }
+  .tips button.on { background: #4f52d6; color: #fff; }
+  .total { margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: baseline; }
+  .total b { font-size: 26px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Tip calculator</h1>
+  <label>Bill</label>
+  <input id="bill" type="number" value="48.50">
+  <label>Tip</label>
+  <div class="tips"><button data-tip="15">15%</button><button data-tip="18" class="on">18%</button><button data-tip="20">20%</button></div>
+  <label>People</label>
+  <input id="people" type="number" value="2" min="1">
+  <div class="total"><span>Each person pays</span><b id="each"></b></div>
+</div>
+<script>
+  let tip = 18;
+  const el = (id) => document.getElementById(id);
+  function update() {
+    const bill = parseFloat(el('bill').value) || 0;
+    const people = Math.max(1, parseInt(el('people').value, 10) || 1);
+    el('each').textContent = '$' + (bill * (1 + tip / 100) / people).toFixed(2);
+  }
+  document.querySelectorAll('[data-tip]').forEach((b) => (b.onclick = () => {
+    document.querySelectorAll('[data-tip]').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on');
+    tip = Number(b.dataset.tip);
+    update();
+  }));
+  el('bill').oninput = el('people').oninput = update;
+  update();
+</script>
+</body>
+</html>`;
+      await textBlock(
+        'Here’s a simple tip calculator. Type the bill, pick a tip, and set how many people are splitting it:\n\n```html\n' +
+          page +
+          '\n```\n\nClick **Preview** above the code to try it.',
+        { size: 60, delay: 2 },
+      );
+      finish('end_turn');
+      return;
+    }
+
+    if (text.includes('webpage')) {
+      await thinking('A tiny page with a script in it.');
+      await textBlock(
+        'Here you go:\n\n```html\n<!doctype html>\n<html>\n<head><title>Hello page</title></head>\n<body>\n' +
+          '<h1 id="greeting">Hello from the preview</h1>\n' +
+          '<script>document.getElementById("greeting").textContent += "!";</script>\n</body>\n</html>\n```\n\n' +
+          'Click **Preview** to see it.',
+      );
+      finish('end_turn');
+      return;
+    }
+
+    if (text.includes('svg')) {
+      await textBlock(
+        'A circle:\n\n```svg\n<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">' +
+          '<circle cx="60" cy="60" r="50" fill="#4f52d6"/></svg>\n```',
+      );
       finish('end_turn');
       return;
     }

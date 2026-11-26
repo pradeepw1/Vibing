@@ -146,7 +146,7 @@ class Store {
   async setApiKey(key) {
     let record;
     // Automated tests skip the Keychain (a Keychain prompt would hang a test machine).
-    const skipKeychain = process.env.BUDDY_PLAIN_KEY_STORAGE === '1';
+    const skipKeychain = process.env.BUDDY_TEST_MODE === '1';
     if (!skipKeychain && this.safeStorage.isEncryptionAvailable()) {
       record = { encrypted: true, apiKey: this.safeStorage.encryptString(key).toString('base64') };
     } else {

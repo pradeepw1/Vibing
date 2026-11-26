@@ -1,6 +1,6 @@
 // Buddy - the chat window.
 
-import { renderMarkdown, escapeHtml } from './markdown.js';
+import { renderMarkdown, escapeHtml, typesetMath, previewKind, previewTitle } from './markdown.js';
 import { icon, logo } from './icons.js';
 
 const api = window.buddy;
@@ -75,13 +75,22 @@ function assistantName() {
   return (state.settings.assistantName || '').trim() || 'Buddy';
 }
 
-function toast(text, kind = '') {
+function toast(text, kind = '', action = null) {
   const root = $('.toasts');
   if (!root) return;
-  const el = h(`<div class="toast ${kind}"></div>`);
-  el.textContent = text;
+  const el = h(`<div class="toast ${kind}"><span></span></div>`);
+  el.firstElementChild.textContent = text;
+  if (action) {
+    const btn = h('<button class="toast-action" type="button"></button>');
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => {
+      action.run();
+      el.remove();
+    });
+    el.appendChild(btn);
+  }
   root.appendChild(el);
-  setTimeout(() => el.remove(), kind === 'error' ? 5000 : 2200);
+  setTimeout(() => el.remove(), kind === 'error' || action ? 5000 : 2200);
 }
 
 async function copyText(text, note = 'Copied') {
@@ -276,10 +285,21 @@ function renderShell() {
           <div class="footnote"></div>
         </div>
       </main>
+      <aside class="preview-panel" hidden>
+        <div class="preview-resizer" title="Drag to resize"></div>
+        <header class="preview-head drag">
+          <div class="preview-title"></div>
+          <button class="icon-btn small" data-pv="copy" title="Copy the code">${icon('copy', 15)}</button>
+          <button class="icon-btn small" data-pv="browser" title="Open in your browser">${icon('external', 15)}</button>
+          <button class="icon-btn small" data-pv="close" title="Close preview (Esc)">${icon('x', 16)}</button>
+        </header>
+        <div class="preview-body"></div>
+      </aside>
       <div class="drop-overlay">Drop files to add them to your message</div>
       <div class="toasts"></div>
     </div>`);
   root.appendChild(app);
+  wirePreviewPanel();
 
   app.addEventListener('click', onClick);
 
@@ -392,6 +412,10 @@ function onMenu(action) {
     }
     case 'focus-composer':
       if (!document.querySelector('.overlay')) focusComposer();
+      break;
+    case 'export':
+      if (!state.current || state.current.isNew) toast('Start a chat first, then you can export it.');
+      else exportChat(state.current.id);
       break;
     default:
       break;
@@ -514,6 +538,7 @@ function openChatMenu(anchor, chat) {
   const menu = h(`
     <div class="popover">
       <button class="menu-item" data-a="rename">${icon('pencil', 16)}<span class="mi-main">Rename</span></button>
+      <button class="menu-item" data-a="export">${icon('download', 16)}<span class="mi-main">Export as Markdown</span></button>
       <button class="menu-item danger" data-a="delete">${icon('trash', 16)}<span class="mi-main">Delete</span></button>
     </div>`);
   anchor.classList.add('open');
@@ -526,6 +551,7 @@ function openChatMenu(anchor, chat) {
     if (!a) return;
     closePopover();
     if (a === 'rename') startRename(chat.id);
+    if (a === 'export') exportChat(chat.id);
     if (a === 'delete') {
       const deleted = await api.deleteChat(chat.id);
       if (deleted && state.current?.id === chat.id) newChat();
@@ -651,6 +677,7 @@ async function setComposerOption(patch, persist) {
 
 function newChat() {
   if (!$('.app')) return;
+  closePreview();
   state.current = { id: uuid(), title: 'New chat', isNew: true, messages: [] };
   state.editingId = null;
   resetComposerOptions();
@@ -670,6 +697,7 @@ async function openChat(id) {
     loadChats();
     return;
   }
+  closePreview();
   state.current = { ...conv, isNew: false };
   state.editingId = null;
   if (state.models.some((m) => m.id === conv.model)) state.composer.model = conv.model;
@@ -1043,6 +1071,7 @@ function buildText(seg) {
   const node = h('<div class="md"></div>');
   node.innerHTML = renderMarkdown(md);
   if (sources.length) insertCitations(node, sources);
+  typesetMath(node);
   return node;
 }
 
@@ -1082,9 +1111,13 @@ function isLastMessage(m) {
 
 function buildAssistant(m) {
   const node = h(`<div class="msg assistant" data-id="${escapeHtml(m.id)}"></div>`);
+  // One listener per message (fillAssistant re-draws the inside many times while streaming).
+  node.addEventListener('click', onCodeCopy);
   fillAssistant(node, m);
   return node;
 }
+
+const expandedCode = new Set(); // `${messageId}:${cardIndex}` for code cards you opened
 
 function fillAssistant(node, m) {
   node.innerHTML = '';
@@ -1168,19 +1201,178 @@ function fillAssistant(node, m) {
     }
     node.appendChild(actions);
   }
-  node.addEventListener('click', onCodeCopy);
+
+  // Code cards keep the open/closed state you gave them, even as the reply re-draws.
+  const cards = [...reply.querySelectorAll('.codeblock.artifact')];
+  cards.forEach((card, i) => {
+    if (!expandedCode.has(`${m.id}:${i}`)) return;
+    card.classList.remove('collapsed');
+    card.querySelector('[data-action="toggle-code"]').textContent = 'Hide code';
+  });
+  const lastCard = cards[cards.length - 1];
+  const texts = reply.querySelectorAll('.md');
+  if (streaming && lastCard && !lastCard.nextElementSibling && lastCard.parentElement === texts[texts.length - 1]) {
+    lastCard.classList.add('writing');
+  }
 }
 
 function onCodeCopy(e) {
-  const btn = e.target.closest('[data-action="copy-code"]');
+  const btn = e.target.closest('[data-action="copy-code"], [data-action="preview-code"], [data-action="toggle-code"]');
   if (!btn) return;
-  const code = btn.closest('.codeblock')?.querySelector('code');
+  const block = btn.closest('.codeblock');
+  const code = block?.querySelector('code');
   if (!code) return;
+  if (btn.dataset.action === 'preview-code') {
+    openPreview(code.textContent, block.dataset.lang || '');
+    return;
+  }
+  if (btn.dataset.action === 'toggle-code') {
+    const collapsed = block.classList.toggle('collapsed');
+    btn.textContent = collapsed ? 'Show code' : 'Hide code';
+    const msg = block.closest('.msg');
+    const key = `${msg?.dataset.id}:${[...msg.querySelectorAll('.codeblock.artifact')].indexOf(block)}`;
+    if (collapsed) expandedCode.delete(key);
+    else expandedCode.add(key);
+    return;
+  }
   api.copy(code.textContent);
   btn.textContent = 'Copied';
   setTimeout(() => {
     btn.textContent = 'Copy';
   }, 1400);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Live previews of code Claude writes. They run in a locked-down frame on their own origin:
+// scripts work, but the page can't reach the app, your chats or your files.
+
+const MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs';
+
+function previewDocument(code, kind) {
+  const head = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+  if (kind === 'html') {
+    if (/<html[\s>]|<!doctype/i.test(code)) return code;
+    return `<!doctype html><html><head>${head}</head><body>${code}</body></html>`;
+  }
+  if (kind === 'svg') {
+    return (
+      `<!doctype html><html><head>${head}<style>html,body{margin:0;height:100%;background:#fff}` +
+      'body{display:flex;align-items:center;justify-content:center}svg{max-width:100%;max-height:100vh;height:auto}</style>' +
+      `</head><body>${code}</body></html>`
+    );
+  }
+  // Mermaid diagrams are drawn by the Mermaid library, loaded from the web.
+  return (
+    `<!doctype html><html><head>${head}<style>body{margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#222}` +
+    '.note{color:#888;font-size:13px;margin-top:16px}</style></head><body>' +
+    `<pre class="mermaid">${escapeHtml(code)}</pre>` +
+    '<p class="note" id="note">Drawing the diagram… (this needs an internet connection)</p>' +
+    `<script type="module">import mermaid from '${MERMAID_URL}';` +
+    "mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });" +
+    "await mermaid.run({ querySelector: '.mermaid' }).then(() => document.getElementById('note').remove())" +
+    ".catch((e) => { document.getElementById('note').textContent = 'Could not draw this diagram: ' + e.message; });" +
+    '</script></body></html>'
+  );
+}
+
+async function openPreview(code, lang) {
+  const kind = previewKind(lang, code);
+  if (!kind) return;
+  const html = previewDocument(code, kind);
+  let url;
+  try {
+    url = await api.createPreview(html);
+  } catch (err) {
+    toast(errorText(err), 'error');
+    return;
+  }
+  state.preview = { code, kind, html, title: previewTitle(code, kind) };
+  const panel = $('.preview-panel');
+  if (!panel) return;
+  panel.hidden = false;
+  $('.app').classList.add('preview-open');
+  $('.preview-title', panel).textContent = state.preview.title;
+  const body = $('.preview-body', panel);
+  body.innerHTML = '';
+  const frame = document.createElement('iframe');
+  // No "allow-same-origin": the page gets a sealed-off origin of its own.
+  frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-pointer-lock allow-popups');
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  frame.title = state.preview.title;
+  frame.src = url;
+  body.appendChild(frame);
+}
+
+function closePreview() {
+  const panel = $('.preview-panel');
+  if (!panel || panel.hidden) return false;
+  panel.hidden = true;
+  $('.preview-body', panel).innerHTML = '';
+  $('.app')?.classList.remove('preview-open');
+  state.preview = null;
+  return true;
+}
+
+function wirePreviewPanel() {
+  const panel = $('.preview-panel');
+  try {
+    const saved = Number(localStorage.getItem('previewWidth'));
+    if (saved >= 320) panel.style.width = `${saved}px`;
+  } catch {
+    // no saved width; use the default
+  }
+  panel.addEventListener('click', async (e) => {
+    const a = e.target.closest('[data-pv]')?.dataset.pv;
+    if (!a || !state.preview) return;
+    if (a === 'close') closePreview();
+    if (a === 'copy') copyText(state.preview.code, 'Code copied');
+    if (a === 'browser') {
+      try {
+        await api.openPreviewInBrowser(state.preview.html, state.preview.title);
+        toast('Opened in your browser');
+      } catch (err) {
+        toast(errorText(err), 'error');
+      }
+    }
+  });
+  // Drag the left edge to make the preview wider or narrower.
+  const resizer = $('.preview-resizer', panel);
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const app = $('.app');
+    app.classList.add('resizing');
+    const move = (ev) => {
+      const width = Math.min(Math.max(window.innerWidth - ev.clientX, 320), window.innerWidth - 420);
+      panel.style.width = `${width}px`;
+    };
+    const up = () => {
+      app.classList.remove('resizing');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      try {
+        localStorage.setItem('previewWidth', String(parseInt(panel.style.width, 10) || ''));
+      } catch {
+        // fine, it just won't be remembered
+      }
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Export
+
+async function exportChat(id) {
+  if (!id) return;
+  try {
+    const file = await api.exportChat(id);
+    if (!file) return;
+    const name = file.split(/[\\/]/).pop();
+    toast(`Saved “${name}”`, '', { label: 'Show in Finder', run: () => api.reveal(file) });
+  } catch (err) {
+    toast(errorText(err), 'error');
+  }
 }
 
 // Repaint a streaming reply at most once per frame.
@@ -1244,6 +1436,13 @@ function onEvent(ev) {
         renderOtherAssistantActions();
         if (stick) scrollToBottom();
         updateComposer();
+        // Like Claude's artifacts: when a reply finishes with a web page, picture or diagram,
+        // show it right away.
+        if (m.status === 'done') {
+          const cards = messageNodes.get(m.id)?.querySelectorAll('.codeblock.artifact') || [];
+          const card = cards[cards.length - 1];
+          if (card) openPreview(card.querySelector('code').textContent, card.dataset.lang || '');
+        }
       }
       reloadChats();
       break;
@@ -1579,6 +1778,7 @@ function wireGlobalKeys() {
         return;
       }
       if (isBusy()) stopReply();
+      else closePreview();
     }
   });
   window.addEventListener('focus', updateGreeting);

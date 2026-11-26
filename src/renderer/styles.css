@@ -847,12 +847,89 @@ body.mac .app.sidebar-collapsed .topbar {
   color: var(--text-3);
 }
 
+.codeblock-actions {
+  display: flex;
+  gap: 2px;
+}
+
 .copy-code {
   font-size: 12px;
   height: 24px;
   padding: 0 8px;
   border-radius: 6px;
   color: var(--text-2);
+}
+
+.copy-code[data-action='preview-code'] {
+  color: var(--accent-text);
+  font-weight: 550;
+}
+
+/* Longer web pages, SVG and diagrams show as a compact card */
+
+.codeblock.artifact {
+  background: var(--surface);
+}
+
+.artifact-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px 12px 12px;
+}
+
+.codeblock.artifact:not(.collapsed) .artifact-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.codeblock.artifact.collapsed pre {
+  display: none;
+}
+
+.codeblock.artifact pre {
+  background: var(--code-block);
+  max-height: 480px;
+  overflow: auto;
+}
+
+.artifact-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 11.5px/1 var(--font-mono);
+}
+
+.artifact-meta {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.artifact-title {
+  font-weight: 600;
+  font-size: 14.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifact-sub {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.codeblock.artifact.writing .artifact-sub::after {
+  content: ' · writing…';
+}
+
+.codeblock.artifact.writing .artifact-icon {
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 .copy-code:hover {
@@ -923,6 +1000,24 @@ body.mac .app.sidebar-collapsed .topbar {
 .hljs-title.class_,
 .hljs-meta {
   color: var(--hl-type);
+}
+
+/* math */
+
+.md .math-block {
+  display: block;
+  margin: 0.6em 0 0.9em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.md .math-block .katex-display {
+  margin: 0;
+}
+
+.md .katex {
+  font-size: 1.08em;
 }
 
 /* citations */
@@ -1795,6 +1890,94 @@ body.mac .app.sidebar-collapsed .topbar {
 .toast.error {
   background: var(--danger);
   color: #fff;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-action {
+  pointer-events: auto;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------
+   Preview panel (live web pages, SVG and diagrams)
+   ------------------------------------------------------------------ */
+
+.preview-panel {
+  position: relative;
+  flex: none;
+  width: min(46%, 720px);
+  min-width: 320px;
+  max-width: calc(100% - 420px);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.preview-panel[hidden] {
+  display: none;
+}
+
+.preview-head {
+  height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.preview-body iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.preview-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 5;
+}
+
+.app.resizing,
+.app.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.app.resizing iframe {
+  pointer-events: none;
 }
 
 .drop-overlay {

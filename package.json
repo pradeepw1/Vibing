@@ -16,6 +16,7 @@
     "@anthropic-ai/sdk": "^1.14.0",
     "@highlightjs/cdn-assets": "^11.12.0",
     "dompurify": "^3.5.0",
+    "katex": "^0.19.1",
     "marked": "^18.3.0"
   },
   "devDependencies": {

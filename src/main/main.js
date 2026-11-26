@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
+const crypto = require('crypto');
 const {
   app,
   BrowserWindow,
@@ -24,6 +25,9 @@ const claude = require('./claude');
 
 const isMac = process.platform === 'darwin';
 const ORIGIN = 'app://buddy';
+// Previews of code Claude writes (web pages, games, SVG, diagrams) load from their own
+// origin, inside a sandboxed frame, so they can never reach the app or your data.
+const PREVIEW_ORIGIN = 'app://preview';
 const UI_DIR = path.join(__dirname, '..', 'renderer');
 const NODE_MODULES = path.join(__dirname, '..', '..', 'node_modules');
 const VENDOR = {
@@ -31,6 +35,8 @@ const VENDOR = {
   'purify.js': path.join(NODE_MODULES, 'dompurify', 'dist', 'purify.es.mjs'),
   'highlight.js': path.join(NODE_MODULES, '@highlightjs', 'cdn-assets', 'es', 'highlight.min.js'),
 };
+// KaTeX (math) is served as a folder because its stylesheet loads its own fonts.
+const KATEX_DIR = path.join(NODE_MODULES, 'katex', 'dist');
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -42,6 +48,9 @@ const MIME = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.json': 'application/json',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
 };
 const CSP = [
   "default-src 'none'",
@@ -52,9 +61,12 @@ const CSP = [
   "connect-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",
-  "frame-src 'none'",
+  `frame-src ${PREVIEW_ORIGIN}`,
   "object-src 'none'",
 ].join('; ');
+// What a preview may do: run its own scripts and load things from the web (https only).
+const PREVIEW_CSP = "default-src https: data: blob: 'unsafe-inline' 'unsafe-eval'";
+const TEST_MODE = process.env.BUDDY_TEST_MODE === '1';
 
 const SHORTCUTS = ['Alt+Space', 'Control+Alt+Space', 'Alt+Shift+Space', 'CommandOrControl+Shift+Space', ''];
 
@@ -80,6 +92,9 @@ let shortcutOk = true;
 let quitting = false;
 const turns = new Map(); // conversation id -> running Turn
 const drafts = new Map(); // attachment id -> metadata, for files added but not sent yet
+const previews = new Map(); // preview token -> HTML, kept in memory only
+const written = new Set(); // files Buddy exported this session (the only ones it will show in Finder)
+const MAX_PREVIEW_CHARS = 5_000_000;
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
@@ -141,8 +156,34 @@ function cleanText(text) {
   return typeof text === 'string' ? text.slice(0, 200000) : '';
 }
 
+function safeFileName(name, fallback = 'Chat') {
+  const clean = String(name || '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  return clean || fallback;
+}
+
+function previewHtml(html) {
+  if (typeof html !== 'string' || !html.trim()) throw new Error('There is nothing to preview.');
+  if (html.length > MAX_PREVIEW_CHARS) throw new Error('That preview is too big.');
+  return html;
+}
+
+// Preview files written for "Open in browser" are cleaned up after a week.
+async function cleanOldPreviewFiles() {
+  const dir = path.join(app.getPath('userData'), 'previews');
+  const weekAgo = Date.now() - 7 * 86400000;
+  for (const name of await fsp.readdir(dir).catch(() => [])) {
+    const file = path.join(dir, name);
+    const stat = await fsp.stat(file).catch(() => null);
+    if (stat && stat.mtimeMs < weekAgo) await fsp.rm(file, { force: true });
+  }
+}
+
 async function confirm(message, detail, okLabel) {
-  if (process.env.BUDDY_TEST_AUTOCONFIRM === '1') return true;
+  if (TEST_MODE) return true;
   const result = await dialog.showMessageBox(win, {
     type: 'warning',
     buttons: [okLabel, 'Cancel'],
@@ -410,8 +451,58 @@ function registerIpc() {
     return Boolean(turn);
   });
 
+  handle('preview:create', async (html) => {
+    const token = crypto.randomUUID();
+    previews.set(token, previewHtml(html));
+    while (previews.size > 30) previews.delete(previews.keys().next().value);
+    return `${PREVIEW_ORIGIN}/${token}`;
+  });
+
+  handle('preview:openInBrowser', async (html, title) => {
+    const dir = path.join(app.getPath('userData'), 'previews');
+    await fsp.mkdir(dir, { recursive: true });
+    const file = path.join(dir, `${safeFileName(title, 'Preview')}-${Date.now().toString(36)}.html`);
+    await fsp.writeFile(file, previewHtml(html), 'utf8');
+    if (!TEST_MODE) {
+      const problem = await shell.openPath(file);
+      if (problem) throw new Error(problem);
+    }
+    return file;
+  });
+
+  handle('chat:export', async (id) => {
+    const conv = await store.getConversation(id);
+    if (!conv) throw new Error('Chat not found');
+    const markdown = claude.exportMarkdown(conv, store.getSettings());
+    const fileName = `${safeFileName(conv.title)}.md`;
+    let filePath;
+    if (TEST_MODE) {
+      const dir = path.join(app.getPath('userData'), 'exports');
+      await fsp.mkdir(dir, { recursive: true });
+      filePath = path.join(dir, fileName);
+    } else {
+      const result = await dialog.showSaveDialog(win, {
+        title: 'Export chat',
+        defaultPath: path.join(app.getPath('documents'), fileName),
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      filePath = result.filePath;
+    }
+    await fsp.writeFile(filePath, markdown, 'utf8');
+    written.add(filePath);
+    return filePath;
+  });
+
   handle('shell:open', async (url) => {
+    if (TEST_MODE) return;
     if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) await shell.openExternal(url);
+  });
+
+  handle('shell:reveal', async (filePath) => {
+    // Only files Buddy itself wrote (exports) can be shown in Finder.
+    if (TEST_MODE || !written.has(filePath)) return;
+    if (fs.existsSync(filePath)) shell.showItemInFolder(filePath);
   });
 
   handle('clipboard:write', async (text) => {
@@ -432,12 +523,28 @@ async function serveFile(file, extraHeaders = {}) {
   return new Response(data, { headers: { 'content-type': type, ...extraHeaders } });
 }
 
+function notFound() {
+  return new Response('Not found', { status: 404 });
+}
+
 function registerProtocol() {
   protocol.handle('app', async (request) => {
     try {
       const url = new URL(request.url);
-      if (url.host !== 'buddy') return new Response('Not found', { status: 404 });
+      if (url.host === 'preview') {
+        const html = previews.get(url.pathname.slice(1));
+        if (typeof html !== 'string') return notFound();
+        return new Response(html, {
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_CSP },
+        });
+      }
+      if (url.host !== 'buddy') return notFound();
       const pathname = decodeURIComponent(url.pathname);
+      if (pathname.startsWith('/vendor/katex/')) {
+        const file = path.resolve(KATEX_DIR, pathname.slice('/vendor/katex/'.length));
+        const allowed = /\.(mjs|css|woff2|woff|ttf)$/.test(file) && file.startsWith(KATEX_DIR + path.sep);
+        return allowed ? await serveFile(file, { 'cache-control': 'max-age=31536000, immutable' }) : notFound();
+      }
       if (pathname.startsWith('/vendor/')) {
         const file = VENDOR[pathname.slice('/vendor/'.length)];
         return file ? await serveFile(file) : new Response('Not found', { status: 404 });
@@ -506,6 +613,14 @@ function createWindow() {
       event.preventDefault();
       if (/^(https?:|mailto:)/i.test(url)) shell.openExternal(url);
     }
+  });
+  // A link clicked inside a preview opens in your browser instead of replacing the preview.
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame) return;
+    const url = event.url || '';
+    if (url.startsWith(`${PREVIEW_ORIGIN}/`) || url.startsWith('about:')) return;
+    event.preventDefault();
+    if (!TEST_MODE && /^https?:/i.test(url)) shell.openExternal(url);
   });
 
   win.webContents.on('context-menu', (_event, params) => showContextMenu(params));
@@ -635,6 +750,7 @@ function buildMenu() {
       submenu: [
         { label: 'New Chat', accelerator: 'CmdOrCtrl+N', click: menuAction('new-chat') },
         { label: 'Search Chats', accelerator: 'CmdOrCtrl+K', click: menuAction('search') },
+        { label: 'Export Chat…', accelerator: 'CmdOrCtrl+Shift+E', click: menuAction('export') },
         ...(isMac ? [] : [{ label: 'Settings', accelerator: 'Ctrl+,', click: menuAction('settings') }]),
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
@@ -682,6 +798,7 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   registerShortcut(store.getSettings().shortcut);
+  cleanOldPreviewFiles().catch(() => {});
   nativeTheme.on('updated', () => {
     if (win && !win.isDestroyed()) win.setBackgroundColor(backgroundColor());
   });

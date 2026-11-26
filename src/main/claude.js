@@ -99,6 +99,8 @@ function buildSystemPrompt(settings) {
     '- Each user message starts with a short <context> note from the app with the current date and time, and sometimes a note that web search is off. Use it when timing matters, but don\'t mention it otherwise.',
     '- When web search is on, use it for anything recent, fast-changing or niche, and cite what you find.',
     '- The user can attach images, PDFs and text files to their messages.',
+    '- Math written in LaTeX shows up nicely: use $...$ inline and $$...$$ on its own lines.',
+    '- When asked to make something visual or interactive (a web page, a small game, an animation, a chart), write it as one self-contained HTML file in a single ```html code block. The app can show a live preview of it. For diagrams, a ```mermaid or ```svg block can be previewed too.',
   );
   const about = (settings.about || '').trim();
   if (about) {
@@ -432,6 +434,41 @@ function displayConversation(conv, liveMessage) {
   };
 }
 
+// A chat as a Markdown file people can keep or share.
+function exportMarkdown(conv, settings) {
+  const assistant = (settings.assistantName || '').trim() || 'Buddy';
+  const you = (settings.name || '').trim() || 'You';
+  const linkText = (s) => String(s || '').replace(/[[\]]/g, '');
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const lines = [`# ${conv.title || 'Chat'}`, '', `_Exported from Buddy on ${date}_`, ''];
+  for (const m of conv.messages) {
+    lines.push('---', '');
+    if (m.role === 'user') {
+      lines.push(`**${you}**`, '');
+      if (m.text) lines.push(m.text, '');
+      if (m.attachments?.length) lines.push(`_Attached: ${m.attachments.map((a) => a.name).join(', ')}_`, '');
+      continue;
+    }
+    const d = displayAssistant(m);
+    lines.push(`**${assistant}** · ${d.model}`, '');
+    const texts = d.blocks.filter((b) => b.type === 'text');
+    const body = texts.map((b) => b.text).join('').trim();
+    if (d.status === 'refused') lines.push('_Claude declined to answer this one._', '');
+    else if (body) lines.push(body, '');
+    if (d.status === 'stopped') lines.push('_(Stopped early.)_', '');
+    if (d.status === 'error' && d.error) lines.push(`_${d.error.title}_`, '');
+    const seen = new Set();
+    const sources = [];
+    for (const c of texts.flatMap((b) => b.citations || [])) {
+      if (!c.url || seen.has(c.url)) continue;
+      seen.add(c.url);
+      sources.push(`- [${linkText(c.title || c.url)}](${c.url})`);
+    }
+    if (sources.length && d.status !== 'refused') lines.push('Sources:', '', ...sources, '');
+  }
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Errors in plain words
 
@@ -724,6 +761,7 @@ module.exports = {
   displayConversation,
   displayAssistant,
   displayUser,
+  exportMarkdown,
   describeError,
   generateTitle,
   cleanTitle,

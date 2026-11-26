@@ -16,7 +16,12 @@ It looks and works a lot like the Claude app: you chat, replies stream in as the
 - **Get to know you.** Tell it your name, a bit about you, and how you like answers (Settings → About you). You can even rename your assistant.
 - **Pop up from anywhere.** Press ⌥ Space in any app to show or hide it.
 - **Edit and retry.** Fix a message you already sent, or ask for a fresh answer.
+- **See what it builds.** Ask for a web page, a small game, a chart or a diagram, and it opens right next to the chat, ready to use. One click opens it in your browser.
+- **Math that looks like math.** Formulas show up properly instead of as code.
+- **Export a chat** as a Markdown file (⌘⇧E).
 - Light and dark mode, code highlighting with copy buttons, tables and more.
+
+![Buddy showing a tip calculator it just made, running in the side panel](docs/preview.png)
 
 ## Before you start
 
@@ -60,10 +65,11 @@ GitHub builds and tests Buddy on a Mac every time the code changes.
 | ⌥ Space | Show or hide Buddy from any app (change it in Settings) |
 | ⌘ N | New chat |
 | ⌘ K | Search your chats |
+| ⌘ ⇧ E | Export this chat as Markdown |
 | ⌘ , | Settings |
 | ⌘ \ | Show or hide the sidebar |
 | Enter | Send (Shift + Enter for a new line) |
-| Esc | Stop a reply |
+| Esc | Stop a reply, or close the preview |
 
 ## What it costs
 
@@ -81,6 +87,7 @@ Tip: set a monthly spend limit in the Console so there are no surprises.
 - Chats and files are saved only on your Mac, in `~/Library/Application Support/Buddy`.
 - Your API key is encrypted with your Mac's Keychain.
 - Your messages go straight from your Mac to Anthropic to get replies, and nowhere else.
+- Previews of things Claude builds run in a sealed-off frame. They can load things from the web (like a charting library), but they can't see your chats, your files or your key.
 
 ## If something goes wrong
 
@@ -116,4 +123,5 @@ npm start
 - If a model declines a request for safety reasons, the API can hand it to a backup model so you still get an answer.
 - Chat history is only ever added to, never rewritten. That keeps Claude's saved reasoning valid and makes long chats cheaper thanks to caching.
 - If the API ever rejects one of the newer options, Buddy quietly retries with a simpler request instead of failing.
+- Math is drawn with [KaTeX](https://katex.org). Previews load from their own `app://preview` address inside a sandboxed frame, so they're walled off from the app.
 - `test/` has an end-to-end test that drives the real app against a fake Claude API. To run it: `npm install --no-save playwright`, then `npm test` (on Linux, `xvfb-run -a npm test`).

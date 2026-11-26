@@ -29,8 +29,8 @@ async function launch() {
       ...process.env,
       BUDDY_USER_DATA: userData,
       BUDDY_API_BASE_URL: mockUrl,
-      BUDDY_TEST_AUTOCONFIRM: '1',
-      BUDDY_PLAIN_KEY_STORAGE: '1',
+      // Test mode: no Keychain, no confirm dialogs, nothing opened in other apps.
+      BUDDY_TEST_MODE: '1',
     },
   });
   win = await app.firstWindow();
@@ -412,6 +412,85 @@ async function lastAssistantText() {
     await win.locator('.chat-empty', { hasText: 'No chats match' }).waitFor();
     await win.fill('.search-box input', '');
     await win.waitForFunction(() => document.querySelectorAll('.chat-item').length > 1);
+  });
+
+  await step('math is drawn with KaTeX, and prices stay as plain text', async () => {
+    await win.click('[data-act="new-chat"] >> nth=0');
+    await send('Show me some math');
+    const md = win.locator('.msg.assistant').last().locator('.md');
+    await md.locator('.katex').first().waitFor();
+    assert.equal(await md.locator('.katex').count(), 3);
+    assert.equal(await md.locator('.katex-display').count(), 1);
+    assert.match(await md.innerText(), /Coffee costs \$5 and lunch costs \$10\./);
+  });
+
+  await step('web pages Claude writes can be previewed in a locked-down panel', async () => {
+    await send('Make me a small webpage');
+    await win.locator('.msg.assistant').last().locator('[data-action="preview-code"]').click();
+    const panel = win.locator('.preview-panel');
+    await panel.waitFor();
+    assert.equal(await panel.locator('.preview-title').innerText(), 'Hello page');
+    // The page's own script ran...
+    await win.frameLocator('.preview-panel iframe').locator('#greeting', { hasText: 'Hello from the preview!' }).waitFor();
+    // ...but it can't touch the app: no access to the page around it, and no app bridge.
+    const frame = await (await win.locator('.preview-panel iframe').elementHandle()).contentFrame();
+    const sealed = await frame.evaluate(() => {
+      let parent = 'blocked';
+      try {
+        parent = window.parent.document.title;
+      } catch {
+        // expected
+      }
+      return { parent, bridge: typeof window.buddy };
+    });
+    assert.deepEqual(sealed, { parent: 'blocked', bridge: 'undefined' });
+    await win.screenshot({ path: path.join(shots, '07-preview.png') });
+    await panel.locator('[data-pv="browser"]').click();
+    await win.locator('.toast', { hasText: 'Opened in your browser' }).waitFor();
+    const files = fs.readdirSync(path.join(userData, 'previews'));
+    assert.ok(files.some((f) => f.startsWith('Hello page') && f.endsWith('.html')), files.join(','));
+    await win.keyboard.press('Escape');
+    await panel.waitFor({ state: 'hidden' });
+  });
+
+  await step('SVG pictures can be previewed too', async () => {
+    await send('Draw an svg circle');
+    await win.locator('.msg.assistant').last().locator('[data-action="preview-code"]').click();
+    await win.frameLocator('.preview-panel iframe').locator('svg circle').waitFor();
+    await win.locator('.preview-panel [data-pv="close"]').click();
+    await win.locator('.preview-panel').waitFor({ state: 'hidden' });
+  });
+
+  await step('long web pages show as a card and open their preview by themselves', async () => {
+    await send('Make me a tip calculator');
+    const card = win.locator('.msg.assistant').last().locator('.codeblock.artifact');
+    assert.equal(await card.locator('.artifact-title').innerText(), 'Tip calculator');
+    assert.equal(await card.locator('pre').isVisible(), false, 'code starts folded away');
+    await win.locator('.preview-panel .preview-title', { hasText: 'Tip calculator' }).waitFor();
+    await win.frameLocator('.preview-panel iframe').locator('#each', { hasText: '$28.61' }).waitFor();
+    await card.locator('[data-action="toggle-code"]').click();
+    assert.equal(await card.locator('pre').isVisible(), true);
+    assert.equal(await card.locator('[data-action="toggle-code"]').innerText(), 'Hide code');
+    await card.locator('[data-action="toggle-code"]').click();
+    assert.equal(await card.locator('pre').isVisible(), false);
+    await win.keyboard.press('Escape');
+    await win.locator('.preview-panel').waitFor({ state: 'hidden' });
+  });
+
+  await step('a chat can be exported as Markdown', async () => {
+    const item = win.locator('.chat-item.active');
+    await item.hover();
+    await item.locator('.more').click();
+    await win.click('.popover [data-a="export"]');
+    await win.locator('.toast', { hasText: 'Saved' }).waitFor();
+    const dir = path.join(userData, 'exports');
+    const [file] = fs.readdirSync(dir);
+    const text = fs.readFileSync(path.join(dir, file), 'utf8');
+    assert.match(text, /^# Mock chat title/);
+    assert.match(text, /\*\*Sam\*\*/);
+    assert.match(text, /Show me some math/);
+    assert.match(text, /\$E = mc\^2\$/);
+    assert.match(text, /\*\*Pal\*\* · Opus 5\.5/);
   });
 
   await step('everything is still there after a restart', async () => {
