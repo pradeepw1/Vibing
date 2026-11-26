@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('buddy', {
   stop: (convId) => invoke('chat:stop', convId),
 
   exportChat: (convId) => invoke('chat:export', convId),
+
+  localStatus: () => invoke('local:status'),
+  localStart: () => invoke('local:start'),
+  localPull: (name) => invoke('local:pull', name),
+  localCancelPull: (name) => invoke('local:cancelPull', name),
   createPreview: (html) => invoke('preview:create', html),
   openPreviewInBrowser: (html, title) => invoke('preview:openInBrowser', html, title),
 

@@ -51,6 +51,7 @@ function modelInfo(id) {
 }
 
 function prettyModel(id) {
+  if (String(id || '').startsWith('local:')) return require('./local').label(id);
   const known = modelInfo(id);
   if (known) return known.label;
   const m = /^claude-([a-z]+)-(\d+)(?:-(\d+))?/.exec(String(id || ''));
@@ -85,20 +86,27 @@ function webTools(info) {
 // ---------------------------------------------------------------------------------------------
 // Prompts
 
-function buildSystemPrompt(settings) {
+// `local` is set for models running on the user's own Mac through Ollama.
+function buildSystemPrompt(settings, { local = false, modelLabel = '' } = {}) {
   const assistant = (settings.assistantName || '').trim() || 'Buddy';
   const user = (settings.name || '').trim();
   const lines = [
-    `You are ${assistant}, a personal AI assistant that lives in a chat app on the user's Mac. You run on Claude, an AI model made by Anthropic.`,
+    local
+      ? `You are ${assistant}, a personal AI assistant that lives in a chat app on the user's Mac. You run on ${modelLabel || 'an open AI model'}, running privately on the user's own Mac. You have no internet access, so say so if a question needs up-to-date information.`
+      : `You are ${assistant}, a personal AI assistant that lives in a chat app on the user's Mac. You run on Claude, an AI model made by Anthropic.`,
   ];
   if (user) lines.push(`You're chatting with ${user}.`);
   lines.push(
     '',
     'About the app:',
     '- Replies are shown with Markdown, so headings, lists, tables and code blocks all display nicely. Use them when they help, and keep simple answers short and plain.',
-    '- Each user message starts with a short <context> note from the app with the current date and time, and sometimes a note that web search is off. Use it when timing matters, but don\'t mention it otherwise.',
-    '- When web search is on, use it for anything recent, fast-changing or niche, and cite what you find.',
-    '- The user can attach images, PDFs and text files to their messages.',
+    local
+      ? "- Each user message starts with a short <context> note from the app with the current date and time. Use it when timing matters, but don't mention it otherwise."
+      : '- Each user message starts with a short <context> note from the app with the current date and time, and sometimes a note that web search is off. Use it when timing matters, but don\'t mention it otherwise.',
+  );
+  if (!local) lines.push('- When web search is on, use it for anything recent, fast-changing or niche, and cite what you find.');
+  lines.push(
+    local ? '- The user can attach text files and images to their messages.' : '- The user can attach images, PDFs and text files to their messages.',
     '- Math written in LaTeX shows up nicely: use $...$ inline and $$...$$ on its own lines.',
     '- When asked to make something visual or interactive (a web page, a small game, an animation, a chart), write it as one self-contained HTML file in a single ```html code block. The app can show a live preview of it. For diagrams, a ```mermaid or ```svg block can be previewed too.',
   );
@@ -113,7 +121,7 @@ function buildSystemPrompt(settings) {
   return lines.join('\n');
 }
 
-function buildContext({ webSearch }) {
+function buildContext({ webSearch, local = false }) {
   const when = new Date().toLocaleString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -124,7 +132,7 @@ function buildContext({ webSearch }) {
     timeZoneName: 'short',
   });
   let text = `<context>Sent ${when}.`;
-  if (!webSearch) text += ' Web search is turned off for this message.';
+  if (!webSearch && !local) text += ' Web search is turned off for this message.';
   return `${text}</context>`;
 }
 

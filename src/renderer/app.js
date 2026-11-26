@@ -33,6 +33,7 @@ const state = {
   editingId: null,
   renamingId: null,
   shortcutOk: true,
+  local: { status: null }, // what Ollama reports: running, installed, models on this Mac
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -67,7 +68,17 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Models running on this Mac (through Ollama) are named "local:<name>".
+function isLocalModel(id) {
+  return typeof id === 'string' && id.startsWith('local:');
+}
+
 function modelLabel(id) {
+  if (isLocalModel(id)) {
+    const name = id.slice('local:'.length);
+    const known = state.info?.local?.models.find((m) => m.name === name || `${m.name}:latest` === name);
+    return known ? known.label : name.replace(/:latest$/, '');
+  }
   return state.models.find((m) => m.id === id)?.label || 'Claude';
 }
 
@@ -125,8 +136,24 @@ async function boot() {
   wireGlobalKeys();
   wireDragAndDrop();
 
-  if (!state.hasKey) renderOnboarding();
+  if (!canChat()) renderOnboarding();
   else startApp();
+}
+
+// You can chat if you have a Claude key, or if your default model runs on this Mac.
+function canChat() {
+  return state.hasKey || isLocalModel(state.settings.model);
+}
+
+// Make sure Ollama is up (opening it if it's installed), and remember what it has.
+async function wakeOllama({ quiet = true } = {}) {
+  let s = await api.localStatus().catch(() => null);
+  if (s && !s.running && s.installed) {
+    if (!quiet) toast('Opening Ollama…');
+    s = await api.localStart().catch(() => s);
+  }
+  state.local.status = s;
+  return s;
 }
 
 function applyFont() {
@@ -150,20 +177,266 @@ function startApp() {
   renderShell();
   newChat();
   loadChats();
+  if (isLocalModel(state.composer.model)) wakeOllama().then(() => updateComposer());
 }
 
 // ---------------------------------------------------------------------------------------------
 // First run
 
+function onboardScreen(inner) {
+  const root = $('#root');
+  root.innerHTML = '';
+  const el = h(`<div class="onboard drag"><div class="onboard-card">${inner}</div></div>`);
+  root.appendChild(el);
+  root.appendChild(h('<div class="toasts"></div>'));
+  return el;
+}
+
 function renderOnboarding() {
+  const el = onboardScreen(`
+    ${logo(52)}
+    <h1>Welcome to Buddy</h1>
+    <p class="lead">Your own AI assistant, right on your Mac. First, pick where its brain runs.</p>
+    <div class="choices">
+      <button class="choice" data-choice="local">
+        <span class="choice-icon">${icon('laptop', 20)}</span>
+        <span class="choice-main">
+          <span class="choice-title">Run on this Mac</span>
+          <span class="choice-sub">Free and private. No account or key, works offline, no usage limits. Uses the free Ollama app. Not as smart as Claude.</span>
+        </span>
+        ${icon('chevronRight', 16)}
+      </button>
+      <button class="choice" data-choice="claude">
+        <span class="choice-icon">${icon('sparkle', 20)}</span>
+        <span class="choice-main">
+          <span class="choice-title">Use Claude</span>
+          <span class="choice-sub">The smartest option, with web search. Needs an Anthropic API key, and you pay as you go.</span>
+        </span>
+        ${icon('chevronRight', 16)}
+      </button>
+    </div>
+    <div class="fine-print">${icon('shield', 15)}<div>You can switch or use both any time. Your chats are always saved only on this Mac.</div></div>`);
+  $('[data-choice="local"]', el).addEventListener('click', () => renderLocalSetup());
+  $('[data-choice="claude"]', el).addEventListener('click', () => renderKeySetup());
+}
+
+function gb(bytes) {
+  if (!bytes) return '';
+  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+}
+
+function pullProgressNode(model) {
+  const node = h(`
+    <div class="pull-progress">
+      <div class="progress"><div class="bar"></div></div>
+      <div class="progress-row"><span class="progress-text">Starting the download…</span><button class="link-btn" type="button">Cancel</button></div>
+    </div>`);
+  node.dataset.model = model;
+  node.querySelector('.link-btn').addEventListener('click', () => api.localCancelPull(model));
+  return node;
+}
+
+// Download progress for a model, shown wherever a progress bar for it is on screen.
+function updatePullProgress(ev) {
+  for (const node of document.querySelectorAll('.pull-progress')) {
+    if (node.dataset.model !== ev.model) continue;
+    const bar = node.querySelector('.bar');
+    const text = node.querySelector('.progress-text');
+    const biggest = Number(node.dataset.total || 0);
+    if (ev.status === 'success') {
+      bar.style.width = '100%';
+      text.textContent = 'Done!';
+    } else if (ev.total > 0 && ev.total >= biggest) {
+      // The model file is the big piece; the small extra files that follow don't move the bar back.
+      node.dataset.total = String(ev.total);
+      bar.style.width = `${Math.min(100, (ev.completed / ev.total) * 100).toFixed(1)}%`;
+      text.textContent = `Downloading… ${gb(ev.completed) || '0 MB'} of ${gb(ev.total)}`;
+    } else if (!ev.total) {
+      text.textContent = /verifying/i.test(ev.status)
+        ? 'Checking the download…'
+        : /manifest/i.test(ev.status) && biggest
+          ? 'Almost done…'
+          : 'Getting ready…';
+    }
+  }
+}
+
+function renderLocalSetup() {
+  const rec = state.info.local;
+  const el = onboardScreen(`
+    <button class="back" type="button">${icon('chevronLeft', 15)} Back</button>
+    ${logo(52)}
+    <h1>Run on this Mac</h1>
+    <p class="lead">Buddy uses Ollama, a free app that runs AI models right on your Mac. Nothing you type leaves your computer.</p>
+    <div class="local-box" id="ls-ollama"></div>
+    <div id="ls-models"></div>
+    <div class="field" id="ls-name-row">
+      <label for="ob-name">What should Buddy call you? <span class="kbd">(optional)</span></label>
+      <input class="input" type="text" id="ob-name" placeholder="Your first name" autocomplete="off" />
+    </div>
+    <div id="ls-progress"></div>
+    <div class="row between">
+      <div class="form-msg" id="ls-msg"></div>
+      <button class="btn primary" id="ls-go" disabled>Start chatting</button>
+    </div>`);
+  const box = $('#ls-ollama', el);
+  const modelsBox = $('#ls-models', el);
+  const go = $('#ls-go', el);
+  const msg = $('#ls-msg', el);
+  const nameInput = $('#ob-name', el);
+  nameInput.value = state.settings.name || '';
+  let alive = true;
+  let busy = false;
+  let choice = null; // { name, download, sizeGB }
+
+  $('.back', el).addEventListener('click', () => {
+    alive = false;
+    renderOnboarding();
+  });
+
+  const paintButton = () => {
+    go.disabled = busy || !choice;
+    go.textContent = choice?.download ? `Download and start${choice.sizeGB ? ` (about ${choice.sizeGB} GB)` : ''}` : 'Start chatting';
+  };
+
+  const paintModels = (s) => {
+    modelsBox.innerHTML = '';
+    if (!s?.running) {
+      choice = null;
+      paintButton();
+      return;
+    }
+    const list = h('<div class="model-options"></div>');
+    const add = (opt) => {
+      const row = h(`
+        <label class="model-option">
+          <input type="radio" name="ls-model" />
+          <span class="mo-main"><span class="mo-title"></span><span class="mo-sub"></span></span>
+          <span class="mo-size"></span>
+        </label>`);
+      row.querySelector('input').value = opt.name;
+      row.querySelector('.mo-title').textContent = opt.title;
+      row.querySelector('.mo-sub').textContent = opt.sub;
+      row.querySelector('.mo-size').textContent = opt.size;
+      if (opt.tag) row.querySelector('.mo-title').appendChild(h(`<span class="tag">${escapeHtml(opt.tag)}</span>`));
+      row.querySelector('input').addEventListener('change', () => {
+        choice = { name: opt.name, download: opt.download, sizeGB: opt.sizeGB };
+        paintButton();
+      });
+      list.appendChild(row);
+      return row;
+    };
+    if (s.models.length) {
+      list.appendChild(h('<div class="mo-group">Already on your Mac</div>'));
+      for (const m of s.models) {
+        add({ name: m.name, title: modelLabel(`local:${m.name}`), sub: m.parameterSize ? `${m.parameterSize} model` : 'Ready to use', size: gb(m.size), download: false });
+      }
+    }
+    const installed = new Set(s.models.map((m) => m.name));
+    const toGet = rec.models.filter((m) => !installed.has(m.name) && !installed.has(`${m.name}:latest`));
+    if (toGet.length) {
+      list.appendChild(h(`<div class="mo-group">${s.models.length ? 'Or download one' : 'Pick one to download'}</div>`));
+      for (const m of toGet) {
+        const tooBig = m.minRamGB > rec.ram;
+        add({
+          name: m.name,
+          title: m.label,
+          sub: tooBig ? `${m.blurb} (Your Mac has ${rec.ram} GB.)` : m.blurb,
+          size: `${m.sizeGB} GB`,
+          sizeGB: m.sizeGB,
+          download: true,
+          tag: m.name === rec.pick ? 'Best for your Mac' : '',
+        });
+      }
+    }
+    modelsBox.appendChild(list);
+    // Pre-pick: something already downloaded, or the best fit for this Mac.
+    const preferred = s.models[0]?.name || rec.pick;
+    const radio = [...list.querySelectorAll('input')].find((r) => r.value === preferred) || list.querySelector('input');
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change'));
+    }
+  };
+
+  const paint = (s) => {
+    if (!alive) return;
+    if (!s) {
+      box.innerHTML = `<div class="lb-row">${icon('sparkle', 16)}<span>Looking for Ollama…</span></div>`;
+    } else if (s.running) {
+      box.innerHTML = `<div class="lb-row ok">${icon('check', 16)}<span>Ollama is ready</span></div>`;
+    } else if (s.installed) {
+      box.innerHTML = `<div class="lb-row">${icon('sparkle', 16)}<span>Opening Ollama… If nothing happens, open it from your Applications folder.</span></div>`;
+    } else {
+      box.innerHTML = `
+        <div class="lb-row">${icon('download', 16)}<span><b>First, get Ollama.</b> It's free. Install it, open it once, and Buddy will notice by itself.</span></div>
+        <div class="lb-actions"><button class="btn" type="button" data-a="get-ollama">${icon('external', 15)} Download Ollama</button></div>`;
+      $('[data-a="get-ollama"]', box).addEventListener('click', () => api.openExternal('https://ollama.com/download'));
+    }
+    if (!busy) paintModels(s);
+  };
+
+  const finish = async (name) => {
+    const patch = { model: `local:${name}`, name: nameInput.value.trim() };
+    const saved = await api.saveSettings(patch);
+    state.settings = saved.settings;
+    alive = false;
+    resetComposerOptions();
+    startApp();
+  };
+
+  go.addEventListener('click', async () => {
+    if (!choice || busy) return;
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    if (!choice.download) {
+      await finish(choice.name);
+      return;
+    }
+    busy = true;
+    paintButton();
+    const progressBox = $('#ls-progress', el);
+    progressBox.innerHTML = '';
+    progressBox.appendChild(pullProgressNode(choice.name));
+    const result = await api.localPull(choice.name).catch((err) => ({ ok: false, error: errorText(err) }));
+    busy = false;
+    if (result.ok) {
+      await finish(choice.name);
+      return;
+    }
+    progressBox.innerHTML = '';
+    msg.textContent = result.cancelled ? 'Download stopped.' : result.error;
+    if (!result.cancelled) msg.classList.add('error');
+    paintButton();
+  });
+
+  paint(null);
+  // Keep checking until Ollama is up (it may still be installing).
+  (async () => {
+    let first = true;
+    while (alive) {
+      const s = first ? await wakeOllama() : await api.localStatus().catch(() => null);
+      first = false;
+      if (!alive) return;
+      const wasRunning = state.local.status?.running;
+      state.local.status = s;
+      if (!busy && (!s?.running || !wasRunning || modelsBox.childElementCount === 0)) paint(s);
+      if (s?.running) return;
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+  })();
+}
+
+function renderKeySetup() {
   const root = $('#root');
   root.innerHTML = '';
   const el = h(`
     <div class="onboard drag">
       <div class="onboard-card">
+        <button class="back" type="button">${icon('chevronLeft', 15)} Back</button>
         ${logo(52)}
-        <h1>Welcome to Buddy</h1>
-        <p class="lead">Your own Claude, right on your Mac. Let’s get you set up in a minute.</p>
+        <h1>Use Claude</h1>
+        <p class="lead">Connect your Anthropic API key. It takes a minute.</p>
         <ol class="steps">
           <li>
             <div class="step-head">Get an API key from Anthropic</div>
@@ -192,6 +465,7 @@ function renderOnboarding() {
   nameInput.value = state.settings.name || '';
   const go = $('#ob-go', el);
   const msg = $('#ob-msg', el);
+  $('.back', el).addEventListener('click', () => renderOnboarding());
   $('[data-act="console"]', el).addEventListener('click', () => api.openExternal('https://platform.claude.com/settings/keys'));
 
   async function submit() {
@@ -215,12 +489,17 @@ function renderOnboarding() {
       return;
     }
     const name = nameInput.value.trim();
-    if (name !== (state.settings.name || '')) {
-      const saved = await api.saveSettings({ name });
+    const patch = {};
+    if (name !== (state.settings.name || '')) patch.name = name;
+    // Coming here from a local setup? Make Claude the default now that there's a key.
+    if (isLocalModel(state.settings.model)) patch.model = 'claude-opus-5-5';
+    if (Object.keys(patch).length) {
+      const saved = await api.saveSettings(patch);
       state.settings = saved.settings;
     }
     state.hasKey = true;
     state.keyHint = result.keyHint || '';
+    resetComposerOptions();
     startApp();
     if (result.warning) toast(result.warning);
   }
@@ -345,7 +624,6 @@ function renderProfile() {
   $('.profile .name').textContent = name || 'You';
   $('.brand-name').textContent = assistantName();
   $('.composer textarea').placeholder = `Message ${assistantName()}…`;
-  $('.footnote').textContent = `${assistantName()} runs on Claude and can make mistakes. Double-check anything important.`;
   updateGreeting();
 }
 
@@ -618,19 +896,41 @@ function closePopover() {
 }
 
 function openModelMenu(anchor) {
-  const menu = h('<div class="popover" style="width: 300px"></div>');
+  const menu = h('<div class="popover model-menu" style="width: 320px"></div>');
+  const item = (id, title, sub, { disabled = false, action = '' } = {}) => {
+    const el = h(`
+      <button class="menu-item ${id === state.composer.model ? 'checked' : ''} ${disabled ? 'disabled' : ''}">
+        <span class="mi-main"><div class="mi-title"></div><div class="mi-sub"></div></span>
+        <span class="check">${icon('check', 16)}</span>
+      </button>`);
+    if (id) el.dataset.model = id;
+    if (action) el.dataset.a = action;
+    el.querySelector('.mi-title').textContent = title;
+    el.querySelector('.mi-sub').textContent = sub;
+    if (!sub) el.querySelector('.mi-sub').remove();
+    return el;
+  };
   const render = () => {
-    menu.innerHTML = '<div class="menu-section">Model</div>';
-    for (const m of state.models) {
-      const item = h(`
-        <button class="menu-item ${m.id === state.composer.model ? 'checked' : ''}" data-model="${escapeHtml(m.id)}">
-          <span class="mi-main"><div class="mi-title"></div><div class="mi-sub"></div></span>
-          <span class="check">${icon('check', 16)}</span>
-        </button>`);
-      item.querySelector('.mi-title').textContent = m.label;
-      item.querySelector('.mi-sub').textContent = m.blurb;
-      menu.appendChild(item);
+    menu.innerHTML = '';
+    // Models on this Mac
+    menu.appendChild(h('<div class="menu-section">On this Mac · free and private</div>'));
+    const s = state.local.status;
+    if (s?.running) {
+      for (const m of s.models) {
+        const id = `local:${m.name}`;
+        menu.appendChild(item(id, modelLabel(id), [m.parameterSize, gb(m.size)].filter(Boolean).join(' · ')));
+      }
+      if (!s.models.length) menu.appendChild(h('<div class="menu-hint">No models downloaded yet.</div>'));
+    } else if (s && !s.installed) {
+      menu.appendChild(item('', 'Get Ollama (free)', 'Runs AI models on your Mac', { action: 'get-ollama' }));
+    } else {
+      menu.appendChild(item('', s ? "Ollama isn't open" : 'Checking…', s ? 'Click to open it' : '', { action: 'start-ollama' }));
     }
+    menu.appendChild(item('', 'Get more models…', '', { action: 'get-models' }));
+    // Claude
+    menu.appendChild(h('<div class="menu-sep"></div>'));
+    menu.appendChild(h(`<div class="menu-section">Claude${state.hasKey ? '' : ' · needs an API key'}</div>`));
+    for (const m of state.models) menu.appendChild(item(m.id, m.label, m.blurb, { disabled: !state.hasKey }));
     menu.appendChild(h('<div class="menu-sep"></div>'));
     menu.appendChild(h('<div class="menu-section">Thinking</div>'));
     const seg = h('<div class="segmented"></div>');
@@ -645,15 +945,37 @@ function openModelMenu(anchor) {
     menu.appendChild(hint);
   };
   render();
-  menu.addEventListener('click', (e) => {
+  // Refresh what's on this Mac while the menu is open.
+  api
+    .localStatus()
+    .then((s) => {
+      state.local.status = s;
+      if (menu.isConnected) render();
+    })
+    .catch(() => {});
+  menu.addEventListener('click', async (e) => {
     const modelBtn = e.target.closest('[data-model]');
     const effortBtn = e.target.closest('[data-effort]');
+    const action = e.target.closest('[data-a]')?.dataset.a;
     if (modelBtn) {
-      setComposerOption({ model: modelBtn.dataset.model }, true);
+      const id = modelBtn.dataset.model;
+      if (!isLocalModel(id) && !state.hasKey) {
+        toast('Claude models need an API key.', '', { label: 'Add one', run: () => openSettings('key') });
+        return;
+      }
+      setComposerOption({ model: id }, true);
       closePopover();
     } else if (effortBtn) {
       setComposerOption({ effort: effortBtn.dataset.effort }, true);
       render();
+    } else if (action === 'get-ollama') {
+      api.openExternal('https://ollama.com/download');
+    } else if (action === 'start-ollama') {
+      await wakeOllama({ quiet: false });
+      if (menu.isConnected) render();
+    } else if (action === 'get-models') {
+      closePopover();
+      openSettings('local');
     }
   });
   openPopover(anchor, menu, { placement: 'above-end' });
@@ -1149,7 +1471,18 @@ function fillAssistant(node, m) {
 
   if (m.status === 'error' && m.error) {
     const actions = [];
-    if (m.error.action === 'settings') actions.push({ label: 'Open Settings', run: () => openSettings() });
+    if (m.error.action === 'settings') actions.push({ label: 'Open Settings', run: () => openSettings(isLocalModel(state.composer.model) ? 'local' : '') });
+    if (m.error.action === 'start-ollama') {
+      actions.push({
+        label: 'Open Ollama',
+        run: async () => {
+          const s = await wakeOllama({ quiet: false });
+          if (s?.running) toast('Ollama is running. Try again now.');
+          else if (s?.installed) toast("Ollama didn't start. Open it from your Applications folder.", 'error');
+          else toast('Ollama isn’t installed yet.', 'error', { label: 'Get Ollama', run: () => api.openExternal('https://ollama.com/download') });
+        },
+      });
+    }
     if (isLastMessage(m)) actions.push({ label: 'Try again', run: () => regenerate() });
     reply.appendChild(noticeNode('error', m.error.title, m.error.detail, actions));
   }
@@ -1454,6 +1787,9 @@ function onEvent(ev) {
       }
       reloadChats();
       break;
+    case 'pull-progress':
+      updatePullProgress(ev);
+      break;
     case 'list-changed':
       reloadChats();
       break;
@@ -1506,10 +1842,16 @@ function updateComposer() {
   send.innerHTML = busy ? icon('stop', 18) : icon('arrowUp', 18);
   send.title = busy ? 'Stop (Esc)' : 'Send (Enter)';
   send.disabled = !busy && (pending || (!text && !ready));
+  const local = isLocalModel(state.composer.model);
+  // Models on this Mac can't search the web, so the button goes away for them.
+  $('.web-btn').hidden = local;
   $('.web-btn').classList.toggle('on', state.composer.webSearch);
   $('.web-btn').title = state.composer.webSearch ? 'Web search is on' : 'Web search is off';
   const effort = EFFORT_LABELS[state.composer.effort];
   $('.model-name').textContent = `${modelLabel(state.composer.model)}${state.composer.effort !== 'medium' ? ` · ${effort}` : ''}`;
+  $('.footnote').textContent = local
+    ? `${assistantName()} is running ${modelLabel(state.composer.model)} privately on your Mac. It can make mistakes, so double-check anything important.`
+    : `${assistantName()} runs on Claude and can make mistakes. Double-check anything important.`;
 }
 
 function wireComposer() {
@@ -1570,6 +1912,9 @@ async function addFiles(files) {
       }
       draft.pending = false;
       draft.meta = result.attachment;
+      if (draft.meta.kind === 'pdf' && isLocalModel(state.composer.model)) {
+        toast('Only Claude models can read PDFs. The model on your Mac will just be told one is attached.');
+      }
     } catch (err) {
       removeDraft(draft, false);
       toast(errorText(err), 'error');
@@ -1813,7 +2158,7 @@ function wireDragAndDrop() {
 // ---------------------------------------------------------------------------------------------
 // Settings
 
-function openSettings() {
+function openSettings(section = '') {
   if (!$('.app') || document.querySelector('.overlay')) return;
   closePopover();
   const s = state.settings;
@@ -1839,9 +2184,24 @@ function openSettings() {
             </div>
           </div>
 
-          <div class="section">
-            <h3>API key</h3>
-            <p class="hint">Buddy uses your own Anthropic API key. It’s stored in your Mac’s Keychain.</p>
+          <div class="section" id="s-local">
+            <h3>Models on this Mac</h3>
+            <p class="hint">Free and private: these run on your Mac through Ollama, and need no internet once downloaded. They’re not as smart as Claude.</p>
+            <div class="local-box" id="s-ollama"></div>
+            <div class="installed-list" id="s-installed"></div>
+            <div class="field" id="s-pull-field">
+              <label for="s-pull-pick">Download a model</label>
+              <div class="row"><select class="select" id="s-pull-pick"></select><button class="btn" data-a="pull">Download</button></div>
+              <input class="input" id="s-pull-name" placeholder="A name from ollama.com/library, like llama3.2:3b" autocomplete="off" spellcheck="false" hidden style="margin-top:8px" />
+              <div id="s-pull-progress"></div>
+              <div class="form-msg" id="s-pull-msg"></div>
+              <div class="sub">Browse more at <a href="#" data-a="library">ollama.com/library</a>. Bigger models are smarter but need more memory.</div>
+            </div>
+          </div>
+
+          <div class="section" id="s-key">
+            <h3>Claude API key</h3>
+            <p class="hint">To use Claude, Buddy needs your own Anthropic API key. It’s stored in your Mac’s Keychain.</p>
             <div class="row between wrap">
               <div class="key-status"><span class="dot"></span><span class="key-text"></span></div>
               <div class="row"><button class="btn" data-a="change-key">Change key</button><button class="btn ghost danger" data-a="remove-key">Remove</button></div>
@@ -1944,6 +2304,8 @@ function openSettings() {
   const renderKey = () => {
     dot.classList.toggle('off', !state.hasKey);
     keyText.textContent = state.hasKey ? `Connected${state.keyHint ? ` · key ending in ${state.keyHint}` : ''}` : 'No key saved';
+    $('[data-a="change-key"]', overlay).textContent = state.hasKey ? 'Change key' : 'Add a key';
+    $('[data-a="remove-key"]', overlay).hidden = !state.hasKey;
   };
   renderKey();
   const keyEdit = $('.key-edit', overlay);
@@ -1976,6 +2338,7 @@ function openSettings() {
       keyEdit.hidden = true;
       keyMsg.textContent = '';
       renderKey();
+      fillModelSelect();
       toast(res.warning || 'API key saved');
     }
     if (a === 'remove-key') {
@@ -1983,7 +2346,45 @@ function openSettings() {
       state.hasKey = res.hasKey;
       state.keyHint = res.keyHint || '';
       overlay.remove();
-      if (!state.hasKey) renderOnboarding();
+      if (!canChat()) renderOnboarding();
+      else if (!state.hasKey && !isLocalModel(state.composer.model)) {
+        resetComposerOptions();
+        updateComposer();
+      }
+    }
+    if (a === 'library') {
+      e.preventDefault();
+      api.openExternal('https://ollama.com/library');
+    }
+    if (a === 'get-ollama') api.openExternal('https://ollama.com/download');
+    if (a === 'start-ollama') {
+      await wakeOllama({ quiet: false });
+      if (overlay.isConnected) paintLocal();
+    }
+    if (a === 'pull') {
+      const name = (pullPick.value || pullName.value).trim();
+      pullMsg.className = 'form-msg';
+      pullMsg.textContent = '';
+      if (!name) {
+        pullMsg.textContent = 'Type the name of a model first.';
+        pullMsg.classList.add('error');
+        return;
+      }
+      const btn = e.target.closest('[data-a="pull"]');
+      btn.disabled = true;
+      const progressBox = $('#s-pull-progress', overlay);
+      progressBox.innerHTML = '';
+      progressBox.appendChild(pullProgressNode(name));
+      const result = await api.localPull(name).catch((err) => ({ ok: false, error: errorText(err) }));
+      btn.disabled = false;
+      progressBox.innerHTML = '';
+      if (result.ok) {
+        toast(`${modelLabel(`local:${name}`)} is ready`);
+        await refreshLocal();
+      } else {
+        pullMsg.textContent = result.cancelled ? 'Download stopped.' : result.error;
+        if (!result.cancelled) pullMsg.classList.add('error');
+      }
     }
     if (a === 'reveal') api.revealData();
     if (a === 'delete-all') {
@@ -2001,14 +2402,89 @@ function openSettings() {
 
   // defaults
   const modelSel = $('#s-model', overlay);
-  for (const m of state.models) {
-    const o = document.createElement('option');
-    o.value = m.id;
-    o.textContent = m.label;
-    modelSel.appendChild(o);
-  }
-  modelSel.value = s.model;
+  // Both kinds of model can be the default: ones on this Mac, and Claude.
+  const fillModelSelect = () => {
+    modelSel.innerHTML = '';
+    const localGroup = document.createElement('optgroup');
+    localGroup.label = 'On this Mac';
+    for (const m of state.local.status?.models || []) {
+      const o = document.createElement('option');
+      o.value = `local:${m.name}`;
+      o.textContent = modelLabel(o.value);
+      localGroup.appendChild(o);
+    }
+    if (isLocalModel(state.settings.model) && ![...localGroup.children].some((o) => o.value === state.settings.model)) {
+      const o = document.createElement('option');
+      o.value = state.settings.model;
+      o.textContent = modelLabel(o.value);
+      localGroup.appendChild(o);
+    }
+    if (localGroup.children.length) modelSel.appendChild(localGroup);
+    const claudeGroup = document.createElement('optgroup');
+    claudeGroup.label = state.hasKey ? 'Claude' : 'Claude (needs an API key)';
+    for (const m of state.models) {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = m.label;
+      o.disabled = !state.hasKey;
+      claudeGroup.appendChild(o);
+    }
+    modelSel.appendChild(claudeGroup);
+    modelSel.value = state.settings.model;
+  };
+  fillModelSelect();
   modelSel.addEventListener('change', () => save({ model: modelSel.value }));
+
+  // Models on this Mac
+  const ollamaBox = $('#s-ollama', overlay);
+  const installedBox = $('#s-installed', overlay);
+  const pullPick = $('#s-pull-pick', overlay);
+  const pullName = $('#s-pull-name', overlay);
+  const pullMsg = $('#s-pull-msg', overlay);
+  const rec = state.info.local;
+  for (const m of rec.models) {
+    const o = document.createElement('option');
+    o.value = m.name;
+    o.textContent = `${m.label} · about ${m.sizeGB} GB${m.name === rec.pick ? ' · best for your Mac' : ''}`;
+    pullPick.appendChild(o);
+  }
+  const other = document.createElement('option');
+  other.value = '';
+  other.textContent = 'Another model (type its name)…';
+  pullPick.appendChild(other);
+  pullPick.value = rec.pick;
+  pullPick.addEventListener('change', () => {
+    pullName.hidden = pullPick.value !== '';
+    if (!pullName.hidden) pullName.focus();
+  });
+  const paintLocal = () => {
+    const ls = state.local.status;
+    if (!ls) {
+      ollamaBox.innerHTML = `<div class="lb-row">${icon('sparkle', 16)}<span>Checking for Ollama…</span></div>`;
+    } else if (ls.running) {
+      ollamaBox.innerHTML = `<div class="lb-row ok">${icon('check', 16)}<span>Ollama is running${ls.version ? ` (version ${escapeHtml(ls.version)})` : ''}</span></div>`;
+    } else if (ls.installed) {
+      ollamaBox.innerHTML = `<div class="lb-row">${icon('alert', 16)}<span>Ollama isn't open right now.</span></div><div class="lb-actions"><button class="btn" data-a="start-ollama">Open Ollama</button></div>`;
+    } else {
+      ollamaBox.innerHTML = `<div class="lb-row">${icon('download', 16)}<span>To run models on this Mac, first install Ollama. It's free.</span></div><div class="lb-actions"><button class="btn" data-a="get-ollama">${icon('external', 15)} Download Ollama</button></div>`;
+    }
+    installedBox.innerHTML = '';
+    for (const m of ls?.models || []) {
+      const row = h('<div class="installed-row"><span class="ir-name"></span><span class="ir-size"></span></div>');
+      row.querySelector('.ir-name').textContent = modelLabel(`local:${m.name}`);
+      row.querySelector('.ir-size').textContent = [m.parameterSize, gb(m.size)].filter(Boolean).join(' · ');
+      row.title = m.name;
+      installedBox.appendChild(row);
+    }
+    $('#s-pull-field', overlay).hidden = !ls?.running;
+    fillModelSelect();
+  };
+  const refreshLocal = async () => {
+    state.local.status = await api.localStatus().catch(() => null);
+    if (overlay.isConnected) paintLocal();
+  };
+  paintLocal();
+  refreshLocal();
   const effortSel = $('#s-effort', overlay);
   effortSel.value = s.effort;
   effortSel.addEventListener('change', () => save({ effort: effortSel.value }));
@@ -2069,6 +2545,7 @@ function openSettings() {
   });
 
   $('#s-version', overlay).textContent = `Buddy ${state.info.version}`;
+  if (section) overlay.querySelector(`#s-${section}`)?.scrollIntoView({ block: 'start' });
 }
 
 boot().catch((err) => {

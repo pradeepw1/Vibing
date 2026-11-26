@@ -20,15 +20,16 @@ let app;
 let win;
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-test-'));
 
-async function launch() {
+async function launch(dataDir = userData) {
   app = await electron.launch({
     executablePath: require(path.join(repo, 'node_modules', 'electron')),
     args: ['--no-sandbox', repo],
     cwd: repo,
     env: {
       ...process.env,
-      BUDDY_USER_DATA: userData,
+      BUDDY_USER_DATA: dataDir,
       BUDDY_API_BASE_URL: mockUrl,
+      BUDDY_OLLAMA_URL: mockUrl,
       // Test mode: no Keychain, no confirm dialogs, nothing opened in other apps.
       BUDDY_TEST_MODE: '1',
     },
@@ -95,6 +96,7 @@ async function lastAssistantText() {
   });
 
   await step('a wrong API key is rejected with a clear message', async () => {
+    await win.click('[data-choice="claude"]');
     await win.fill('#ob-key', 'sk-ant-wrong-key-0000000000000');
     await win.click('#ob-go');
     await win.locator('#ob-msg', { hasText: "didn't work" }).waitFor();
@@ -503,6 +505,121 @@ async function lastAssistantText() {
     await win.locator('.chat-item').first().click();
     await win.waitForFunction(() => document.querySelectorAll('.msg').length > 0);
     await win.screenshot({ path: path.join(shots, '06-after-restart.png') });
+  });
+
+  // ---------------------------------------------------------------------------------------
+  // Round two: a fresh Mac with no API key, running a model locally through (fake) Ollama.
+
+  const ollamaChats = () => mock.ollama.requests.filter((r) => r.path === '/api/chat' && r.body.stream);
+  const lastOllamaChat = () => ollamaChats()[ollamaChats().length - 1].body;
+
+  await step('with no API key, "Run on this Mac" downloads a model and starts', async () => {
+    await app.close();
+    await launch(fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-local-')));
+    await win.locator('text=Welcome to Buddy').waitFor();
+    await win.screenshot({ path: path.join(shots, '08-choose.png') });
+    await win.click('[data-choice="local"]');
+    await win.locator('.lb-row.ok', { hasText: 'Ollama is ready' }).waitFor();
+    // It suggests a model that suits this computer's memory...
+    const ram = Math.round(os.totalmem() / 1024 ** 3);
+    const suited = ram >= 24 ? 'gpt-oss:20b' : ram >= 16 ? 'qwen3:8b' : 'qwen3:4b';
+    assert.equal(await win.locator('.model-option input:checked').inputValue(), suited);
+    assert.match(await win.locator('.model-option:has(input:checked)').innerText(), /Best for your Mac/);
+    // ...but any can be picked. The small one keeps this test quick.
+    await win.locator('.model-option', { hasText: 'Qwen 3 (4B)' }).click();
+    assert.match(await win.locator('#ls-go').innerText(), /Download and start \(about 2\.6 GB\)/);
+    await win.fill('#ob-name', 'Sam');
+    await win.screenshot({ path: path.join(shots, '09-local-setup.png') });
+    await win.click('#ls-go');
+    await win.locator('.pull-progress .progress-text', { hasText: /Downloading|Done|Getting ready/ }).waitFor();
+    await win.locator('.composer textarea').waitFor({ timeout: 15000 });
+    assert.equal(await win.locator('.model-name').innerText(), 'Qwen 3 (4B)');
+    assert.equal(await win.locator('.web-btn').isVisible(), false, 'no web search on local models');
+    assert.match(await win.locator('.footnote').innerText(), /privately on your Mac/);
+  });
+
+  await step('a local model streams its thinking and reply, and names the chat', async () => {
+    const before = ollamaChats().length;
+    await send('Hello there');
+    assert.equal(ollamaChats().length, before + 1);
+    const msg = win.locator('.msg.assistant').last();
+    assert.match(await msg.locator('.md').innerText(), /Hello from your Mac!/);
+    assert.match(await msg.locator('.process-head').innerText(), /Thought/);
+    assert.equal(await msg.locator('.model-tag').innerText(), 'Qwen 3 (4B)');
+    const b = lastOllamaChat();
+    assert.equal(b.model, 'qwen3:4b');
+    assert.equal(b.think, true);
+    assert.equal(b.keep_alive, '30m');
+    assert.ok(b.options.num_ctx >= 8192);
+    assert.equal(b.messages[0].role, 'system');
+    assert.match(b.messages[0].content, /running privately on the user's own Mac/);
+    assert.match(b.messages[1].content, /^<context>Sent .+\.<\/context>\n\nHello there$/);
+    await win.locator('.chat-item .title', { hasText: 'Local chat title' }).waitFor();
+    await win.screenshot({ path: path.join(shots, '10-local-chat.png') });
+  });
+
+  await step('Quick thinking turns a local model\'s thinking off', async () => {
+    await win.click('[data-act="model"]');
+    await win.click('.popover [data-effort="low"]');
+    await win.keyboard.press('Escape');
+    await send('quick one');
+    assert.equal(lastOllamaChat().think, false);
+    assert.equal(await win.locator('.msg.assistant').last().locator('.process-head').count(), 0);
+    // earlier replies are sent back as plain text
+    const history = lastOllamaChat().messages;
+    assert.equal(history[2].role, 'assistant');
+    assert.match(history[2].content, /Hello from your Mac/);
+  });
+
+  await step('more models can be downloaded in Settings, and image-capable ones get your images', async () => {
+    await win.click('.sidebar-foot .icon-btn');
+    await win.locator('#s-ollama .lb-row.ok').waitFor();
+    await win.selectOption('#s-pull-pick', 'gemma3:12b');
+    await win.click('#s-local [data-a="pull"]');
+    await win.locator('.toast', { hasText: 'Gemma 3 (12B) is ready' }).waitFor();
+    await win.locator('#s-installed .installed-row', { hasText: 'Gemma 3 (12B)' }).waitFor();
+    await win.keyboard.press('Escape');
+    await win.click('[data-act="model"]');
+    await win.click('.popover [data-model="local:gemma3:12b"]');
+    await win.setInputFiles('.file-input', [path.join(repo, 'build', 'icon.png')]);
+    await win.waitForFunction(() => document.querySelectorAll('.draft:not(.pending)').length === 1);
+    await send('What is in this picture?');
+    const b = lastOllamaChat();
+    assert.equal(b.model, 'gemma3:12b');
+    assert.equal(b.think, undefined, 'no thinking switch for a model that cannot think');
+    const last = b.messages[b.messages.length - 1];
+    assert.equal(last.images.length, 1);
+    assert.ok(last.images[0].length > 1000);
+  });
+
+  await step('Claude models show that they need an API key', async () => {
+    await win.click('[data-act="model"]');
+    assert.ok(await win.locator('.popover .menu-item.disabled[data-model="claude-opus-5-5"]').count());
+    await win.click('.popover [data-model="claude-opus-5-5"]');
+    await win.locator('.toast', { hasText: 'Claude models need an API key' }).waitFor();
+    await win.keyboard.press('Escape');
+  });
+
+  await step('Stop works for local replies too', async () => {
+    await composer().fill('Tell me something slow');
+    await composer().press('Enter');
+    await win.locator('.msg.assistant').last().locator('.md', { hasText: 'Step3' }).waitFor();
+    await win.click('.send-btn.stop');
+    await waitIdle();
+    await win.locator('.msg.assistant').last().locator('.muted-note', { hasText: 'You stopped this reply' }).waitFor();
+  });
+
+  await step("if Ollama isn't running, Buddy says so plainly", async () => {
+    mock.ollama.up = false;
+    await send('are you there?');
+    const notice = win.locator('.msg.assistant').last().locator('.notice.error');
+    await notice.waitFor();
+    assert.match(await notice.innerText(), /can't reach Ollama/);
+    assert.ok(await notice.locator('button', { hasText: 'Open Ollama' }).count());
+    mock.ollama.up = true;
+    await notice.locator('button', { hasText: 'Try again' }).click();
+    await waitIdle();
+    assert.match(await lastAssistantText(), /Hello from your Mac/);
   });
 
   assert.deepEqual(pageErrors, [], 'no page errors');

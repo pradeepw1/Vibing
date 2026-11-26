@@ -22,6 +22,7 @@ const {
 const { Store, isId } = require('./store');
 const { prepareAttachment, AttachmentError } = require('./attachments');
 const claude = require('./claude');
+const local = require('./local');
 
 const isMac = process.platform === 'darwin';
 const ORIGIN = 'app://buddy';
@@ -144,12 +145,25 @@ function provisionalTitle(text, attachments) {
   return 'New chat';
 }
 
+// A model is either a Claude model id, or "local:<name>" for one running on this Mac.
+function validModel(model) {
+  return Boolean(claude.modelInfo(model)) || local.isLocal(model);
+}
+
 function turnOptions(payload) {
   const settings = store.getSettings();
-  const model = claude.modelInfo(payload?.model) ? payload.model : settings.model;
+  const model = validModel(payload?.model) ? payload.model : settings.model;
   const effort = claude.EFFORTS.includes(payload?.effort) ? payload.effort : settings.effort;
-  const webSearch = typeof payload?.webSearch === 'boolean' ? payload.webSearch : settings.webSearch;
-  return { model, effort, webSearch };
+  const isLocal = local.isLocal(model);
+  // Local models can't search the web.
+  const webSearch = isLocal ? false : typeof payload?.webSearch === 'boolean' ? payload.webSearch : settings.webSearch;
+  return { model, effort, webSearch, local: isLocal };
+}
+
+function checkCanReply(opts) {
+  if (!opts.local && !store.hasApiKey()) {
+    throw new Error('Claude models need an API key. Add one in Settings, or pick a model that runs on this Mac.');
+  }
 }
 
 function cleanText(text) {
@@ -198,8 +212,27 @@ async function confirm(message, detail, okLabel) {
 // ---------------------------------------------------------------------------------------------
 // Running replies
 
-function startTurn(conv, messageId, opts) {
-  const turn = new claude.Turn({ store, client: getClient(), conv, messageId, opts, emit: sendEvent });
+function startTurn(conv, messageId, opts, { titleFrom } = {}) {
+  const settings = store.getSettings();
+  let turn;
+  if (opts.local) {
+    turn = new local.LocalTurn({
+      store,
+      conv,
+      messageId,
+      opts,
+      emit: sendEvent,
+      systemPrompt: claude.buildSystemPrompt(settings, { local: true, modelLabel: local.label(opts.model) }),
+    });
+  } else {
+    // A chat that began on a local model gets a Claude system prompt from its first Claude reply on
+    // (and keeps it, so Claude's saved thinking stays valid).
+    if (conv.systemFor === 'local' || !conv.system) {
+      conv.system = claude.buildSystemPrompt(settings);
+      conv.systemFor = 'claude';
+    }
+    turn = new claude.Turn({ store, client: getClient(), conv, messageId, opts, emit: sendEvent });
+  }
   turns.set(conv.id, turn);
   listChanged();
   turn.done = turn
@@ -219,13 +252,17 @@ function startTurn(conv, messageId, opts) {
       }
       sendEvent({ type: 'done', convId: conv.id, messageId: msg.id, message: claude.displayAssistant(msg) });
       listChanged();
+      // A local model works on one thing at a time, so its chat title waits for the reply.
+      if (titleFrom && msg.status === 'done') autoTitle(conv, titleFrom, opts.model);
     });
 }
 
 async function autoTitle(conv, text, model) {
   if (!text.trim()) return;
   try {
-    const title = await claude.generateTitle(getClient(), model, text);
+    const title = local.isLocal(model)
+      ? claude.cleanTitle(await local.generateTitle(model, text))
+      : await claude.generateTitle(getClient(), model, text);
     if (!title || conv.deleted || conv.titleLocked) return;
     conv.title = title;
     await store.saveConversation(conv);
@@ -260,15 +297,43 @@ function registerIpc() {
     hasKey: store.hasApiKey(),
     keyHint: keyHint(),
     models: claude.MODELS.map(({ id, label, blurb }) => ({ id, label, blurb })),
+    local: local.recommendedFor(),
     shortcuts: SHORTCUTS,
     shortcutOk,
     platform: process.platform,
     version: app.getVersion(),
   }));
 
+  // ---- models on this Mac (Ollama) ----
+
+  handle('local:status', async () => local.status());
+
+  handle('local:start', async () => local.start());
+
+  handle('local:pull', async (name) => {
+    if (typeof name !== 'string') throw new Error('Pick a model first.');
+    const model = name.trim();
+    try {
+      await local.pull(model, (progress) => sendEvent({ type: 'pull-progress', model, ...progress }));
+      return { ok: true };
+    } catch (err) {
+      const unreachable = err?.code === 'UNREACHABLE';
+      const cancelled = err?.code === 'CANCELLED';
+      return {
+        ok: false,
+        cancelled,
+        error: unreachable ? "Buddy can't reach Ollama. Make sure the Ollama app is open." : String(err?.message || err),
+      };
+    }
+  });
+
+  handle('local:cancelPull', async (name) => {
+    if (typeof name === 'string') local.cancelPull(name);
+  });
+
   handle('settings:save', async (patch) => {
     const clean = { ...(patch || {}) };
-    if ('model' in clean && !claude.modelInfo(clean.model)) delete clean.model;
+    if ('model' in clean && !validModel(clean.model)) delete clean.model;
     if ('effort' in clean && !claude.EFFORTS.includes(clean.effort)) delete clean.effort;
     if ('theme' in clean && !['system', 'light', 'dark'].includes(clean.theme)) delete clean.theme;
     if ('font' in clean && !['sans', 'serif'].includes(clean.font)) delete clean.font;
@@ -367,7 +432,6 @@ function registerIpc() {
   });
 
   handle('chat:send', async (payload) => {
-    if (!store.hasApiKey()) throw new Error('Add your API key in Settings first.');
     const p = payload || {};
     if (!isId(p.convId) || !isId(p.messageId) || !isId(p.assistantId)) throw new Error('Bad request');
     const text = cleanText(p.text);
@@ -377,11 +441,18 @@ function registerIpc() {
     if (!text.trim() && !attachments.length) throw new Error('Type a message first.');
 
     const opts = turnOptions(p);
+    checkCanReply(opts);
     let conv = await store.getConversation(p.convId);
     const isNew = !conv;
     if (conv && turns.has(conv.id)) throw new Error('Buddy is still replying in this chat.');
     if (isNew) {
-      conv = store.newConversation({ id: p.convId, model: opts.model, system: claude.buildSystemPrompt(store.getSettings()) });
+      // Claude chats get their system prompt now (startTurn fills it in for local ones).
+      conv = store.newConversation({
+        id: p.convId,
+        model: opts.model,
+        system: opts.local ? '' : claude.buildSystemPrompt(store.getSettings()),
+      });
+      conv.systemFor = opts.local ? 'local' : 'claude';
       conv.title = provisionalTitle(text, attachments);
     }
     for (const att of attachments) drafts.delete(att.id);
@@ -397,8 +468,9 @@ function registerIpc() {
     conv.model = opts.model;
     conv.updatedAt = now;
     await store.saveConversation(conv);
-    startTurn(conv, p.assistantId, opts);
-    if (isNew) autoTitle(conv, text, opts.model);
+    const titleLater = isNew && opts.local;
+    startTurn(conv, p.assistantId, opts, titleLater ? { titleFrom: text } : {});
+    if (isNew && !opts.local) autoTitle(conv, text, opts.model);
     return { id: conv.id, title: conv.title };
   });
 
@@ -409,6 +481,7 @@ function registerIpc() {
     if (!conv) throw new Error('Chat not found');
     if (turns.has(conv.id)) throw new Error('Buddy is still replying in this chat.');
     const opts = turnOptions(p);
+    checkCanReply(opts);
     while (conv.messages.length && conv.messages[conv.messages.length - 1].role === 'assistant') conv.messages.pop();
     const last = conv.messages[conv.messages.length - 1];
     if (!last) throw new Error('Nothing to retry');
@@ -433,6 +506,7 @@ function registerIpc() {
     const text = cleanText(p.text);
     if (!text.trim() && !(target.attachments || []).length) throw new Error('Type a message first.');
     const opts = turnOptions(p);
+    checkCanReply(opts);
     const removed = conv.messages.splice(index + 1);
     await deleteAttachments(removed);
     target.text = text;

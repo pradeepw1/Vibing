@@ -174,6 +174,10 @@ a {
   display: block;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 /* Macs already have slim overlay scrollbars; elsewhere, make them less chunky. */
 body:not(.mac) ::-webkit-scrollbar {
   width: 10px;
@@ -2100,6 +2104,259 @@ body.mac .app.sidebar-collapsed .topbar {
   color: var(--text-3);
   margin-top: 18px;
   line-height: 1.45;
+}
+
+.back {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+  margin: -10px 0 14px -6px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+}
+
+.back:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 6px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 16px 14px 16px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-3);
+}
+
+.choice:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.choice-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.choice:hover .choice-icon {
+  background: var(--surface);
+}
+
+.choice-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.choice-title {
+  font-weight: 650;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.choice-sub {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* Ollama status, model choices and download progress */
+
+.local-box {
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  margin: 0 0 14px;
+  font-size: 13.5px;
+}
+
+.lb-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.lb-row .icon {
+  margin-top: 1px;
+}
+
+.lb-row.ok {
+  color: var(--text);
+}
+
+.lb-row.ok .icon {
+  color: #3c9a63;
+}
+
+.lb-actions {
+  margin: 10px 0 2px 25px;
+}
+
+.model-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.mo-group {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  margin: 6px 2px 0;
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.model-option:hover {
+  border-color: var(--border-strong);
+}
+
+.model-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.model-option input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.mo-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mo-title {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mo-sub {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.mo-size {
+  font-size: 12.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.pull-progress {
+  margin: 8px 0 14px;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progress .bar {
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.link-btn {
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.installed-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 14px;
+}
+
+.installed-list:empty {
+  display: none;
+}
+
+.installed-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+
+.installed-row:last-child {
+  border-bottom: 0;
+}
+
+.ir-size {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.menu-item.disabled {
+  opacity: 0.55;
 }
 
 .fine-print .icon {

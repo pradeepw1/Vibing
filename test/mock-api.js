@@ -37,13 +37,114 @@ function chunks(text, size = 12) {
   return out;
 }
 
+// --- A fake Ollama (the app that runs models on your Mac), on the same server under /api ---
+
+const OLLAMA_CATALOG = {
+  'qwen3:4b': { size: 2_600_000_000, caps: ['completion', 'thinking'], family: 'qwen3', parameterSize: '4.0B' },
+  'qwen3:8b': { size: 5_200_000_000, caps: ['completion', 'thinking'], family: 'qwen3', parameterSize: '8.2B' },
+  'gemma3:12b': { size: 8_100_000_000, caps: ['completion', 'vision'], family: 'gemma3', parameterSize: '12.2B' },
+  'gpt-oss:20b': { size: 14_000_000_000, caps: ['completion', 'thinking'], family: 'gptoss', parameterSize: '20.9B' },
+};
+
+async function handleOllama(req, res, url, raw, ollama) {
+  const json = (status, data) => {
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(data));
+  };
+  const body = raw ? JSON.parse(raw) : {};
+  ollama.requests.push({ path: url.pathname, body });
+  if (url.pathname === '/api/version') return json(200, { version: '0.20.0' });
+  if (url.pathname === '/api/tags') {
+    return json(200, {
+      models: [...ollama.installed].map((name) => ({
+        name,
+        model: name,
+        size: OLLAMA_CATALOG[name].size,
+        details: { family: OLLAMA_CATALOG[name].family, parameter_size: OLLAMA_CATALOG[name].parameterSize },
+      })),
+    });
+  }
+  if (url.pathname === '/api/show') {
+    if (!ollama.installed.has(body.model)) return json(404, { error: `model '${body.model}' not found` });
+    return json(200, { capabilities: OLLAMA_CATALOG[body.model].caps, details: {} });
+  }
+  let closed = false;
+  req.on('close', () => {
+    closed = true;
+  });
+  const stream = () => res.writeHead(200, { 'content-type': 'application/x-ndjson' });
+  const line = (obj) => {
+    if (!closed) res.write(`${JSON.stringify(obj)}\n`);
+  };
+  if (url.pathname === '/api/pull') {
+    stream();
+    const info = OLLAMA_CATALOG[body.model];
+    if (!info) {
+      line({ error: 'pull model manifest: file does not exist' });
+      return res.end();
+    }
+    line({ status: 'pulling manifest' });
+    for (let i = 0; i <= 10 && !closed; i++) {
+      line({ status: 'pulling 8f3a…', digest: 'sha256:8f3a', total: info.size, completed: Math.round((info.size * i) / 10) });
+      await sleep(40);
+    }
+    if (closed) return undefined;
+    line({ status: 'verifying sha256 digest' });
+    line({ status: 'writing manifest' });
+    line({ status: 'success' });
+    ollama.installed.add(body.model);
+    return res.end();
+  }
+  if (url.pathname === '/api/chat') {
+    const info = OLLAMA_CATALOG[body.model];
+    if (!ollama.installed.has(body.model)) {
+      return json(404, { error: `model "${body.model}" not found, try pulling it first` });
+    }
+    if (body.think !== undefined && !info.caps.includes('thinking')) {
+      return json(400, { error: `"${body.model}" does not support thinking` });
+    }
+    const last = body.messages[body.messages.length - 1]?.content || '';
+    if (!body.stream) {
+      return json(200, { message: { role: 'assistant', content: 'Local chat title' }, done: true, done_reason: 'stop' });
+    }
+    stream();
+    if (body.think) {
+      for (const c of ['Let me think ', 'about that ', 'for a moment.']) {
+        line({ model: body.model, message: { role: 'assistant', content: '', thinking: c }, done: false });
+        await sleep(15);
+      }
+    }
+    const reply = /slow/i.test(last)
+      ? Array.from({ length: 300 }, (_, n) => `Step${n} `)
+      : chunks(`Hello from your Mac! I'm **${body.model}**, running right here.`, 9);
+    for (const c of reply) {
+      if (closed) return undefined;
+      line({ model: body.model, message: { role: 'assistant', content: c }, done: false });
+      await sleep(/slow/i.test(last) ? 40 : 10);
+    }
+    line({ model: body.model, message: { role: 'assistant', content: '' }, done: true, done_reason: 'stop', prompt_eval_count: 42, eval_count: 17 });
+    return res.end();
+  }
+  return json(404, { error: 'not found' });
+}
+
 function createServer() {
   const requests = [];
+  const ollama = { up: true, installed: new Set(), requests: [] };
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     let raw = '';
     for await (const c of req) raw += c;
+
+    if (url.pathname.startsWith('/api/')) {
+      if (!ollama.up) {
+        req.socket.destroy(); // like Ollama not running
+        return;
+      }
+      await handleOllama(req, res, url, raw, ollama);
+      return;
+    }
 
     if (url.pathname === '/_requests') {
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -448,6 +549,7 @@ function createServer() {
   return {
     server,
     requests,
+    ollama,
     listen: () =>
       new Promise((resolve) => {
         server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`));

@@ -39,6 +39,20 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright
           npm test
 
+      - name: Chat with a real model on this Mac (Ollama)
+        timeout-minutes: 20
+        env:
+          BUDDY_SHOTS: ${{ runner.temp }}/shots
+          BUDDY_REAL_MODEL: qwen3:0.6b
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          brew install ollama
+          ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 1; done
+          ollama pull "$BUDDY_REAL_MODEL"
+          node test/local-real.js || { echo "--- Ollama's log ---"; tail -n 60 "$RUNNER_TEMP/ollama.log"; exit 1; }
+
       - name: Build Buddy.app
         run: npx electron-builder --mac --dir --arm64 --x64
 
