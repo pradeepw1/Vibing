@@ -553,7 +553,8 @@ async function lastAssistantText() {
     assert.ok(b.options.num_ctx >= 8192);
     assert.equal(b.messages[0].role, 'system');
     assert.match(b.messages[0].content, /running privately on the user's own Mac/);
-    assert.match(b.messages[1].content, /^<context>Sent .+\.<\/context>\n\nHello there$/);
+    assert.match(b.messages[0].content, /It is now \w+day, /, "today's date is in the instructions");
+    assert.equal(b.messages[1].content, 'Hello there', 'no date note inside the message itself');
     await win.locator('.chat-item .title', { hasText: 'Local chat title' }).waitFor();
     await win.screenshot({ path: path.join(shots, '10-local-chat.png') });
   });

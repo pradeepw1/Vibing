@@ -239,9 +239,10 @@ async function history(store, conv, { canSee }) {
   const out = [];
   for (const m of conv.messages) {
     if (m.role === 'user') {
+      // (The date note kept with each message isn't sent: local models get today's date in their
+      // instructions instead, because small ones tend to repeat a note like that back.)
       const pieces = [];
       const images = [];
-      if (m.context) pieces.push(m.context);
       for (const att of m.attachments || []) {
         try {
           if (att.kind === 'text') {

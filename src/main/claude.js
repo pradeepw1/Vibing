@@ -86,7 +86,21 @@ function webTools(info) {
 // ---------------------------------------------------------------------------------------------
 // Prompts
 
-// `local` is set for models running on the user's own Mac through Ollama.
+function nowText() {
+  return new Date().toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
+// `local` is set for models running on the user's own Mac through Ollama. Their prompt is
+// rebuilt for every reply (there's no prompt cache to protect), so it can carry today's date
+// directly. Small models tend to repeat a date note placed inside the messages.
 function buildSystemPrompt(settings, { local = false, modelLabel = '' } = {}) {
   const assistant = (settings.assistantName || '').trim() || 'Buddy';
   const user = (settings.name || '').trim();
@@ -96,14 +110,17 @@ function buildSystemPrompt(settings, { local = false, modelLabel = '' } = {}) {
       : `You are ${assistant}, a personal AI assistant that lives in a chat app on the user's Mac. You run on Claude, an AI model made by Anthropic.`,
   ];
   if (user) lines.push(`You're chatting with ${user}.`);
+  if (local) lines.push(`It is now ${nowText()}.`);
   lines.push(
     '',
     'About the app:',
     '- Replies are shown with Markdown, so headings, lists, tables and code blocks all display nicely. Use them when they help, and keep simple answers short and plain.',
-    local
-      ? "- Each user message starts with a short <context> note from the app with the current date and time. Use it when timing matters, but don't mention it otherwise."
-      : '- Each user message starts with a short <context> note from the app with the current date and time, and sometimes a note that web search is off. Use it when timing matters, but don\'t mention it otherwise.',
   );
+  if (!local) {
+    lines.push(
+      "- Each user message starts with a short <context> note from the app with the current date and time, and sometimes a note that web search is off. Use it when timing matters, but don't mention it otherwise.",
+    );
+  }
   if (!local) lines.push('- When web search is on, use it for anything recent, fast-changing or niche, and cite what you find.');
   lines.push(
     local ? '- The user can attach text files and images to their messages.' : '- The user can attach images, PDFs and text files to their messages.',
@@ -122,16 +139,7 @@ function buildSystemPrompt(settings, { local = false, modelLabel = '' } = {}) {
 }
 
 function buildContext({ webSearch, local = false }) {
-  const when = new Date().toLocaleString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-  let text = `<context>Sent ${when}.`;
+  let text = `<context>Sent ${nowText()}.`;
   if (!webSearch && !local) text += ' Web search is turned off for this message.';
   return `${text}</context>`;
 }
@@ -712,6 +720,8 @@ class Turn {
 function cleanTitle(text) {
   let t = String(text || '').split('\n').map((s) => s.trim()).find(Boolean) || '';
   t = t.replace(/^(title|chat title)\s*:\s*/i, '').replace(/^["'“”‘’`*#\s]+|["'“”‘’`*\s]+$/g, '').replace(/[.!?。]+$/, '');
+  // ALL-CAPS TITLES (small models do this) become sentence case.
+  if (t.length > 3 && /[A-Z]/.test(t) && t === t.toUpperCase()) t = t[0] + t.slice(1).toLowerCase();
   if (t.length > 60) t = `${t.slice(0, 57).trimEnd()}…`;
   return t;
 }
