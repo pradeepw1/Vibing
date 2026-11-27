@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#21132B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lotería">
+<link rel="apple-touch-icon" href="icon.png">
 <title>Lotería Night</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,7 +49,12 @@ body{
   font-family:var(--f-ui);font-size:16px;line-height:1.5;
   -webkit-tap-highlight-color:transparent;
 }
-button{font:inherit;color:inherit;cursor:pointer}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+/* iPhone: no double-tap zoom, no long-press popup or text selection on game pieces */
+.card,.cell,.go,.ghost,.seg button,.tabs button,.rule,.shout,.rm,.add,.linkbtn,.picado,.fan{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.locked{overflow:hidden}
 button:disabled{cursor:not-allowed}
 :focus-visible{outline:3px solid var(--marigold);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -109,7 +120,7 @@ body.playing .picado svg{width:34px;height:41px}
 .go:active{transform:translateY(3px);box-shadow:0 1px 0 var(--rosa-deep)}
 .go:disabled{opacity:.45}
 .ghost{border:1px solid var(--line);background:transparent;border-radius:10px;padding:8px 13px;color:var(--text);font-weight:600}
-.ghost:hover{background:var(--night-2)}
+@media (hover:hover){.ghost:hover{background:var(--night-2)}}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{border:1px solid var(--line);background:var(--night);border-radius:999px;padding:8px 14px;font-weight:600}
 .seg button[aria-pressed="true"]{background:var(--turquesa);border-color:var(--turquesa);color:var(--ink)}
@@ -142,7 +153,7 @@ body.playing .picado svg{width:34px;height:41px}
 .plist input{flex:1;min-width:0;background:var(--night);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit}
 .plist input:focus{border-color:var(--marigold);outline:none}
 .rm{border:0;background:transparent;color:var(--muted);width:38px;height:38px;border-radius:9px;font-size:1.3rem;line-height:1}
-.rm:hover:not(:disabled){background:var(--night)}
+@media (hover:hover){.rm:hover:not(:disabled){background:var(--night)}}
 .rm:disabled{opacity:.25}
 .add{margin-top:8px;width:100%;border:1px dashed rgba(247,236,221,.3);background:transparent;padding:9px 12px;border-radius:10px;font-weight:600}
 .rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -189,18 +200,18 @@ body.playing .picado svg{width:34px;height:41px}
 .autorow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .autorow > span{font-size:.78rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
 .shout{border:2px solid var(--marigold);background:transparent;color:var(--marigold);font-family:var(--f-display);font-size:1.25rem;padding:9px;border-radius:14px}
-.shout:hover{background:rgba(255,168,30,.1)}
+@media (hover:hover){.shout:hover{background:rgba(255,168,30,.1)}}
 .note{margin:0;background:var(--night);border-left:4px solid var(--marigold);padding:10px 12px;border-radius:0 10px 10px 0;font-size:.92rem}
 .history header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
 .history h3{margin:0;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .history h3 b{color:var(--text);font-variant-numeric:tabular-nums}
 .linkbtn{border:0;background:none;color:var(--turquesa);font-weight:700;padding:4px 0;text-decoration:underline;text-underline-offset:3px}
-.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;min-height:79px}
+.strip{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 2px 8px;min-height:79px}
 .strip .card{width:46px;flex:none}
 .strip .none{margin:0;color:var(--muted);font-size:.9rem;align-self:center}
 
 .boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:22px;align-items:start}
-.board{background:var(--paper);color:var(--ink);border-radius:14px;padding:10px;border-top:7px solid var(--pc);
+.board{isolation:isolate;background:var(--paper);color:var(--ink);border-radius:14px;padding:10px;border-top:7px solid var(--pc);
   box-shadow:0 14px 30px rgba(8,3,12,.45)}
 .board > header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 10px}
 .who{margin:0;display:flex;align-items:center;gap:8px;min-width:0;font-family:var(--f-display);font-weight:400;font-size:1.15rem;line-height:1.1}
@@ -259,7 +270,7 @@ body.playing .picado svg{width:34px;height:41px}
 .solowin .row{justify-content:center}
 
 /* ---------- overlays ---------- */
-.overlay{position:fixed;inset:0;z-index:40;background:rgba(14,7,19,.8);display:grid;place-items:center;overflow-y:auto;
+.overlay{position:fixed;inset:0;z-index:40;background:rgba(14,7,19,.8);display:grid;place-items:center;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .dialog{position:relative;z-index:1;width:min(600px,100%);background:var(--night-2);border:1px solid var(--line);border-radius:22px;padding:22px;display:grid;gap:16px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
 .dialog.wide{width:min(820px,100%)}
@@ -279,10 +290,14 @@ body.playing .picado svg{width:34px;height:41px}
 .scorelist i{width:10px;height:10px;border-radius:50%;background:var(--pc);flex:none}
 .scorelist span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scorelist b{font-family:var(--f-display);font-weight:400;font-size:1.15rem;font-variant-numeric:tabular-nums}
+/* Rematch stays pinned to the bottom when the pop-up is taller than the phone screen */
+.winfoot{position:sticky;bottom:0;z-index:2;display:grid;gap:12px;margin:0 -22px -22px;
+  padding:14px 22px calc(18px + env(safe-area-inset-bottom,0px));background:var(--night-2);
+  border-top:1px solid var(--line);border-radius:0 0 22px 22px}
 .checkrow{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
 .checkrow input{width:20px;height:20px;accent-color:var(--turquesa)}
 .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.calledgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;max-height:min(52vh,520px);overflow-y:auto;padding:4px 4px 4px 0}
+.calledgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;max-height:min(52vh,520px);overflow-y:auto;overscroll-behavior:contain;padding:4px 4px 4px 0}
 .calledgrid .card{color:var(--ink)}
 
 .shuffle{position:fixed;inset:0;z-index:50;background:rgba(14,7,19,.72);display:grid;place-items:center;align-content:center;gap:26px}
@@ -321,12 +336,26 @@ body.playing .picado svg{width:34px;height:41px}
   .fan .card{width:112px}
   .lede{font-size:1.04rem}
   .winbody{grid-template-columns:minmax(0,1fr)}
-  .winbody .board{max-width:270px;width:100%;margin:0 auto}
+  .winbody .board{max-width:230px;width:100%;margin:0 auto}
+  .dialog{padding:18px;gap:14px}
+  .winfoot{margin:0 -18px -18px;padding-inline:18px}
+  .winfoot .actions .go{flex:1 1 100%}
 }
 @media (max-width:420px){
   .rules{grid-template-columns:minmax(0,1fr)}
   .rule{grid-template-columns:auto minmax(0,1fr);justify-items:start;text-align:left;align-items:center;column-gap:12px}
   .rule .mini4{grid-row:span 2}
+}
+@media (orientation:landscape) and (max-height:500px){
+  body.playing .picado{height:30px}
+  body.playing .picado svg{width:24px;height:29px}
+  .topbar{padding-block:0 10px}
+  .caller,.mode-caller .caller{grid-template-columns:minmax(0,150px) minmax(0,1fr)}
+  .mode-caller .caller{grid-template-columns:minmax(0,160px) minmax(0,1fr)}
+  .winbody{grid-template-columns:minmax(0,200px) minmax(0,1fr)}
+  .winbody .board{max-width:none}
+  .riffle,.riffle .card{width:84px}
+  .fan{height:200px}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
@@ -471,11 +500,13 @@ body.playing .picado svg{width:34px;height:41px}
         <ol class="scorelist" id="winScores"></ol>
       </div>
     </div>
-    <label class="checkrow"><input type="checkbox" id="keepBoards"> Keep the same boards next round</label>
-    <div class="actions">
-      <button class="go" id="rematchBtn" data-act="rematch">Rematch</button>
-      <button class="ghost" data-act="close">See the boards</button>
-      <button class="ghost" data-act="home">Change players</button>
+    <div class="winfoot">
+      <label class="checkrow"><input type="checkbox" id="keepBoards"> Keep the same boards next round</label>
+      <div class="actions">
+        <button class="go" id="rematchBtn" data-act="rematch">Rematch</button>
+        <button class="ghost" data-act="close">See the boards</button>
+        <button class="ghost" data-act="home">Change players</button>
+      </div>
     </div>
   </div>
 </div>
@@ -703,15 +734,32 @@ function speak(n) {
   const c = BY[n];
   const text = S.voice === 'verse' ? `${c.verse} … ¡${c.name}!` : c.name;
   try {
-    speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'es-MX';
     const v = pickVoice();
     if (v) u.voice = v;
     u.rate = 0.95;
-    speechSynthesis.speak(u);
+    if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(() => synth.speak(u), 80); }
+    else synth.speak(u); // first call stays inside the tap, which iPhone needs to allow sound
   } catch (e) {}
 }
+
+/* ---------- keep the screen on during a game ---------- */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator && document.visibilityState === 'visible') {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      const w = wakeLock; wakeLock = null; await w.release();
+    }
+  } catch (e) { wakeLock = null; /* not allowed here: the game still works */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.screen !== 'home') keepAwake(true);
+});
 
 /* ---------- screens ---------- */
 function show(screen) {
@@ -720,6 +768,7 @@ function show(screen) {
   $('#game').hidden = screen !== 'game';
   $('#solo').hidden = screen !== 'solo';
   document.body.classList.toggle('playing', screen !== 'home');
+  keepAwake(screen !== 'home');
   if (screen !== 'game') { stopAuto(); hush(); }
   updateNowbar();
   window.scrollTo(0, 0);
@@ -747,7 +796,7 @@ function renderRules() { $$('.rules').forEach(el => { el.innerHTML = ruleChips()
 function renderPlayers() {
   $('#plist').innerHTML = S.players.map((p, i) =>
     `<li style="--pc:${pcol(i)}"><i class="dot"></i><label class="sr" for="pn${p.id}">Player ${i + 1} name</label>` +
-    `<input id="pn${p.id}" data-id="${p.id}" value="${esc(p.name)}" maxlength="18" autocomplete="off" spellcheck="false">` +
+    `<input id="pn${p.id}" data-id="${p.id}" value="${esc(p.name)}" maxlength="18" autocomplete="off" autocorrect="off" autocapitalize="words" enterkeyhint="done" spellcheck="false">` +
     `<button class="rm" data-act="rm" data-v="${p.id}" aria-label="Remove ${esc(p.name)}" ${S.players.length < 2 ? 'disabled' : ''}>×</button></li>`).join('');
   $('#addBtn').hidden = S.players.length >= 6;
 }
@@ -990,6 +1039,7 @@ function openWin() {
     .map(({ p, i }) => `<li class="${p.score === top && top > 0 ? 'lead' : ''}" style="--pc:${pcol(i)}"><i></i><span>${esc(p.name)}</span><b>${p.score}</b></li>`).join('');
   $('#keepBoards').checked = S.keepBoards;
   $('#win').hidden = false;
+  document.body.classList.add('locked');
   updateNowbar();
   confetti();
   $('#rematchBtn').focus({ preventScroll: true });
@@ -1009,6 +1059,7 @@ function openCheck(kind) {
     ? `<button class="go" data-act="rematch">It’s a win. Rematch</button><button class="ghost" data-act="close">False alarm, keep going</button>`
     : `<button class="go" data-act="close">Back to the game</button>`;
   $('#check').hidden = false;
+  document.body.classList.add('locked');
   updateNowbar();
   $('#checkActions button').focus({ preventScroll: true });
 }
@@ -1016,6 +1067,7 @@ function openCheck(kind) {
 function closeDialogs() {
   $('#win').hidden = true;
   $('#check').hidden = true;
+  document.body.classList.remove('locked');
   $('#confetti').innerHTML = '';
   updateNowbar();
   scheduleAuto();
