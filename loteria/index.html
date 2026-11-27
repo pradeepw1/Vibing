@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lotería Night</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fraunces:ital,opsz,wght@1,9..144,400..600&family=Ultra&display=swap">
+<style>
+/* Layout: a fiesta table at night. Papel picado hangs across the top, the caller's deck sits on the left,
+   cream card-stock boards fill the right (stacked on phones), and pinto beans are the markers. */
+:root{
+  --night:#21132B;      /* tablecloth */
+  --night-2:#2E1C3B;    /* raised panels */
+  --night-3:#3F2A52;    /* selected */
+  --paper:#FBF1DC;      /* card stock */
+  --ink:#1D1222;        /* card frames, text on paper */
+  --ink-soft:#6B5670;
+  --text:#F7ECDD;
+  --muted:#BBA7C8;
+  --line:rgba(247,236,221,.14);
+  --rosa:#E4007C;       /* rosa mexicano */
+  --rosa-deep:#8F004D;
+  --marigold:#FFA81E;   /* cempasúchil */
+  --turquesa:#19BDB4;
+  --lima:#A6CE39;
+  --f-display:"Ultra","Rockwell Extra Bold","Georgia",serif;
+  --f-ui:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-verse:"Fraunces",Georgia,"Times New Roman",serif;
+  --f-emoji:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100%;
+  background-color:var(--night);
+  background-image:radial-gradient(circle at 1px 1px,rgba(247,236,221,.05) 1px,transparent 0);
+  background-size:22px 22px;
+  color:var(--text);
+  font-family:var(--f-ui);font-size:16px;line-height:1.5;
+  -webkit-tap-highlight-color:transparent;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:3px solid var(--marigold);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{
+  max-width:1240px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+
+/* ---------- papel picado ---------- */
+.picado{position:relative;height:86px;overflow:hidden;pointer-events:none}
+.picado::before{content:"";position:absolute;left:0;right:0;top:9px;height:2px;background:rgba(247,236,221,.3)}
+.picado .row{position:absolute;top:9px;left:-12px;display:flex;gap:6px}
+.picado svg{flex:none;width:56px;height:68px;transform-origin:50% 0;animation:sway 4.5s ease-in-out infinite alternate;animation-delay:var(--d)}
+@keyframes sway{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+body.playing .picado{height:50px}
+body.playing .picado svg{width:34px;height:41px}
+
+/* ---------- cards ---------- */
+.card{container-type:inline-size;display:block;width:100%}
+.ci{aspect-ratio:2/3;background:var(--paper);padding:4.2cqi;border-radius:5cqi;
+  box-shadow:0 .6cqi 0 rgba(255,255,255,.5) inset,0 3cqi 7cqi rgba(10,4,14,.45)}
+.fr{position:relative;height:100%;border:2.4cqi solid var(--ink);border-radius:1.5cqi;overflow:hidden;
+  display:grid;grid-template-rows:minmax(0,1fr) auto;color:var(--t);
+  background:
+    linear-gradient(180deg,transparent 66%,rgba(0,0,0,.07) 66.5%),
+    radial-gradient(120% 85% at 50% 34%,var(--a) 38%,var(--b) 100%)}
+.fr::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(118deg,rgba(255,255,255,.08) 0 1.2cqi,transparent 1.2cqi 3.4cqi);mix-blend-mode:soft-light}
+.num{position:absolute;top:2.5cqi;left:5cqi;z-index:1;font-family:var(--f-display);font-weight:400;font-size:15cqi;line-height:1}
+.art{display:grid;place-items:center;padding-top:12cqi;min-height:0}
+.emo{font-family:var(--f-emoji);font-size:50cqi;line-height:1;filter:drop-shadow(0 .05em 0 rgba(0,0,0,.2))}
+.art svg{width:74cqi;height:auto;filter:drop-shadow(0 1.6cqi 0 rgba(0,0,0,.2))}
+.nm{font-family:var(--f-display);font-weight:400;font-size:min(10.5cqi,calc(88cqi / var(--len)));line-height:1.05;
+  text-transform:uppercase;text-align:center;padding:0 3cqi 4.5cqi;text-wrap:balance}
+
+.mini .ci{padding:0;background:none;border-radius:4cqi;box-shadow:none}
+.mini .fr{border-width:3cqi;border-radius:4cqi}
+.mini .num{font-size:19cqi;top:3cqi;left:6cqi}
+.mini .art{padding-top:15cqi}
+.mini .emo{font-size:52cqi}
+.mini .nm{font-family:var(--f-ui);font-weight:800;font-stretch:75%;letter-spacing:0;line-height:1;
+  font-size:min(14cqi,calc(170cqi / var(--len)));padding:0 3cqi 6cqi}
+.tiny .nm{display:none}
+.tiny .art{padding:16cqi 0 10cqi}
+
+.back .fr{display:grid;place-items:center;grid-template-rows:1fr;background-color:var(--rosa);
+  background-image:
+    linear-gradient(45deg,rgba(255,255,255,.14) 25%,transparent 25% 75%,rgba(255,255,255,.14) 75%),
+    linear-gradient(45deg,rgba(255,255,255,.14) 25%,transparent 25% 75%,rgba(255,255,255,.14) 75%);
+  background-size:14cqi 14cqi;background-position:0 0,7cqi 7cqi}
+.back .fr::after{display:none}
+.medal{width:66cqi;aspect-ratio:1;border-radius:50%;background:var(--night);border:3cqi solid var(--marigold);
+  display:grid;place-items:center;transform:rotate(-12deg);
+  font-family:var(--f-display);font-size:11.5cqi;color:var(--paper)}
+
+.deal .ci{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes deal{0%{transform:translateX(-55%) rotateY(80deg) scale(.75);opacity:.2}100%{transform:none;opacity:1}}
+
+/* ---------- shared controls ---------- */
+.go{border:0;background:var(--rosa);color:var(--paper);font-weight:800;font-size:1.08rem;
+  padding:14px 26px;border-radius:14px;box-shadow:0 4px 0 var(--rosa-deep);transition:transform .08s,box-shadow .08s}
+.go:active{transform:translateY(3px);box-shadow:0 1px 0 var(--rosa-deep)}
+.go:disabled{opacity:.45}
+.ghost{border:1px solid var(--line);background:transparent;border-radius:10px;padding:8px 13px;color:var(--text);font-weight:600}
+.ghost:hover{background:var(--night-2)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--night);border-radius:999px;padding:8px 14px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--turquesa);border-color:var(--turquesa);color:var(--ink)}
+.seg.sm button{padding:6px 11px;font-size:.88rem}
+.label{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 10px}
+
+/* ---------- home ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:24px 40px;align-items:center;padding-block:4px 28px}
+.eyebrow{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--marigold);font-weight:700;margin:0 0 8px}
+.logo{font-family:var(--f-display);font-weight:400;font-size:clamp(3.4rem,11vw,7.4rem);line-height:.92;margin:0;
+  color:var(--paper);text-shadow:.055em .055em 0 var(--rosa)}
+.lede{max-width:36ch;font-size:1.14rem;margin:18px 0 0}
+.lede b{color:var(--marigold)}
+.fan{position:relative;height:clamp(210px,30vw,300px);display:flex;justify-content:center;align-items:center}
+.fan .card{position:absolute;width:clamp(112px,15vw,172px)}
+.fan .card:nth-child(1){transform:translateX(-64%) rotate(-11deg)}
+.fan .card:nth-child(2){transform:translateY(-5%);z-index:2}
+.fan .card:nth-child(3){transform:translateX(64%) rotate(11deg)}
+
+.setup{background:var(--night-2);border:1px solid var(--line);border-radius:20px;padding:18px}
+.tabs{display:flex;gap:4px;background:var(--night);padding:4px;border-radius:13px;overflow-x:auto}
+.tabs button{flex:1 0 auto;border:0;background:transparent;color:var(--muted);padding:10px 14px;border-radius:10px;font-weight:700;white-space:nowrap}
+.tabs button[aria-selected="true"]{background:var(--paper);color:var(--ink)}
+.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:22px 30px;padding:22px 4px 4px}
+.panel > .go{grid-column:1/-1;justify-self:start}
+.panel p.say{margin:0;max-width:52ch;grid-column:1/-1}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.plist li{display:flex;align-items:center;gap:8px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--pc);flex:none}
+.plist input{flex:1;min-width:0;background:var(--night);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit}
+.plist input:focus{border-color:var(--marigold);outline:none}
+.rm{border:0;background:transparent;color:var(--muted);width:38px;height:38px;border-radius:9px;font-size:1.3rem;line-height:1}
+.rm:hover:not(:disabled){background:var(--night)}
+.rm:disabled{opacity:.25}
+.add{margin-top:8px;width:100%;border:1px dashed rgba(247,236,221,.3);background:transparent;padding:9px 12px;border-radius:10px;font-weight:600}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rule{border:1px solid var(--line);background:var(--night);border-radius:12px;padding:12px 8px;display:grid;justify-items:center;align-content:start;gap:7px;text-align:center}
+.rule[aria-pressed="true"]{border-color:var(--marigold);background:var(--night-3)}
+.rule b{font-size:.95rem;line-height:1.2}
+.rule small{font-size:.74rem;color:var(--muted);line-height:1.25}
+.mini4{display:grid;grid-template-columns:repeat(4,9px);gap:3px}
+.mini4 i{width:9px;height:12px;border-radius:2px;background:rgba(247,236,221,.2)}
+.mini4 i.on{background:var(--marigold)}
+
+.steps{list-style:none;margin:28px 0 48px;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:18px 28px;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;color:var(--muted)}
+.steps li::before{content:counter(s);font-family:var(--f-display);font-size:2rem;line-height:1;color:var(--marigold)}
+.steps b{color:var(--text)}
+
+/* ---------- game ---------- */
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:4px 16px}
+.roundtag{font-family:var(--f-display);font-size:1.15rem}
+.scores{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{display:inline-flex;align-items:center;gap:7px;background:var(--night-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px 4px 8px;font-size:.88rem;font-weight:600;max-width:100%}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--pc);flex:none}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip b{font-variant-numeric:tabular-nums}
+.mode-caller .scores{display:none}
+.mode-caller #voiceBtn{margin-left:auto}
+
+.layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:28px;align-items:start;padding-bottom:56px}
+.caller{position:sticky;top:12px;background:var(--night-2);border:1px solid var(--line);border-radius:20px;padding:16px;
+  display:grid;gap:16px;grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "info" "hist"}
+.stage{grid-area:stage;display:grid;grid-template-columns:72px minmax(0,1fr);gap:14px;align-items:end}
+.callinfo{grid-area:info;display:grid;gap:11px;align-content:start;min-width:0}
+.history{grid-area:hist;min-width:0}
+.deck{position:relative;aspect-ratio:2/3;border-radius:8px;outline:2px dashed rgba(247,236,221,.16);outline-offset:-2px}
+.deck .card{position:absolute;left:0;top:0;width:100%;transform:translate(calc(var(--k) * -2px),calc(var(--k) * -3px))}
+.current{perspective:900px;min-width:0}
+.slot{aspect-ratio:2/3;border:2px dashed rgba(247,236,221,.25);border-radius:12px;display:grid;place-items:center;text-align:center;color:var(--muted);padding:16px;font-size:.95rem}
+.meta{margin:0;font-size:.78rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700;font-variant-numeric:tabular-nums}
+.gloss{margin:0;font-size:1rem;line-height:1.3}
+.gloss b{font-family:var(--f-display);font-weight:400;color:var(--marigold)}
+.gloss span{color:var(--muted)}
+.verse{margin:0;font-family:var(--f-verse);font-style:italic;font-size:1.12rem;line-height:1.35;color:var(--paper)}
+.callinfo .go{width:100%}
+.autorow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.autorow > span{font-size:.78rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.shout{border:2px solid var(--marigold);background:transparent;color:var(--marigold);font-family:var(--f-display);font-size:1.25rem;padding:9px;border-radius:14px}
+.shout:hover{background:rgba(255,168,30,.1)}
+.note{margin:0;background:var(--night);border-left:4px solid var(--marigold);padding:10px 12px;border-radius:0 10px 10px 0;font-size:.92rem}
+.history header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.history h3{margin:0;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.history h3 b{color:var(--text);font-variant-numeric:tabular-nums}
+.linkbtn{border:0;background:none;color:var(--turquesa);font-weight:700;padding:4px 0;text-decoration:underline;text-underline-offset:3px}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;min-height:79px}
+.strip .card{width:46px;flex:none}
+.strip .none{margin:0;color:var(--muted);font-size:.9rem;align-self:center}
+
+.boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:22px;align-items:start}
+.board{background:var(--paper);color:var(--ink);border-radius:14px;padding:10px;border-top:7px solid var(--pc);
+  box-shadow:0 14px 30px rgba(8,3,12,.45)}
+.board > header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 10px}
+.who{margin:0;display:flex;align-items:center;gap:8px;min-width:0;font-family:var(--f-display);font-weight:400;font-size:1.15rem;line-height:1.1}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who i{width:12px;height:12px;border-radius:50%;background:var(--pc);flex:none}
+.wins{font-size:.8rem;font-weight:700;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.cell{position:relative;display:block;border:0;padding:0;background:none;border-radius:6px;color:var(--ink)}
+.cell .card{transition:filter .2s}
+.cell.on .card{filter:saturate(.7) brightness(.9)}
+.cell.win::before{content:"";position:absolute;inset:-3px;border-radius:8px;border:3px solid var(--marigold);
+  box-shadow:0 0 14px var(--marigold);z-index:2;animation:glow .9s ease-in-out infinite alternate}
+@keyframes glow{from{box-shadow:0 0 4px var(--marigold)}to{box-shadow:0 0 16px var(--marigold)}}
+.cell.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+/* a pinto bean: beige with reddish-brown mottling */
+.bean{position:absolute;left:50%;top:54%;z-index:3;width:40%;aspect-ratio:1.6;pointer-events:none;
+  transform:translate(-50%,-50%) rotate(var(--r));
+  border-radius:48% 52% 44% 56% / 58% 62% 38% 42%;
+  background:
+    radial-gradient(16% 10% at 30% 38%,#94442A 50%,transparent 75%),
+    radial-gradient(13% 9% at 58% 66%,#94442A 50%,transparent 75%),
+    radial-gradient(11% 8% at 74% 34%,#7E3520 50%,transparent 75%),
+    radial-gradient(10% 7% at 46% 24%,#A85A38 50%,transparent 75%),
+    radial-gradient(9% 7% at 20% 64%,#7E3520 50%,transparent 75%),
+    radial-gradient(10% 7% at 84% 60%,#94442A 50%,transparent 75%),
+    radial-gradient(ellipse at 38% 32%,#F4E4CB 0 15%,#DDBB93 55%,#B98B60 100%);
+  box-shadow:0 2px 3px rgba(0,0,0,.55),inset -2px -3px 4px rgba(80,40,10,.3),inset 2px 2px 2px rgba(255,255,255,.35)}
+.bean.fresh{animation:drop .38s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes drop{from{transform:translate(-50%,-95%) rotate(var(--r)) scale(1.8);opacity:0}to{transform:translate(-50%,-50%) rotate(var(--r)) scale(1);opacity:1}}
+
+.mode-caller .layout{grid-template-columns:minmax(0,1fr);max-width:860px;margin-inline:auto}
+.mode-caller .caller{position:static;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"stage info" "hist hist";padding:22px;gap:22px}
+.mode-caller .stage{grid-template-columns:96px minmax(0,1fr)}
+
+/* sticky "now calling" bar, shows on phones once the caller scrolls away */
+.nowbar{position:fixed;left:0;right:0;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+  background:rgba(33,19,43,.96);border-bottom:1px solid var(--line);
+  padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  transform:translateY(-110%);visibility:hidden;transition:transform .2s,visibility .2s}
+.nowbar.show{transform:none;visibility:visible}
+.nowbar .card{width:40px;flex:none}
+.nowbar .txt{flex:1;min-width:0;line-height:1.2}
+.nowbar .txt b{display:block;font-family:var(--f-display);font-weight:400;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowbar .txt span{font-size:.8rem;color:var(--muted)}
+.nowbar .go{padding:10px 16px;font-size:.95rem}
+
+/* ---------- one board ---------- */
+.solo{max-width:520px;margin:0 auto;display:grid;gap:16px;padding-bottom:56px}
+.solo .hint{margin:0;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.solowin{background:var(--night-2);border:2px solid var(--marigold);border-radius:16px;padding:16px;display:grid;gap:10px;text-align:center}
+.solowin h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:2.4rem;line-height:1;color:var(--marigold);text-shadow:.05em .05em 0 var(--rosa)}
+.solowin p{margin:0}
+.solowin .row{justify-content:center}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:40;background:rgba(14,7,19,.8);display:grid;place-items:center;overflow-y:auto;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dialog{position:relative;z-index:1;width:min(600px,100%);background:var(--night-2);border:1px solid var(--line);border-radius:22px;padding:22px;display:grid;gap:16px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
+.dialog.wide{width:min(820px,100%)}
+.dialog h2{margin:0}
+.dialog p{margin:0}
+.bigshout{font-family:var(--f-display);font-weight:400;text-align:center;font-size:clamp(2.8rem,11vw,4.4rem);line-height:1;color:var(--marigold);text-shadow:.05em .05em 0 var(--rosa);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.4) rotate(-6deg);opacity:0}to{transform:none;opacity:1}}
+.winwho{text-align:center;font-size:1.25rem;font-weight:700}
+.winsub{text-align:center;color:var(--muted)}
+.winbody{display:grid;grid-template-columns:minmax(0,250px) minmax(0,1fr);gap:20px;align-items:start}
+.winbody .board{padding:8px}
+.winbody .board > header{padding-bottom:8px}
+.winbody .who{font-size:1rem}
+.scorelist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.scorelist li{display:flex;align-items:center;gap:10px;background:var(--night);border-radius:10px;padding:8px 12px}
+.scorelist li.lead{box-shadow:inset 0 0 0 2px var(--marigold)}
+.scorelist i{width:10px;height:10px;border-radius:50%;background:var(--pc);flex:none}
+.scorelist span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scorelist b{font-family:var(--f-display);font-weight:400;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.checkrow{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
+.checkrow input{width:20px;height:20px;accent-color:var(--turquesa)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.calledgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;max-height:min(52vh,520px);overflow-y:auto;padding:4px 4px 4px 0}
+.calledgrid .card{color:var(--ink)}
+
+.shuffle{position:fixed;inset:0;z-index:50;background:rgba(14,7,19,.72);display:grid;place-items:center;align-content:center;gap:26px}
+.riffle{position:relative;width:120px;aspect-ratio:2/3}
+.riffle .card{position:absolute;inset:0;width:120px;z-index:var(--z)}
+.riffle .card:nth-child(odd){animation:rifL .72s ease-in-out 2 both;animation-delay:var(--dl)}
+.riffle .card:nth-child(even){animation:rifR .72s ease-in-out 2 both;animation-delay:var(--dl)}
+@keyframes rifL{0%,100%{transform:none}45%{transform:translateX(-78%) rotate(-14deg)}}
+@keyframes rifR{0%,100%{transform:none}45%{transform:translateX(78%) rotate(14deg)}}
+.shuffle p{margin:0;text-align:center;font-family:var(--f-display);font-size:1.6rem;line-height:1.1}
+.shuffle p span{display:block;font-family:var(--f-ui);font-size:.95rem;color:var(--muted);margin-top:6px}
+
+.confetti{position:fixed;inset:0;z-index:45;pointer-events:none;overflow:hidden}
+.confetti i{position:absolute;top:-24px;background:var(--c);clip-path:polygon(0 0,100% 0,100% 78%,50% 100%,0 78%);animation:fall linear forwards}
+@keyframes fall{to{transform:translate(var(--dx),110vh) rotate(var(--rot))}}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60;max-width:calc(100% - 32px);
+  transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+  background:var(--paper);color:var(--ink);padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- small screens ---------- */
+@media (max-width:900px){
+  .layout,.mode-caller .layout{grid-template-columns:minmax(0,1fr);gap:20px}
+  .caller,.mode-caller .caller{position:static;padding:12px;gap:12px;grid-template-columns:minmax(0,42%) minmax(0,1fr);grid-template-areas:"stage info" "hist hist"}
+  .stage,.mode-caller .stage{grid-template-columns:minmax(0,1fr)}
+  .deck{display:none}
+  .verse{font-size:.98rem}
+  .go{font-size:1rem}
+  .seg.sm{gap:4px}
+  .seg.sm button{padding:5px 9px;font-size:.84rem}
+}
+@media (max-width:720px){
+  .hero{grid-template-columns:minmax(0,1fr);padding-bottom:18px}
+  .fan{height:190px}
+  .fan .card{width:112px}
+  .lede{font-size:1.04rem}
+  .winbody{grid-template-columns:minmax(0,1fr)}
+  .winbody .board{max-width:270px;width:100%;margin:0 auto}
+}
+@media (max-width:420px){
+  .rules{grid-template-columns:minmax(0,1fr)}
+  .rule{grid-template-columns:auto minmax(0,1fr);justify-items:start;text-align:left;align-items:center;column-gap:12px}
+  .rule .mini4{grid-row:span 2}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="picado" id="picado" aria-hidden="true"></div>
+
+<!-- ============ HOME ============ -->
+<main id="home" class="wrap">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">54 picture cards · 4×4 boards · beans for markers</p>
+      <h1 class="logo">Lotería</h1>
+      <p class="lede">Shuffle the deck and call the cards one at a time. Got that picture on your board? Drop a bean on it. Finish your pattern first and shout <b>¡Lotería!</b></p>
+    </div>
+    <div class="fan" id="fan"></div>
+  </section>
+
+  <section class="setup" aria-label="Game setup">
+    <div class="tabs" role="tablist" aria-label="How do you want to play?">
+      <button role="tab" id="tab-table" data-act="tab" data-v="table" aria-controls="panel-table">Play on this screen</button>
+      <button role="tab" id="tab-caller" data-act="tab" data-v="caller" aria-controls="panel-caller">Just call the cards</button>
+      <button role="tab" id="tab-board" data-act="tab" data-v="board" aria-controls="panel-board">One board</button>
+    </div>
+
+    <div class="panel" id="panel-table" role="tabpanel" aria-labelledby="tab-table" data-panel="table">
+      <div>
+        <h2 class="label">Players</h2>
+        <ol class="plist" id="plist"></ol>
+        <button class="add" id="addBtn" data-act="add">+ Add a player</button>
+      </div>
+      <div>
+        <h2 class="label">How to win</h2>
+        <div class="rules"></div>
+        <h2 class="label" style="margin-top:20px">Beans</h2>
+        <div class="seg" id="autoSeg">
+          <button data-act="auto" data-v="0">We tap our own</button>
+          <button data-act="auto" data-v="1">Place them for us</button>
+        </div>
+      </div>
+      <button class="go" data-act="start" data-v="table">Shuffle and play</button>
+    </div>
+
+    <div class="panel" id="panel-caller" role="tabpanel" aria-labelledby="tab-caller" data-panel="caller" hidden>
+      <p class="say">Got paper boards, or friends using <b>One board</b> on their phones? This turns the screen into the deck. Shuffle, flip one card at a time, and when someone shouts, check their board against every card that came out.</p>
+      <button class="go" data-act="start" data-v="caller">Shuffle and start calling</button>
+    </div>
+
+    <div class="panel" id="panel-board" role="tabpanel" aria-labelledby="tab-board" data-panel="board" hidden>
+      <p class="say">Playing on different phones? Each player opens this page and picks <b>One board</b>. One person picks <b>Just call the cards</b> and runs the deck.</p>
+      <div>
+        <h2 class="label">How to win</h2>
+        <div class="rules"></div>
+      </div>
+      <button class="go" data-act="start" data-v="board">Deal me a board</button>
+    </div>
+  </section>
+
+  <ol class="steps" aria-label="How a round goes">
+    <li><span><b>Shuffle.</b> The deck gets mixed and everyone gets their own 4×4 board.</span></li>
+    <li><span><b>Call.</b> Flip one card at a time and read its little rhyme. Got that picture? Bean on it.</span></li>
+    <li><span><b>Shout.</b> Finish the pattern first and yell ¡Lotería! Then hit Rematch for a new shuffle.</span></li>
+  </ol>
+</main>
+
+<!-- ============ GAME ============ -->
+<main id="game" class="wrap mode-table" hidden>
+  <div class="topbar">
+    <button class="ghost" data-act="home">← Setup</button>
+    <span class="roundtag" id="roundTag">Round 1</span>
+    <div class="scores" id="scores"></div>
+    <button class="ghost" id="voiceBtn" data-act="voice">Voice: name</button>
+  </div>
+  <div class="layout">
+    <aside class="caller" id="caller" aria-label="The deck">
+      <div class="stage">
+        <div class="deck" id="deck" aria-hidden="true"></div>
+        <div class="current" id="current"></div>
+      </div>
+      <div class="callinfo">
+        <p class="meta" id="meta">Round 1 · 54 cards left</p>
+        <p class="gloss" id="gloss" aria-live="polite">Ready when you are</p>
+        <p class="verse" id="verse"></p>
+        <button class="go" id="nextBtn" data-act="next">Flip the first card</button>
+        <div class="autorow"><span>Auto</span><div class="seg sm" id="speedSeg"></div></div>
+        <button class="shout" id="shoutBtn" data-act="shout">¡Lotería!</button>
+        <p class="note" id="emptyNote" hidden></p>
+      </div>
+      <div class="history">
+        <header><h3>Called <b id="calledCount">0</b></h3><button class="linkbtn" data-act="all">See them all</button></header>
+        <div class="strip" id="strip"></div>
+      </div>
+    </aside>
+    <div class="boards" id="boards"></div>
+  </div>
+</main>
+
+<!-- ============ ONE BOARD ============ -->
+<main id="solo" class="wrap" hidden>
+  <div class="topbar">
+    <button class="ghost" data-act="home">← Setup</button>
+    <span class="roundtag">Your board</span>
+  </div>
+  <div class="solo">
+    <p class="hint">Tap a picture when the caller calls it. Tap it again to take the bean off.</p>
+    <div id="soloBoard"></div>
+    <div class="solowin" id="soloWin" hidden>
+      <h2>¡Lotería!</h2>
+      <p>Shout it out so the caller can check your beans.</p>
+      <div class="row"><button class="go" data-act="solo-clear">Clear beans</button><button class="ghost" data-act="solo-new">Deal a new board</button></div>
+    </div>
+    <div>
+      <h2 class="label">How to win</h2>
+      <div class="rules"></div>
+    </div>
+    <div class="row" id="soloRow"><button class="ghost" data-act="solo-clear">Clear beans</button><button class="ghost" data-act="solo-new">Deal a new board</button></div>
+  </div>
+</main>
+
+<!-- ============ OVERLAYS ============ -->
+<div class="nowbar" id="nowbar" aria-hidden="true"></div>
+
+<div class="shuffle" id="shuffle" hidden>
+  <div class="riffle" id="riffle"></div>
+  <p>Barajando…<span>Shuffling the deck</span></p>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <h2 class="bigshout" id="winTitle">¡Lotería!</h2>
+    <div>
+      <p class="winwho" id="winWho"></p>
+      <p class="winsub" id="winSub"></p>
+    </div>
+    <div class="winbody">
+      <div id="winBoard"></div>
+      <div>
+        <h3 class="label">Score</h3>
+        <ol class="scorelist" id="winScores"></ol>
+      </div>
+    </div>
+    <label class="checkrow"><input type="checkbox" id="keepBoards"> Keep the same boards next round</label>
+    <div class="actions">
+      <button class="go" id="rematchBtn" data-act="rematch">Rematch</button>
+      <button class="ghost" data-act="close">See the boards</button>
+      <button class="ghost" data-act="home">Change players</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="check" hidden>
+  <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="checkTitle">
+    <h2 class="bigshout" id="checkTitle" style="font-size:clamp(2rem,8vw,3rem)">¡Lotería!</h2>
+    <p id="checkText"></p>
+    <div class="calledgrid" id="checkGrid"></div>
+    <div class="actions" id="checkActions"></div>
+  </div>
+</div>
+
+<div class="confetti" id="confetti" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- the deck ---------- */
+// [number, name, English, picture, background, rhyme]
+const CARDS = [
+  [1,'El Gallo','The Rooster','🐓','sun','El que le cantó a San Pedro no le volverá a cantar.'],
+  [2,'El Diablito','The Little Devil','😈','coral','Pórtate bien, cuatito, si no te lleva el coloradito.'],
+  [3,'La Dama','The Lady','💃','rose','Puliendo el paso por toda la calle real.'],
+  [4,'El Catrín','The Dandy','🎩','lilac','Don Ferruco en la alameda, su bastón quería tirar.'],
+  [5,'El Paraguas','The Umbrella','☂️','sky','Para el sol y para el agua.'],
+  [6,'La Sirena','The Mermaid','🧜‍♀️','teal','Con los cantos de sirena no te vayas a marear.'],
+  [7,'La Escalera','The Ladder','🪜','sand','Súbeme paso a pasito, no quieras pegar brinquitos.'],
+  [8,'La Botella','The Bottle','🍾','mint','La herramienta del borracho.'],
+  [9,'El Barril','The Barrel','🛢️','sand','Tanto bebió el albañil que quedó como barril.'],
+  [10,'El Árbol','The Tree','🌳','sky','El que a buen árbol se arrima, buena sombra le cobija.'],
+  [11,'El Melón','The Melon','🍈','coral','Me lo das o me lo quitas.'],
+  [12,'El Valiente','The Brave One','🗡️','sun','¿Por qué le corres, cobarde, trayendo tan buen puñal?'],
+  [13,'El Gorrito','The Little Cap','🧢','lilac','Ponle su gorrito al nene, no se nos vaya a resfriar.'],
+  [14,'La Muerte','Death','⚰️','night','La muerte, tilica y flaca.'],
+  [15,'La Pera','The Pear','🍐','rose','El que espera, desespera.'],
+  [16,'La Bandera','The Flag','flag','sky','Verde, blanco y colorado, la bandera del soldado.'],
+  [17,'El Bandolón','The Mandolin','🪕','sun','Tocando su bandolón está el mariachi Simón.'],
+  [18,'El Violoncello','The Cello','🎻','teal','Creciendo se fue hasta el cielo, y como no fue violín, tuvo que ser violoncello.'],
+  [19,'La Garza','The Heron','🦩','teal','Al otro lado del río tengo mi banco de arena, donde se sienta mi chata, pico de garza morena.'],
+  [20,'El Pájaro','The Bird','🐦','sky','Tú me traes a puros brincos, como pájaro en la rama.'],
+  [21,'La Mano','The Hand','✋','sand','La mano de un criminal.'],
+  [22,'La Bota','The Boot','👢','lilac','Una bota igual que la otra.'],
+  [23,'La Luna','The Moon','🌙','night','El farol de los enamorados.'],
+  [24,'El Cotorro','The Parrot','🦜','sun','Cotorro, cotorro, saca la pata y empiézame a platicar.'],
+  [25,'El Borracho','The Drunk','🥴','mint','¡Ah, qué borracho tan necio, ya no lo puedo aguantar!'],
+  [26,'El Elote','The Corn','🌽','coral','Con limón, chile y sal, el elote es lo ideal.'],
+  [27,'El Corazón','The Heart','❤️','mint','No me extrañes, corazón, que regreso en el camión.'],
+  [28,'La Sandía','The Watermelon','🍉','sun','La barriga que Juan quería.'],
+  [29,'El Tambor','The Drum','🥁','rose','No te arrugues, cuero viejo, que te quiero pa’ tambor.'],
+  [30,'El Camarón','The Shrimp','🦐','teal','Camarón que se duerme, se lo lleva la corriente.'],
+  [31,'Las Jaras','The Arrows','🏹','sand','Las jaras del cazador, donde pegan, dan.'],
+  [32,'El Músico','The Musician','🎺','coral','El músico trompas de hule ya no me quiere tocar.'],
+  [33,'La Araña','The Spider','🕷️','lilac','Atarántamela a palos, no me la dejes llegar.'],
+  [34,'El Soldado','The Soldier','🪖','mint','Uno, dos y tres, el soldado pa’l cuartel.'],
+  [35,'La Estrella','The Star','⭐','night','La guía de los marineros.'],
+  [36,'El Cazo','The Pot','🍲','sun','El caso que te hago es poco.'],
+  [37,'El Mundo','The World','🌎','night','Este mundo es una bola, y nosotros un bolón.'],
+  [38,'La Piñata','The Piñata','🪅','sky','Dale, dale, dale, no pierdas el tino.'],
+  [39,'El Nopal','The Cactus','🌵','sand','Al nopal lo van a ver nomás cuando tiene tunas.'],
+  [40,'El Alacrán','The Scorpion','🦂','sun','El que con la cola pica, le dan una paliza.'],
+  [41,'La Rosa','The Rose','🌹','mint','Rosita, Rosaura, ven que te quiero ahora.'],
+  [42,'La Calavera','The Skull','💀','lilac','Al pasar por el panteón me encontré un calaverón.'],
+  [43,'La Campana','The Bell','🔔','sky','Tú con la campana y yo con tu hermana.'],
+  [44,'El Cantarito','The Water Jug','🏺','teal','Tanto va el cántaro al agua que se quiebra y te moja las enaguas.'],
+  [45,'El Venado','The Deer','🦌','mint','Saltando va buscando, pero no ve nada.'],
+  [46,'El Sol','The Sun','☀️','sky','La cobija de los pobres.'],
+  [47,'La Corona','The Crown','👑','rose','El sombrero de los reyes.'],
+  [48,'La Chalupa','The Canoe','🛶','teal','Rema que rema Lupita, sentada en su chalupita.'],
+  [49,'El Pino','The Pine Tree','🌲','sand','Fresco y oloroso, en todo tiempo hermoso.'],
+  [50,'El Pescado','The Fish','🐟','sky','El que por la boca muere, aunque mudo fuera.'],
+  [51,'La Palma','The Palm Tree','🌴','sun','Palmero, sube a la palma y bájame un coco real.'],
+  [52,'La Maceta','The Flowerpot','🪴','rose','El que nace pa’ maceta no sale del corredor.'],
+  [53,'El Arpa','The Harp','harp','lilac','Arpa vieja de mi suegra, ya no sirves pa’ tocar.'],
+  [54,'La Rana','The Frog','🐸','sun','Al ver a la verde rana, qué susto se llevó mi hermana.'],
+].map(([n, name, en, art, bg, verse]) => ({ n, name, en, art, bg, verse }));
+
+const BY = Object.fromEntries(CARDS.map(c => [c.n, c]));
+const ALL = CARDS.map(c => c.n);
+
+// painted backgrounds: [light, dark, text]
+const BG = {
+  sky:   ['#B5E2F2', '#4A98C2', '#1D1222'],
+  teal:  ['#B9E8D9', '#3EA58C', '#1D1222'],
+  sun:   ['#FFE59A', '#EE9F35', '#1D1222'],
+  coral: ['#FFCBB8', '#E06C66', '#1D1222'],
+  lilac: ['#E2D3F7', '#9474CC', '#1D1222'],
+  mint:  ['#DFF2C4', '#7FB868', '#1D1222'],
+  rose:  ['#FCD0E2', '#DA72A6', '#1D1222'],
+  sand:  ['#F8E7C4', '#CFA265', '#1D1222'],
+  night: ['#5A6BB2', '#1A1E48', '#FBF1DC'],
+};
+const PCOL = ['#FF3FA0', '#19BDB4', '#FFA81E', '#A6CE39', '#A57BF0', '#FF7A59'];
+const pcol = i => PCOL[i % PCOL.length];
+
+const RULES = {
+  line:    { label: 'A line',     sub: 'Any row, column or diagonal', cells: [4, 5, 6, 7] },
+  corners: { label: '4 corners',  sub: 'Beans on all four corners',   cells: [0, 3, 12, 15] },
+  full:    { label: 'Full board', sub: 'All 16 cards. Long game!',    cells: [...Array(16).keys()] },
+};
+const LINES = [[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,4,8,12],[1,5,9,13],[2,6,10,14],[3,7,11,15],[0,5,10,15],[3,6,9,12]];
+const PATTERNS = { line: LINES, corners: [[0, 3, 12, 15]], full: [[...Array(16).keys()]] };
+
+const VOICE_LABEL = { name: 'Voice: name', verse: 'Voice: rhyme + name', off: 'Voice: off' };
+const VOICE_NEXT = { name: 'verse', verse: 'off', off: 'name' };
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function rnd(n) {
+  try {
+    const a = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(a);
+    return a[0] % n;
+  } catch (e) { return Math.floor(Math.random() * n); }
+}
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const dealBoard = () => shuffled(ALL).slice(0, 16);
+const beanRot = (n, i) => ((n * 37 + i * 53) % 140) - 70;
+
+/* ---------- pictures that emoji can't do ---------- */
+function flagSVG() {
+  const top = x => 16 + 5 * Math.sin(((x - 20) / 72) * Math.PI * 2);
+  const band = (x0, x1, fill) => {
+    let d = `M${x0} ${top(x0).toFixed(1)}`;
+    for (let x = x0 + 2; x <= x1; x += 2) d += ` L${x} ${top(x).toFixed(1)}`;
+    for (let x = x1; x >= x0; x -= 2) d += ` L${x} ${(top(x) + 46).toFixed(1)}`;
+    return `<path d="${d} Z" fill="${fill}"/>`;
+  };
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <rect x="15" y="8" width="5" height="88" rx="2.5" fill="#5B3A22"/>
+    <circle cx="17.5" cy="8" r="4.5" fill="#E2B33C"/>
+    ${band(20, 44, '#0B7A43')}${band(44, 68, '#FBF8F0')}${band(68, 92, '#D42A2A')}
+    <circle cx="56" cy="39" r="6.5" fill="#9A6A33"/>
+    <path d="M49 43 Q56 50 63 43" stroke="#2E7D32" stroke-width="2" fill="none"/>
+  </svg>`;
+}
+function harpSVG() {
+  const q = (t, a, b, c) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c;
+  let strings = '';
+  for (let i = 0; i < 9; i++) {
+    const t = 0.14 + i * 0.09;
+    const x = q(t, 24, 58, 86), y = q(t, 18, 2, 44);
+    const yb = 94 - (x - 26) * (52 / 56);
+    strings += `<line x1="${x.toFixed(1)}" y1="${(y + 3).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yb.toFixed(1)}"/>`;
+  }
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <g stroke="#F6E7B8" stroke-width="1.2">${strings}</g>
+    <path d="M24 18 Q58 2 86 44" fill="none" stroke="#7A4A22" stroke-width="7" stroke-linecap="round"/>
+    <path d="M26 94 L36 94 L88 50 L82 42 Z" fill="#A0622D" stroke="#5E3415" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="17" y="14" width="9" height="82" rx="3" fill="#D9A43A" stroke="#7A4A22" stroke-width="1.5"/>
+    <circle cx="21.5" cy="13" r="6" fill="#E9BC4C" stroke="#7A4A22" stroke-width="1.5"/>
+  </svg>`;
+}
+const CUSTOM = { flag: flagSVG(), harp: harpSVG() };
+
+function cardHTML(n, cls = '') {
+  const c = BY[n];
+  const [a, b, t] = BG[c.bg];
+  const art = CUSTOM[c.art] || `<span class="emo">${c.art}</span>`;
+  return `<div class="card ${cls}" style="--a:${a};--b:${b};--t:${t};--len:${c.name.length}" role="img" aria-label="${c.n}, ${c.name}, ${c.en}"><div class="ci"><div class="fr"><b class="num">${c.n}</b><div class="art">${art}</div><div class="nm">${c.name}</div></div></div></div>`;
+}
+const BACK = `<div class="ci"><div class="fr"><span class="medal">Lotería</span></div></div>`;
+const backHTML = (style = '') => `<div class="card back" style="${style}">${BACK}</div>`;
+
+/* ---------- state ---------- */
+function loadSaved() {
+  try {
+    const names = JSON.parse(localStorage.getItem('loteria.players') || 'null');
+    const prefs = JSON.parse(localStorage.getItem('loteria.prefs') || 'null');
+    return { names: Array.isArray(names) && names.length ? names.slice(0, 6) : null, prefs: prefs || {} };
+  } catch (e) { return { names: null, prefs: {} }; }
+}
+function defaultState() {
+  const saved = loadSaved();
+  const names = saved.names || ['Player 1', 'Player 2'];
+  return {
+    screen: 'home', tab: 'table', mode: 'table',
+    players: names.map((name, i) => ({ id: i + 1, name: String(name).slice(0, 18), score: 0 })),
+    nextId: names.length + 1,
+    rule: RULES[saved.prefs.rule] ? saved.prefs.rule : 'line',
+    autoMark: !!saved.prefs.autoMark,
+    voice: VOICE_LABEL[saved.prefs.voice] ? saved.prefs.voice : 'name',
+    speed: 0,
+    round: 1, deck: [], called: [], boards: {}, marks: {}, winners: null, winCells: {},
+    keepBoards: false,
+    solo: { board: [], marks: [], cells: null },
+  };
+}
+let S = defaultState();
+const fresh = new Set();
+let shuffling = false;
+let autoT = null;
+let currentOffscreen = false;
+
+function save() {
+  try {
+    localStorage.setItem('loteria.players', JSON.stringify(S.players.map(p => p.name)));
+    localStorage.setItem('loteria.prefs', JSON.stringify({ rule: S.rule, autoMark: S.autoMark, voice: S.voice }));
+  } catch (e) { /* storage blocked: the game still works */ }
+}
+const player = id => S.players.find(p => p.id === id);
+const pIndex = id => S.players.findIndex(p => p.id === id);
+const anyDialog = () => !$('#win').hidden || !$('#check').hidden;
+
+/* ---------- voice ---------- */
+function pickVoice() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    return vs.find(v => /es[-_]MX/i.test(v.lang)) || vs.find(v => /es[-_]US/i.test(v.lang)) || vs.find(v => /^es/i.test(v.lang)) || null;
+  } catch (e) { return null; }
+}
+function hush() { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+function speak(n) {
+  if (S.voice === 'off' || !('speechSynthesis' in window)) return;
+  const c = BY[n];
+  const text = S.voice === 'verse' ? `${c.verse} … ¡${c.name}!` : c.name;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-MX';
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.rate = 0.95;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+/* ---------- screens ---------- */
+function show(screen) {
+  S.screen = screen;
+  $('#home').hidden = screen !== 'home';
+  $('#game').hidden = screen !== 'game';
+  $('#solo').hidden = screen !== 'solo';
+  document.body.classList.toggle('playing', screen !== 'home');
+  if (screen !== 'game') { stopAuto(); hush(); }
+  updateNowbar();
+  window.scrollTo(0, 0);
+}
+
+function renderPicado() {
+  const D = 'M0 0H60V62L55 72L50 62L45 72L40 62L35 72L30 62L25 72L20 62L15 72L10 62L5 72L0 62Z' +
+    'M30 18L43 34L30 50L17 34Z M30 26L36.5 34L30 42L23.5 34Z' +
+    'M9 12a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0Z M44 12a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0Z' +
+    'M9 56a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0Z M44 56a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0Z' +
+    'M26 5h8l-4 6Z M26 61h8l-4-6Z M4 30l5 4l-5 4Z M56 30l-5 4l5 4Z';
+  const colors = ['var(--rosa)', 'var(--marigold)', 'var(--turquesa)', 'var(--lima)', '#A57BF0', '#FF7A59'];
+  $('#picado').innerHTML = `<div class="row">${Array.from({ length: 40 }, (_, i) =>
+    `<svg viewBox="0 0 60 72" style="--d:${-(i % 5) * 0.9}s"><path style="fill:${colors[i % 6]}" fill-rule="evenodd" d="${D}"/></svg>`).join('')}</div>`;
+}
+
+function ruleChips() {
+  return Object.entries(RULES).map(([k, r]) =>
+    `<button class="rule" data-act="rule" data-v="${k}" aria-pressed="${S.rule === k}"><span class="mini4" aria-hidden="true">${
+      Array.from({ length: 16 }, (_, i) => `<i class="${r.cells.includes(i) ? 'on' : ''}"></i>`).join('')
+    }</span><b>${r.label}</b><small>${r.sub}</small></button>`).join('');
+}
+function renderRules() { $$('.rules').forEach(el => { el.innerHTML = ruleChips(); }); }
+
+function renderPlayers() {
+  $('#plist').innerHTML = S.players.map((p, i) =>
+    `<li style="--pc:${pcol(i)}"><i class="dot"></i><label class="sr" for="pn${p.id}">Player ${i + 1} name</label>` +
+    `<input id="pn${p.id}" data-id="${p.id}" value="${esc(p.name)}" maxlength="18" autocomplete="off" spellcheck="false">` +
+    `<button class="rm" data-act="rm" data-v="${p.id}" aria-label="Remove ${esc(p.name)}" ${S.players.length < 2 ? 'disabled' : ''}>×</button></li>`).join('');
+  $('#addBtn').hidden = S.players.length >= 6;
+}
+
+function renderHome() {
+  $$('.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.v === S.tab)));
+  $$('.panel').forEach(p => { p.hidden = p.dataset.panel !== S.tab; });
+  renderPlayers();
+  renderRules();
+  $$('#autoSeg button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.autoMark)));
+  $('#fan').innerHTML = [19, 43, 1].map(n => cardHTML(n)).join('');
+}
+
+/* ---------- game rendering ---------- */
+function renderScores() {
+  $('#scores').innerHTML = S.mode !== 'table' ? '' : S.players.map((p, i) =>
+    `<span class="chip" style="--pc:${pcol(i)}"><i></i><span>${esc(p.name)}</span><b>${p.score}</b></span>`).join('');
+}
+function renderSpeed() {
+  $('#speedSeg').innerHTML = [0, 4, 6, 9].map(s =>
+    `<button data-act="speed" data-v="${s}" aria-pressed="${S.speed === s}">${s ? s + 's' : 'Off'}</button>`).join('');
+}
+function renderVoice() { $('#voiceBtn').textContent = VOICE_LABEL[S.voice]; }
+
+function roundOver() { return !!S.winners || !S.deck.length; }
+
+function renderCaller(animate) {
+  const last = S.called[S.called.length - 1];
+  const c = last && BY[last];
+  $('#current').innerHTML = c
+    ? cardHTML(last, 'big' + (animate && !reduceMotion ? ' deal' : ''))
+    : `<div class="slot"><span>Tap <b>Flip the first card</b> to start</span></div>`;
+  $('#meta').textContent = `Round ${S.round} · ${S.deck.length} ${S.deck.length === 1 ? 'card' : 'cards'} left`;
+  $('#gloss').innerHTML = c ? `<b>${c.n}</b> &nbsp;${c.name} <span>· ${c.en}</span>` : 'Ready when you are';
+  $('#verse').textContent = c ? `“${c.verse}”` : 'Each card comes with a little rhyme. Read it out loud, then show the picture.';
+
+  renderControls();
+
+  const stack = Math.ceil(S.deck.length / 11);
+  $('#deck').innerHTML = Array.from({ length: stack }, (_, k) => backHTML(`--k:${k}`)).join('');
+
+  $('#calledCount').textContent = S.called.length;
+  $('#strip').innerHTML = S.called.length
+    ? S.called.slice().reverse().map(n => cardHTML(n, 'mini tiny')).join('')
+    : '<p class="none">Called cards line up here.</p>';
+
+}
+
+// the Next / Rematch button, the empty-deck note and the phone bar
+function renderControls() {
+  const nb = $('#nextBtn');
+  if (roundOver()) { nb.textContent = 'Rematch'; nb.dataset.act = 'rematch'; nb.disabled = false; }
+  else { nb.textContent = S.called.length ? 'Next card' : 'Flip the first card'; nb.dataset.act = 'next'; nb.disabled = shuffling; }
+  const note = $('#emptyNote');
+  if (!S.deck.length && !S.winners) {
+    note.hidden = false;
+    note.textContent = S.mode === 'table'
+      ? 'All 54 cards are out and nobody finished. Missed a bean? You can still place it. Or hit Rematch.'
+      : 'All 54 cards are out. Hit Rematch for a fresh shuffle.';
+  } else note.hidden = true;
+  updateNowbar();
+}
+
+function boardHTML(p, pi, { interactive = true } = {}) {
+  const b = S.boards[p.id] || [], m = S.marks[p.id] || [], wc = S.winCells[p.id] || [];
+  const tag = interactive ? 'button' : 'div';
+  const cells = b.map((n, i) => {
+    const k = p.id + ':' + i;
+    const bean = m[i] ? `<i class="bean ${fresh.has(k) ? 'fresh' : ''}" style="--r:${beanRot(n, i)}deg"></i>` : '';
+    const attrs = interactive
+      ? `data-act="mark" data-p="${p.id}" data-i="${i}" aria-pressed="${!!m[i]}" aria-label="${BY[n].name}${m[i] ? ', bean placed' : ''}"`
+      : '';
+    return `<${tag} class="cell ${m[i] ? 'on' : ''} ${wc.includes(i) ? 'win' : ''}" ${attrs}>${cardHTML(n, 'mini')}${bean}</${tag}>`;
+  }).join('');
+  return `<section class="board" style="--pc:${pcol(pi)}" aria-label="${esc(p.name)}’s board">
+    <header><h3 class="who"><i></i><span>${esc(p.name)}</span></h3><span class="wins">${p.score} ${p.score === 1 ? 'win' : 'wins'}</span></header>
+    <div class="grid4">${cells}</div></section>`;
+}
+function renderBoards() {
+  const el = $('#boards');
+  el.hidden = S.mode !== 'table';
+  el.innerHTML = S.mode === 'table' ? S.players.map((p, i) => boardHTML(p, i)).join('') : '';
+  fresh.clear();
+}
+function renderGame() {
+  const g = $('#game');
+  g.classList.toggle('mode-caller', S.mode === 'caller');
+  g.classList.toggle('mode-table', S.mode === 'table');
+  $('#roundTag').textContent = `Round ${S.round}`;
+  $('#shoutBtn').hidden = S.mode !== 'caller';
+  renderScores(); renderSpeed(); renderVoice(); renderCaller(false); renderBoards();
+}
+
+function updateNowbar() {
+  const bar = $('#nowbar');
+  const last = S.called[S.called.length - 1];
+  const on = S.screen === 'game' && S.mode === 'table' && currentOffscreen && !!last && !anyDialog();
+  bar.classList.toggle('show', on);
+  bar.setAttribute('aria-hidden', String(!on));
+  if (!on) return;
+  const c = BY[last];
+  const over = roundOver();
+  bar.innerHTML = `${cardHTML(last, 'mini tiny')}<div class="txt"><b>${c.name}</b><span>${S.called.length} called · ${S.deck.length} left</span></div>` +
+    `<button class="go" data-act="${over ? 'rematch' : 'next'}" ${shuffling ? 'disabled' : ''}>${over ? 'Rematch' : 'Next'}</button>`;
+}
+
+/* ---------- game flow ---------- */
+function startGame(mode) {
+  S.players.forEach((p, i) => { p.name = p.name.trim() || `Player ${i + 1}`; });
+  S.mode = mode;
+  save();
+  if (mode === 'board') { dealSolo(); show('solo'); return; }
+  S.round = 1;
+  S.players.forEach(p => { p.score = 0; });
+  S.boards = {}; S.marks = {};
+  show('game');
+  newRound();
+}
+
+function newRound() {
+  stopAuto(); hush();
+  S.deck = shuffled(ALL);
+  S.called = [];
+  S.winners = null;
+  S.winCells = {};
+  if (S.mode === 'table') {
+    S.players.forEach(p => {
+      if (!S.keepBoards || !S.boards[p.id]) S.boards[p.id] = dealBoard();
+      S.marks[p.id] = Array(16).fill(false);
+    });
+  }
+  renderGame();
+  playShuffle(() => { scheduleAuto(); });
+}
+
+function rematch() {
+  closeDialogs();
+  S.round += 1;
+  newRound();
+}
+
+function drawNext() {
+  if (shuffling || roundOver() || anyDialog()) return;
+  const n = S.deck.shift();
+  S.called.push(n);
+  renderCaller(true);
+  speak(n);
+  if (S.mode === 'table' && S.autoMark) {
+    const hit = [];
+    S.players.forEach(p => {
+      const i = S.boards[p.id].indexOf(n);
+      if (i > -1 && !S.marks[p.id][i]) { S.marks[p.id][i] = true; fresh.add(p.id + ':' + i); hit.push(p.id); }
+    });
+    if (hit.length) { renderBoards(); checkWins(hit); }
+  }
+  scheduleAuto();
+}
+
+function winningSet(m) {
+  for (const p of PATTERNS[S.rule]) if (p.every(i => m[i])) return p;
+  return null;
+}
+
+function checkWins(ids) {
+  const winners = [];
+  ids.forEach(id => {
+    const cells = winningSet(S.marks[id]);
+    if (cells) { winners.push(id); S.winCells[id] = cells; }
+  });
+  if (!winners.length) return;
+  S.winners = winners;
+  winners.forEach(id => { player(id).score += 1; });
+  stopAuto();
+  renderBoards(); renderScores(); renderControls();
+  setTimeout(openWin, reduceMotion ? 80 : 700);
+}
+
+function markCell(pid, i, btn) {
+  if (S.winners || shuffling) return;
+  const n = S.boards[pid][i];
+  const m = S.marks[pid];
+  const hadFocus = document.activeElement === btn;
+  if (m[i]) {
+    m[i] = false;
+  } else if (!S.called.includes(n)) {
+    btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+    toast(`${BY[n].name} hasn’t been called yet`);
+    return;
+  } else {
+    m[i] = true;
+    fresh.add(pid + ':' + i);
+  }
+  renderBoards();
+  if (hadFocus) { const again = $(`[data-act="mark"][data-p="${pid}"][data-i="${i}"]`); again && again.focus({ preventScroll: true }); }
+  if (m[i]) checkWins([pid]);
+}
+
+/* ---------- auto play ---------- */
+function stopAuto() { clearTimeout(autoT); autoT = null; }
+function scheduleAuto() {
+  stopAuto();
+  if (!S.speed || S.screen !== 'game' || roundOver() || shuffling || anyDialog()) return;
+  const tick = () => {
+    if (window.speechSynthesis && speechSynthesis.speaking) { autoT = setTimeout(tick, 400); return; }
+    drawNext();
+  };
+  autoT = setTimeout(tick, S.speed * 1000);
+}
+
+/* ---------- shuffle animation ---------- */
+function playShuffle(done) {
+  shuffling = true;
+  const ov = $('#shuffle');
+  $('#riffle').innerHTML = Array.from({ length: 10 }, (_, i) => backHTML(`--dl:${i * 30}ms;--z:${i}`)).join('');
+  ov.hidden = false;
+  renderCaller(false);
+  setTimeout(() => {
+    ov.hidden = true;
+    shuffling = false;
+    renderControls();
+    const nb = $('#nextBtn');
+    if (S.screen === 'game' && nb.getBoundingClientRect().top < window.innerHeight) nb.focus({ preventScroll: true });
+    done && done();
+  }, reduceMotion ? 350 : 1650);
+}
+
+/* ---------- dialogs ---------- */
+function openWin() {
+  if (!S.winners) return;
+  const ws = S.winners.map(player);
+  const names = ws.map(p => p.name);
+  const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  $('#winWho').textContent = ws.length === 1 ? `${list} wins round ${S.round}!` : `${list} tie round ${S.round}!`;
+  $('#winSub').textContent = `It took ${S.called.length} cards. Last one out: ${BY[S.called[S.called.length - 1]].name}.`;
+  $('#winBoard').innerHTML = boardHTML(ws[0], pIndex(ws[0].id), { interactive: false });
+  const top = Math.max(...S.players.map(p => p.score));
+  $('#winScores').innerHTML = S.players
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => b.p.score - a.p.score)
+    .map(({ p, i }) => `<li class="${p.score === top && top > 0 ? 'lead' : ''}" style="--pc:${pcol(i)}"><i></i><span>${esc(p.name)}</span><b>${p.score}</b></li>`).join('');
+  $('#keepBoards').checked = S.keepBoards;
+  $('#win').hidden = false;
+  updateNowbar();
+  confetti();
+  $('#rematchBtn').focus({ preventScroll: true });
+}
+
+function openCheck(kind) {
+  stopAuto();
+  const shout = kind === 'shout';
+  $('#checkTitle').textContent = shout ? '¡Lotería! Let’s check.' : 'Cards called';
+  $('#checkText').textContent = !S.called.length
+    ? 'No cards have been called yet this round.'
+    : shout
+      ? `Here are all ${S.called.length} cards called this round, in order. Every bean on the winning pattern should match one of these.`
+      : `${S.called.length} of 54 cards so far, in the order they came out.`;
+  $('#checkGrid').innerHTML = S.called.map(n => cardHTML(n, 'mini')).join('');
+  $('#checkActions').innerHTML = shout
+    ? `<button class="go" data-act="rematch">It’s a win. Rematch</button><button class="ghost" data-act="close">False alarm, keep going</button>`
+    : `<button class="go" data-act="close">Back to the game</button>`;
+  $('#check').hidden = false;
+  updateNowbar();
+  $('#checkActions button').focus({ preventScroll: true });
+}
+
+function closeDialogs() {
+  $('#win').hidden = true;
+  $('#check').hidden = true;
+  $('#confetti').innerHTML = '';
+  updateNowbar();
+  scheduleAuto();
+}
+
+function confetti() {
+  if (reduceMotion) return;
+  const colors = ['#E4007C', '#FFA81E', '#19BDB4', '#A6CE39', '#A57BF0', '#FF7A59', '#FBF1DC'];
+  const box = $('#confetti');
+  box.innerHTML = Array.from({ length: 70 }, () =>
+    `<i style="left:${rnd(100)}%;--c:${colors[rnd(colors.length)]};--dx:${rnd(160) - 80}px;--rot:${rnd(900) - 450}deg;` +
+    `width:${8 + rnd(9)}px;height:${11 + rnd(9)}px;animation-duration:${2.2 + rnd(18) / 10}s;animation-delay:${rnd(700)}ms"></i>`).join('');
+  setTimeout(() => { box.innerHTML = ''; }, 5200);
+}
+
+let toastT = null;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 1900);
+}
+
+/* ---------- one board ---------- */
+function dealSolo() { S.solo = { board: dealBoard(), marks: Array(16).fill(false), cells: null }; renderSolo(); }
+function renderSolo() {
+  const so = S.solo;
+  const cells = so.board.map((n, i) => {
+    const k = 'solo:' + i;
+    const bean = so.marks[i] ? `<i class="bean ${fresh.has(k) ? 'fresh' : ''}" style="--r:${beanRot(n, i)}deg"></i>` : '';
+    return `<button class="cell ${so.marks[i] ? 'on' : ''} ${so.cells && so.cells.includes(i) ? 'win' : ''}" data-act="solo-mark" data-i="${i}" aria-pressed="${!!so.marks[i]}" aria-label="${BY[n].name}${so.marks[i] ? ', bean placed' : ''}">${cardHTML(n, 'mini')}${bean}</button>`;
+  }).join('');
+  $('#soloBoard').innerHTML = `<section class="board" style="--pc:var(--rosa)" aria-label="Your board"><header><h3 class="who"><i></i><span>Mi tabla</span></h3><span class="wins">${so.marks.filter(Boolean).length} of 16 beans</span></header><div class="grid4">${cells}</div></section>`;
+  $('#soloWin').hidden = !so.cells;
+  $('#soloRow').hidden = !!so.cells;
+  fresh.clear();
+}
+function soloCheck() {
+  const was = !!S.solo.cells;
+  S.solo.cells = winningSet(S.solo.marks);
+  renderSolo();
+  if (S.solo.cells && !was) confetti();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t || t.disabled) return;
+  const v = t.dataset.v;
+  switch (t.dataset.act) {
+    case 'tab': S.tab = v; renderHome(); break;
+    case 'add':
+      if (S.players.length < 6) {
+        S.players.push({ id: S.nextId++, name: `Player ${S.players.length + 1}`, score: 0 });
+        renderPlayers(); save();
+        const inputs = $$('#plist input'); inputs[inputs.length - 1].select();
+      }
+      break;
+    case 'rm':
+      if (S.players.length > 1) { S.players = S.players.filter(p => p.id !== +v); renderPlayers(); save(); }
+      break;
+    case 'rule':
+      S.rule = v; renderRules(); save();
+      if (S.screen === 'solo') soloCheck();
+      break;
+    case 'auto': S.autoMark = v === '1'; renderHome(); save(); break;
+    case 'start': startGame(v); break;
+    case 'home': closeDialogs(); stopAuto(); show('home'); renderHome(); break;
+    case 'next': drawNext(); break;
+    case 'rematch': rematch(); break;
+    case 'speed':
+      S.speed = +v; renderSpeed();
+      if (S.speed && !S.called.length && !shuffling) drawNext(); else scheduleAuto();
+      break;
+    case 'voice':
+      S.voice = VOICE_NEXT[S.voice]; renderVoice(); save();
+      if (S.voice === 'off') hush();
+      else toast(S.voice === 'verse' ? 'The caller reads the rhyme, then the name' : 'The caller says each card’s name');
+      break;
+    case 'shout': openCheck('shout'); break;
+    case 'all': openCheck('all'); break;
+    case 'close': closeDialogs(); break;
+    case 'mark': markCell(+t.dataset.p, +t.dataset.i, t); break;
+    case 'solo-mark': {
+      const i = +t.dataset.i;
+      S.solo.marks[i] = !S.solo.marks[i];
+      if (S.solo.marks[i]) fresh.add('solo:' + i);
+      soloCheck();
+      const again = $(`[data-act="solo-mark"][data-i="${i}"]`); again && again.focus({ preventScroll: true });
+      break;
+    }
+    case 'solo-clear': S.solo.marks = Array(16).fill(false); S.solo.cells = null; renderSolo(); break;
+    case 'solo-new': dealSolo(); toast('New board dealt'); break;
+  }
+});
+
+document.addEventListener('input', e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  const p = player(+id);
+  if (p) { p.name = e.target.value.slice(0, 18); save(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'keepBoards') S.keepBoards = e.target.checked;
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#check').hidden) { closeDialogs(); return; }
+  if (S.screen !== 'game' || anyDialog()) return;
+  if (e.target.closest && e.target.closest('input,textarea,select,button,[contenteditable]')) return;
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight' || e.key === 'n') {
+    e.preventDefault();
+    roundOver() ? rematch() : drawNext();
+  }
+});
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => {
+    currentOffscreen = !entry.isIntersecting;
+    updateNowbar();
+  }, { threshold: 0.15 }).observe($('#current'));
+}
+try { window.speechSynthesis && speechSynthesis.getVoices(); } catch (e) {}
+
+/* ---------- boot ---------- */
+function boot(data) {
+  if (data && data.S && data.S.players) S = Object.assign(defaultState(), data.S);
+  renderPicado();
+  renderHome();
+  if (S.screen === 'game') { renderGame(); show('game'); }
+  else if (S.screen === 'solo' && S.solo.board.length) { renderSolo(); show('solo'); }
+  else show('home');
+}
+try { window.claude && window.claude.hot && window.claude.hot.snapshot && window.claude.hot.snapshot(() => ({ S })); } catch (e) {}
+const hot = window.claude && window.claude.hot;
+if (hot && hot.ready) hot.ready(boot); else boot((hot && hot.data) || {});
+})();
+</script>
+</body>
+</html>
